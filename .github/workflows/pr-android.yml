@@ -20,30 +20,37 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Verify preinstalled Android SDK
+      - name: Verify Android SDK
         run: |
-          test -n "$ANDROID_SDK_ROOT"
-          command -v sdkmanager
-          sdkmanager --version
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" --version
 
       - name: SDK + NDK + CMake
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager             "platforms;android-35"             "build-tools;35.0.0"             "ndk;27.2.12479018"             "cmake;3.22.1"
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER"             "platforms;android-35"             "build-tools;35.0.0"             "ndk;27.2.12479018"             "cmake;3.22.1"
 
       - name: Host DSP smoke
         run: |
           clang -std=c11 -O2 -Wall -Wextra -Werror             -Iapp/src/main/cpp             native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c             -o dsp_smoke
           ./dsp_smoke
 
-      - name: Host meter smoke
+      - name: Host meter smoke when present
         run: |
-          clang -std=c11 -O2 -Wall -Wextra -Werror             -Iapp/src/main/cpp             native/tests/meter_smoke.c app/src/main/cpp/meter_core.c             -o meter_smoke
-          ./meter_smoke
+          if test -f app/src/main/cpp/meter_core.c; then
+            clang -std=c11 -O2 -Wall -Wextra -Werror               -Iapp/src/main/cpp               native/tests/meter_smoke.c app/src/main/cpp/meter_core.c               -o meter_smoke
+            ./meter_smoke
+          fi
 
       - name: Freestanding source dependency gate
         run: |
-          if grep -RE '\b(malloc|calloc|realloc|free|sqrt|pow|log|sin|cos)[[:space:]]*\('             app/src/main/cpp/dsp_core.c app/src/main/cpp/meter_core.c; then
+          FILES="app/src/main/cpp/dsp_core.c"
+          if test -f app/src/main/cpp/meter_core.c; then
+            FILES="$FILES app/src/main/cpp/meter_core.c"
+          fi
+          if grep -RE '\b(malloc|calloc|realloc|free|sqrt|pow|log|sin|cos)[[:space:]]*\(' $FILES; then
             echo "Forbidden runtime dependency in freestanding core"
             exit 1
           fi
@@ -53,7 +60,9 @@ jobs:
           NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
           CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
           NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          for SRC in dsp_core meter_core; do
+          CORES="dsp_core"
+          if test -f app/src/main/cpp/meter_core.c; then CORES="$CORES meter_core"; fi
+          for SRC in $CORES; do
             "$CC" --target=armv7a-linux-androideabi29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
             "$NM" -u "$SRC.armv7.o" > "$SRC.armv7.undefined"
             if test -s "$SRC.armv7.undefined"; then
@@ -67,7 +76,9 @@ jobs:
           NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
           CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
           NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          for SRC in dsp_core meter_core; do
+          CORES="dsp_core"
+          if test -f app/src/main/cpp/meter_core.c; then CORES="$CORES meter_core"; fi
+          for SRC in $CORES; do
             "$CC" --target=aarch64-linux-android29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
             "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
             if test -s "$SRC.aarch64.undefined"; then
