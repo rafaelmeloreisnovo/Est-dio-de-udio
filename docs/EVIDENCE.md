@@ -28,3 +28,5 @@
 | True peak | PENDING | oversampled implementation + tests |
 
 claim_allowed=false
+
+CI_BASE_WORKFLOW_INSTALLED=true
