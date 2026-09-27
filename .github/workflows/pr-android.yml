@@ -1,10 +1,6 @@
-name: Audio Studio CI
+name: Audio Studio PR Gate
 
 on:
-  push:
-    branches:
-      - main
-      - 'feature/**'
   pull_request:
 
 jobs:
@@ -16,17 +12,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Verify preinstalled Android SDK
+        run: |
+          test -n "$ANDROID_SDK_ROOT"
+          command -v sdkmanager
+          sdkmanager --version
 
       - name: SDK + NDK + CMake
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"             "ndk;27.2.12479018" "cmake;3.22.1"
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager             "platforms;android-35"             "build-tools;35.0.0"             "ndk;27.2.12479018"             "cmake;3.22.1"
 
       - name: Host DSP smoke
         run: |
@@ -53,7 +53,10 @@ jobs:
           for SRC in dsp_core meter_core; do
             "$CC" --target=armv7a-linux-androideabi29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
             "$NM" -u "$SRC.armv7.o" > "$SRC.armv7.undefined"
-            test ! -s "$SRC.armv7.undefined"
+            if test -s "$SRC.armv7.undefined"; then
+              cat "$SRC.armv7.undefined"
+              exit 1
+            fi
           done
 
       - name: AArch64 zero-undefined gate
@@ -64,7 +67,10 @@ jobs:
           for SRC in dsp_core meter_core; do
             "$CC" --target=aarch64-linux-android29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
             "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
-            test ! -s "$SRC.aarch64.undefined"
+            if test -s "$SRC.aarch64.undefined"; then
+              cat "$SRC.aarch64.undefined"
+              exit 1
+            fi
           done
 
       - name: Gradle
