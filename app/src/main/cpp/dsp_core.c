@@ -105,7 +105,7 @@ void dsp_process(i16 *samples, int count, int channels) {
     const i32 gate_threshold = gate_threshold_for_preset();
 
     for (int i = 0; i < count; i++) {
-        int c = i % channels;
+        int c = channels == 1 ? 0 : (i & 1);
         channel_state *st = &g_state[c];
 
         i32 x = (i32)((i64)samples[i] * 65536);
