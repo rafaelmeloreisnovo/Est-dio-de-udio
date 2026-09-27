@@ -6,8 +6,8 @@ APK Android 10+ para captura, tratamento e remasterização de voz com foco em O
 
 - SOURCE: este repositório
 - EXECUTION_TARGET: Android API 29+
-- DSP_CORE: IMPLEMENTED_UNTESTED
-- APK_BUILD: PENDING_CI
+- DSP_CORE: PASS (host smoke + ARMv7 ELF32 compile + 0 undefined symbols)
+- APK_BUILD: ROUTE_STATE_BLOCKED (GitHub Actions ainda sem runs)
 - WHATSAPP_OGG_OPUS_IMPORT: IMPLEMENTED_UNTESTED
 - OGG_OPUS_EXPORT: IMPLEMENTED_UNTESTED
 - ITU_BS1770_5_LOUDNESS: PENDING
