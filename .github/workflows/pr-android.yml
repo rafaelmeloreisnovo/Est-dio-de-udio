@@ -1,0 +1,46 @@
+name: Validate Audio Studio PR
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: SDK + NDK + CMake
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Host DSP smoke
+        run: |
+          clang -std=c11 -O2 -Wall -Wextra -Werror             -Iapp/src/main/cpp             native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c             -o dsp_smoke
+          ./dsp_smoke
+
+      - name: ARMv7 freestanding undefined-symbol gate
+        run: |
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          "$CC" --target=armv7a-linux-androideabi29             -std=c11 -O3 -ffreestanding -fno-builtin             -ffunction-sections -fdata-sections -Wall -Wextra -Werror             -Iapp/src/main/cpp             -c app/src/main/cpp/dsp_core.c -o dsp_core_armv7.o
+          "$NM" -u dsp_core_armv7.o > undefined.txt
+          test ! -s undefined.txt
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Assemble debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
