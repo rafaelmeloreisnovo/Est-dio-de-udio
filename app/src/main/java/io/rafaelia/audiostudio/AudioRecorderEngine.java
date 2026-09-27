@@ -5,12 +5,31 @@ import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.media.audiofx.AcousticEchoCanceler;
+import android.media.audiofx.AutomaticGainControl;
+import android.media.audiofx.NoiseSuppressor;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
 final class AudioRecorderEngine {
+    static final class CaptureStats {
+        final int peak;
+        final int rms;
+        final long samples;
+        final long clipped;
+        final String source;
+
+        CaptureStats(int peak, int rms, long samples, long clipped, String source) {
+            this.peak = peak;
+            this.rms = rms;
+            this.samples = samples;
+            this.clipped = clipped;
+            this.source = source;
+        }
+    }
+
     private static final int SAMPLE_RATE = 48000;
     private static final int CHANNELS = 1;
 
@@ -19,6 +38,16 @@ final class AudioRecorderEngine {
     private volatile boolean running;
     private AudioRecord recorder;
     private Thread worker;
+
+    private AutomaticGainControl agc;
+    private NoiseSuppressor ns;
+    private AcousticEchoCanceler aec;
+
+    private volatile int peak;
+    private volatile long energyScaled;
+    private volatile long sampleCount;
+    private volatile long clipped;
+    private String sourceName = "TOKEN_VAZIO";
 
     AudioRecorderEngine(Context context, File output) {
         this.context = context.getApplicationContext();
@@ -33,6 +62,14 @@ final class AudioRecorderEngine {
         return CHANNELS;
     }
 
+    CaptureStats getStats() {
+        long count = sampleCount;
+        long meanScaled = count == 0 ? 0 : energyScaled / count;
+        long rmsSquare = meanScaled << 8;
+        int rms = (int) isqrt(rmsSquare);
+        return new CaptureStats(peak, rms, count, clipped, sourceName);
+    }
+
     void start() throws IOException {
         if (running) return;
 
@@ -45,6 +82,7 @@ final class AudioRecorderEngine {
         int source = rawSupported
                 ? MediaRecorder.AudioSource.UNPROCESSED
                 : MediaRecorder.AudioSource.VOICE_RECOGNITION;
+        sourceName = rawSupported ? "UNPROCESSED" : "VOICE_RECOGNITION";
 
         int min = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE,
@@ -55,12 +93,21 @@ final class AudioRecorderEngine {
         }
 
         int bufferBytes = Math.max(min * 2, 8192);
-        recorder = new AudioRecord(
-                source,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferBytes);
+        AudioFormat format = new AudioFormat.Builder()
+                .setSampleRate(SAMPLE_RATE)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                .build();
+
+        try {
+            recorder = new AudioRecord.Builder()
+                    .setAudioSource(source)
+                    .setAudioFormat(format)
+                    .setBufferSizeInBytes(bufferBytes)
+                    .build();
+        } catch (UnsupportedOperationException e) {
+            throw new IOException("Configuração de captura não suportada", e);
+        }
 
         if (recorder.getState() != AudioRecord.STATE_INITIALIZED) {
             recorder.release();
@@ -68,11 +115,46 @@ final class AudioRecorderEngine {
             throw new IOException("AudioRecord nao inicializado");
         }
 
+        disablePlatformPreprocessors(recorder.getAudioSessionId());
+
+        peak = 0;
+        energyScaled = 0;
+        sampleCount = 0;
+        clipped = 0;
         running = true;
         recorder.startRecording();
 
         worker = new Thread(() -> captureLoop(bufferBytes), "rafaelia-capture");
         worker.start();
+    }
+
+    private void disablePlatformPreprocessors(int sessionId) {
+        try {
+            if (AutomaticGainControl.isAvailable()) {
+                agc = AutomaticGainControl.create(sessionId);
+                if (agc != null) agc.setEnabled(false);
+            }
+        } catch (RuntimeException ignored) {
+            agc = null;
+        }
+
+        try {
+            if (NoiseSuppressor.isAvailable()) {
+                ns = NoiseSuppressor.create(sessionId);
+                if (ns != null) ns.setEnabled(false);
+            }
+        } catch (RuntimeException ignored) {
+            ns = null;
+        }
+
+        try {
+            if (AcousticEchoCanceler.isAvailable()) {
+                aec = AcousticEchoCanceler.create(sessionId);
+                if (aec != null) aec.setEnabled(false);
+            }
+        } catch (RuntimeException ignored) {
+            aec = null;
+        }
     }
 
     private void captureLoop(int bufferBytes) {
@@ -85,11 +167,26 @@ final class AudioRecorderEngine {
                         AudioRecord.READ_BLOCKING);
                 if (n <= 0) continue;
 
+                int localPeak = peak;
+                long localEnergy = energyScaled;
+                long localClipped = clipped;
+
                 for (int i = 0, j = 0; i < n; i++) {
                     short s = samples[i];
+                    int a = s == Short.MIN_VALUE ? 32768 : Math.abs((int) s);
+                    if (a > localPeak) localPeak = a;
+                    if (a >= 32767) ++localClipped;
+                    localEnergy += ((long) s * (long) s) >> 8;
+
                     bytes[j++] = (byte) (s & 0xff);
                     bytes[j++] = (byte) ((s >>> 8) & 0xff);
                 }
+
+                peak = localPeak;
+                energyScaled = localEnergy;
+                clipped = localClipped;
+                sampleCount += n;
+
                 out.write(bytes, 0, n * 2);
             }
             out.flush();
@@ -113,10 +210,43 @@ final class AudioRecorderEngine {
                 Thread.currentThread().interrupt();
             }
         }
+        releaseEffects();
         if (recorder != null) {
             recorder.release();
             recorder = null;
         }
         worker = null;
+    }
+
+    private void releaseEffects() {
+        if (agc != null) {
+            agc.release();
+            agc = null;
+        }
+        if (ns != null) {
+            ns.release();
+            ns = null;
+        }
+        if (aec != null) {
+            aec.release();
+            aec = null;
+        }
+    }
+
+    private static long isqrt(long x) {
+        if (x <= 0) return 0;
+        long result = 0;
+        long bit = 1L << 62;
+        while (bit > x) bit >>>= 2;
+        while (bit != 0) {
+            if (x >= result + bit) {
+                x -= result + bit;
+                result = (result >>> 1) + bit;
+            } else {
+                result >>>= 1;
+            }
+            bit >>>= 2;
+        }
+        return result;
     }
 }
