@@ -41,3 +41,63 @@ CI_BASE_WORKFLOW_INSTALLED=true
 - apk_build=ROUTE_STATE_BLOCKED
 - github_actions_runs_observed=0
 - physical_audio_test=NOT_RUN
+
+
+# Evidence ledger — Delta 2
+
+## Implemented
+
+| Capability | State | Evidence rule |
+|---|---|---|
+| First-run wizard | IMPLEMENTED_UNTESTED | APK/UI test |
+| Mic capability report | IMPLEMENTED_UNTESTED | physical device |
+| Raw source preservation | IMPLEMENTED_UNTESTED | filesystem receipt |
+| Disable AGC/NS/AEC best-effort | IMPLEMENTED_UNTESTED | session/device receipt |
+| Narration editor + teleprompter | IMPLEMENTED_UNTESTED | APK/UI test |
+| PCM playback | IMPLEMENTED_UNTESTED | physical playback |
+| 16-band Goertzel spectrum | IMPLEMENTED_UNTESTED | synthetic vectors |
+| BS.1770 K-weighting 48 kHz | IMPLEMENTED_UNTESTED | ITU/EBU vectors |
+| 400 ms / 75% gating | IMPLEMENTED_UNTESTED | unit/conformance vectors |
+| -70 absolute / -10 relative gate | IMPLEMENTED_UNTESTED | conformance vectors |
+| Annex-2 4x true-peak FIR | IMPLEMENTED_UNTESTED | true-peak vectors |
+| Fixed-point gated normalization | IMPLEMENTED_UNTESTED | before/after measurement |
+| -1 dBTP gain ceiling | IMPLEMENTED_UNTESTED | physical + vectors |
+| ARMv7 zero undefined Delta2 | PENDING_CI | llvm-nm -u |
+| AArch64 zero undefined Delta2 | PENDING_CI | llvm-nm -u |
+| APK assembleDebug Delta2 | PENDING_CI | GitHub Actions |
+
+## Provenance
+
+- ITU-R BS.1770-5 (11/2023), Annex 1: K-weighting and gated loudness.
+- ITU-R BS.1770-5 (11/2023), Annex 2: true-peak 4x interpolation FIR.
+- EBU R128 v5 (11/2023): -23 LUFS target and true-peak descriptor.
+- EBU Tech 3341: EBU Mode metering.
+- Android platform docs: AudioRecord, AudioTrack, UNPROCESSED, AGC/NS/AEC.
+
+## Claim gate
+
+BS1770_CONFORMANCE=PENDING
+EBU_R128_CONFORMANCE=PENDING
+TRUE_PEAK_CONFORMANCE=PENDING
+APK_BUILD=PENDING_CI
+PHYSICAL_AUDIO=NOT_RUN
+claim_allowed=false
+
+## μWRITE
+
+kind=delta2_audio_professional
+source=feature/pro-audio-delta2-narration-metering
+parent=Delta1 merged main
+summary=wizard+narration+metering+truepeak+spectrum+normalization+playback
+evidence=source_commits+CI_pending
+gap=conformance_vectors|CI|physical_audio|whatsapp_roundtrip
+next=run_CI_and_fix_until_zero_undefined_plus_APK
+
+
+## CI route repair receipt
+- obsolete_setup_android_tools_package=FAIL_INFRA
+- android_sdk_root_unset=FAIL_INFRA
+- base_pr_workflow_repaired_on_main=true
+- sdk_root=/usr/local/lib/android/sdk
+- sdkmanager=/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager
+- next=rerun_PR_gate_against_repaired_base

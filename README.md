@@ -1,70 +1,114 @@
 # Rafaelia Audio Studio
 
-APK Android 10+ para captura, tratamento e remasterização de voz com foco em Ogg/Opus e fluxos de mensageria.
+Android 10+ audio workstation para captura, narração guiada, tratamento, medição, normalização e export Ogg/Opus.
 
-## Estado
+## Estado operacional
 
-- SOURCE: este repositório
+- MAIN_DELTA1: MERGED
+- DELTA2_BRANCH: feature/pro-audio-delta2-narration-metering
 - EXECUTION_TARGET: Android API 29+
-- DSP_CORE: PASS (host smoke + ARMv7 ELF32 compile + 0 undefined symbols)
-- APK_BUILD: ROUTE_STATE_BLOCKED (GitHub Actions ainda sem runs)
-- WHATSAPP_OGG_OPUS_IMPORT: IMPLEMENTED_UNTESTED
-- OGG_OPUS_EXPORT: IMPLEMENTED_UNTESTED
-- ITU_BS1770_5_LOUDNESS: PENDING
-- EBU_R128_METERING: PENDING
-- claim_allowed: false até CI + teste físico com áudio real
+- DSP_CORE_DELTA1: PASS no gate previamente registrado
+- DSP_METER_DELTA2: IMPLEMENTED_UNTESTED
+- APK_BUILD_DELTA2: PENDING_CI
+- PHYSICAL_ANDROID10: NOT_RUN
+- WHATSAPP_REAL_ROUNDTRIP: NOT_RUN
+- claim_allowed: false para conformidade/qualidade end-to-end até CI + vetores + teste físico
+
+## Delta 2
+
+### Gravação
+- PCM16 mono 48 kHz;
+- UNPROCESSED quando declarado pelo dispositivo;
+- VOICE_RECOGNITION como fallback;
+- tentativa best-effort de desativar AGC, NoiseSuppressor e AEC da sessão;
+- raw PCM preservado antes da remasterização;
+- telemetria de sample peak, RMS bruto e samples clipados.
+
+### Wizard
+- pré-voo de permissão;
+- API Android;
+- suporte UNPROCESSED;
+- sample rate / frames-per-buffer reportados;
+- explicação dos targets e fluxo.
+
+### Narração
+- editor de roteiro;
+- teleprompter;
+- velocidade aproximada em WPM;
+- start/stop manual;
+- gravação com countdown;
+- acompanhamento do roteiro durante a captura.
+
+### DSP rack interno
+- high-pass / DC cleanup;
+- gate / expansão suave;
+- speech leveler;
+- limiter;
+- ganho de normalização fixed-point.
+
+É um rack DSP interno. Não é declarado VST2/VST3 enquanto a ABI VST não existir.
+
+### Medição
+- K-weighting de duas etapas, coeficientes BS.1770-5 para 48 kHz quantizados Q29;
+- blocos de 400 ms;
+- overlap 75%;
+- gate absoluto -70 LKFS;
+- gate relativo -10 LU em potência;
+- true-peak 4x com FIR 48-tap / 4-phase do Annex 2;
+- espectrometria relativa de 16 centros via Goertzel fixed-point;
+- ceiling de normalização: -1 dBTP.
+
+A implementação ainda precisa de vetores de conformidade antes de receber PASS normativo.
+
+### Targets
+- Broadcast: -23 LUFS — EBU R128.
+- Narração: -18 LUFS — target de workflow.
+- WhatsApp/mobile: -16 LUFS — target de workflow.
+- Música clean: -18 LUFS conservador — não é mastering musical certificado.
 
 ## Arquitetura
 
-O projeto separa três camadas:
+1. Android I/O/UI:
+   AudioRecord, AudioTrack, MediaExtractor, MediaCodec, MediaMuxer, MediaStore.
+2. JNI:
+   ponte interna de buffers.
+3. dsp_core.c:
+   transformação fixed-point.
+4. meter_core.c:
+   K-weighting, gating, true-peak, spectrum e cálculo de ganho.
 
-1. Android I/O: AudioRecord, MediaExtractor, MediaCodec e MediaMuxer.
-2. JNI bridge: adaptação de buffers Java para o kernel.
-3. DSP core: C freestanding, sem malloc, sem libm, sem I/O e sem dependências externas.
+O APK inteiro não pode ser freestanding/bare-metal porque depende do runtime Android para microfone, tela, armazenamento e codec. Os núcleos DSP/meter são os artefatos freestanding auditáveis.
 
-O APK inteiro não é bare metal: ele roda sobre Android/Linux e usa APIs do sistema. O núcleo dsp_core.c é deliberadamente isolado para poder ser compilado e auditado como componente freestanding.
+## Invariantes do núcleo
 
-## Fluxo Delta 1
+- sem malloc/calloc/realloc/free;
+- sem libm;
+- sem stdio;
+- sem filesystem;
+- sem rede;
+- sem threads;
+- sem bibliotecas DSP de terceiros;
+- sem VST SDK;
+- buffers fornecidos pelo chamador;
+- fixed-point.
 
-Importar Ogg/Opus ou gravar microfone em PCM 48 kHz
--> remasterizar em blocos PCM16
--> exportar Ogg/Opus
--> compartilhar pelo seletor do Android.
+## Build gate
 
-Preset inicial: VOICE_WHATSAPP.
+CI exige:
+1. DSP host smoke;
+2. meter host smoke;
+3. source dependency gate;
+4. ARMv7 zero undefined symbols;
+5. AArch64 zero undefined symbols;
+6. assembleDebug;
+7. APK artifact.
 
-Chain:
-- high-pass/DC cleanup em ponto fixo Q31;
-- gate/expansão suave por envelope;
-- leveler de fala;
-- limiter final abaixo de 0 dBFS.
+## F_next
 
-Nenhum estágio é chamado de LUFS, true-peak, de-esser, EQ paramétrico ou VST enquanto não houver implementação e teste correspondentes.
-
-## Fontes técnicas
-
-- RFC 6716: Definition of the Opus Audio Codec.
-- RFC 7845: Ogg Encapsulation for the Opus Audio Codec.
-- Android 10: Opus encoding support.
-- Android MediaMuxer API 29: MUXER_OUTPUT_OGG.
-- Android MediaRecorder/AudioSource: UNPROCESSED com fallback recomendado.
-- ITU-R BS.1770-5 (2023): loudness e true peak.
-- EBU R 128 v5 (2023): loudness normalisation.
-
-## Build
-
-CI usa JDK 17, Gradle 8.11.1, Android SDK 35, NDK 27.2 e CMake 3.22.1.
-
-Comando local:
-gradle :app:assembleDebug
-
-APK esperado:
-app/build/outputs/apk/debug/app-debug.apk
-
-## Próximo gate
-
-1. CI verde.
-2. Instalação física API 29 armeabi-v7a.
-3. Importar amostra Ogg/Opus real.
-4. Conferir ausência de clipping, duração e inteligibilidade.
-5. Só depois promover BUILD/WHATSAPP_PIPELINE para PASS.
+- CI do Delta 2;
+- corrigir qualquer helper/compile error;
+- vetores BS.1770/EBU;
+- APK no Android 10 armeabi-v7a;
+- gravação física de narração;
+- round-trip Ogg/Opus real;
+- inspeção auditiva e clipping.
