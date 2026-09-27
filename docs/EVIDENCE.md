@@ -17,8 +17,8 @@
 |---|---|---|
 | DSP source exists | PASS | files committed |
 | No heap/libm in dsp_core source | PASS | source inspection |
-| ARMv7 object undefined symbols | PENDING_CI | llvm-nm -u must be empty |
-| Host DSP smoke | PENDING_CI | executable exit 0 |
+| ARMv7 object undefined symbols | PASS | cross-compile ELF32 ARM EABI5; nm -u = 0 after removing __aeabi_uidivmod |
+| Host DSP smoke | PASS | clang host smoke exit 0 |
 | APK assembleDebug | PENDING_CI | GitHub Actions |
 | Android 10 physical install | NOT_RUN | device receipt |
 | Real WhatsApp Ogg/Opus import | NOT_RUN | sample receipt |
@@ -30,3 +30,14 @@
 claim_allowed=false
 
 CI_BASE_WORKFLOW_INSTALLED=true
+
+
+## Receipt 2026-09-27 — kernel gate
+- host_smoke=PASS
+- armv7_compile=PASS
+- armv7_object=ELF32_ARM_EABI5
+- armv7_undefined_symbols=0
+- hotfix=removed modulo helper __aeabi_uidivmod
+- apk_build=ROUTE_STATE_BLOCKED
+- github_actions_runs_observed=0
+- physical_audio_test=NOT_RUN
