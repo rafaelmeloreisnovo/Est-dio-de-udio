@@ -2,6 +2,7 @@
 
 typedef signed int i32;
 typedef signed long long i64;
+typedef unsigned long long u64;
 typedef signed short i16;
 
 _Static_assert(sizeof(i16) == 2, "requires 16-bit short");
@@ -135,6 +136,19 @@ void dsp_process(i16 *samples, int count, int channels) {
         i32 out = y >> 16;
         if (out > 32767) out = 32767;
         if (out < -32768) out = -32768;
+        samples[i] = (i16)out;
+    }
+}
+
+void dsp_apply_gain_q30(i16 *samples, int count, u64 gain_q30) {
+    if (samples == (void *)0 || count <= 0) return;
+    if (gain_q30 > (4ULL << 30)) gain_q30 = 4ULL << 30;
+
+    for (int i = 0; i < count; ++i) {
+        i64 scaled = (i64)samples[i] * (i64)gain_q30;
+        i64 out = scaled >> 30;
+        if (out > 32767LL) out = 32767LL;
+        if (out < -32768LL) out = -32768LL;
         samples[i] = (i16)out;
     }
 }
