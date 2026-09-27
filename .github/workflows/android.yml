@@ -8,9 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-      ANDROID_HOME: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout
@@ -22,36 +19,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Verify Android SDK
-        run: |
-          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
-          test -x "$SDKMANAGER"
-          "$SDKMANAGER" --version
+      - name: Android SDK bootstrap
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: SDK + NDK + CMake
         run: |
-          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER"             "platforms;android-35"             "build-tools;35.0.0"             "ndk;27.2.12479018"             "cmake;3.22.1"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
 
       - name: Host DSP smoke
         run: |
-          clang -std=c11 -O2 -Wall -Wextra -Werror             -Iapp/src/main/cpp             native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c             -o dsp_smoke
+          clang -std=c11 -O2 -Wall -Wextra -Werror -Iapp/src/main/cpp native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c -o dsp_smoke
           ./dsp_smoke
 
       - name: Host meter smoke when present
         run: |
           if test -f app/src/main/cpp/meter_core.c; then
-            clang -std=c11 -O2 -Wall -Wextra -Werror               -Iapp/src/main/cpp               native/tests/meter_smoke.c app/src/main/cpp/meter_core.c               -o meter_smoke
+            clang -std=c11 -O2 -Wall -Wextra -Werror -Iapp/src/main/cpp native/tests/meter_smoke.c app/src/main/cpp/meter_core.c -o meter_smoke
             ./meter_smoke
           fi
 
       - name: Freestanding source dependency gate
         run: |
           FILES="app/src/main/cpp/dsp_core.c"
-          if test -f app/src/main/cpp/meter_core.c; then
-            FILES="$FILES app/src/main/cpp/meter_core.c"
-          fi
+          if test -f app/src/main/cpp/meter_core.c; then FILES="$FILES app/src/main/cpp/meter_core.c"; fi
           if grep -RE '\b(malloc|calloc|realloc|free|sqrt|pow|log|sin|cos)[[:space:]]*\(' $FILES; then
             echo "Forbidden runtime dependency in freestanding core"
             exit 1
@@ -65,12 +57,9 @@ jobs:
           CORES="dsp_core"
           if test -f app/src/main/cpp/meter_core.c; then CORES="$CORES meter_core"; fi
           for SRC in $CORES; do
-            "$CC" --target=armv7a-linux-androideabi29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
+            "$CC" --target=armv7a-linux-androideabi29 -std=c11 -O3 -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Iapp/src/main/cpp -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
             "$NM" -u "$SRC.armv7.o" > "$SRC.armv7.undefined"
-            if test -s "$SRC.armv7.undefined"; then
-              cat "$SRC.armv7.undefined"
-              exit 1
-            fi
+            if test -s "$SRC.armv7.undefined"; then cat "$SRC.armv7.undefined"; exit 1; fi
           done
 
       - name: AArch64 zero-undefined gate
@@ -81,12 +70,9 @@ jobs:
           CORES="dsp_core"
           if test -f app/src/main/cpp/meter_core.c; then CORES="$CORES meter_core"; fi
           for SRC in $CORES; do
-            "$CC" --target=aarch64-linux-android29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
+            "$CC" --target=aarch64-linux-android29 -std=c11 -O3 -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Iapp/src/main/cpp -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
             "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
-            if test -s "$SRC.aarch64.undefined"; then
-              cat "$SRC.aarch64.undefined"
-              exit 1
-            fi
+            if test -s "$SRC.aarch64.undefined"; then cat "$SRC.aarch64.undefined"; exit 1; fi
           done
 
       - name: Gradle
