@@ -1,13 +1,18 @@
-name: Validate Audio Studio PR
+name: Audio Studio CI
 
 on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout PR
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: JDK 17
@@ -21,21 +26,46 @@ jobs:
 
       - name: SDK + NDK + CMake
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"             "ndk;27.2.12479018" "cmake;3.22.1"
 
       - name: Host DSP smoke
         run: |
           clang -std=c11 -O2 -Wall -Wextra -Werror             -Iapp/src/main/cpp             native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c             -o dsp_smoke
           ./dsp_smoke
 
-      - name: ARMv7 freestanding undefined-symbol gate
+      - name: Host meter smoke
+        run: |
+          clang -std=c11 -O2 -Wall -Wextra -Werror             -Iapp/src/main/cpp             native/tests/meter_smoke.c app/src/main/cpp/meter_core.c             -o meter_smoke
+          ./meter_smoke
+
+      - name: Freestanding source dependency gate
+        run: |
+          if grep -RE '\b(malloc|calloc|realloc|free|sqrt|pow|log|sin|cos)[[:space:]]*\('             app/src/main/cpp/dsp_core.c app/src/main/cpp/meter_core.c; then
+            echo "Forbidden runtime dependency in freestanding core"
+            exit 1
+          fi
+
+      - name: ARMv7 zero-undefined gate
         run: |
           NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
           CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
           NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          "$CC" --target=armv7a-linux-androideabi29             -std=c11 -O3 -ffreestanding -fno-builtin             -ffunction-sections -fdata-sections -Wall -Wextra -Werror             -Iapp/src/main/cpp             -c app/src/main/cpp/dsp_core.c -o dsp_core_armv7.o
-          "$NM" -u dsp_core_armv7.o > undefined.txt
-          test ! -s undefined.txt
+          for SRC in dsp_core meter_core; do
+            "$CC" --target=armv7a-linux-androideabi29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
+            "$NM" -u "$SRC.armv7.o" > "$SRC.armv7.undefined"
+            test ! -s "$SRC.armv7.undefined"
+          done
+
+      - name: AArch64 zero-undefined gate
+        run: |
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          for SRC in dsp_core meter_core; do
+            "$CC" --target=aarch64-linux-android29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
+            "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
+            test ! -s "$SRC.aarch64.undefined"
+          done
 
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -44,3 +74,9 @@ jobs:
 
       - name: Assemble debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rafaelia-audio-studio-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
