@@ -248,7 +248,9 @@ u64 meter_gain_q30(u64 target_energy_q36, u64 true_peak_ceiling_q16) {
     if (g_block_count == 0ULL || g_block_sum == 0ULL) return 1ULL << 30;
 
     u64 measured_block = udiv64(g_block_sum, g_block_count);
-    u64 target_block = target_energy_q36 * BLOCK_FRAMES_400MS;
+    u32 target32 = target_energy_q36 > 4294967295ULL
+            ? 4294967295U : (u32)target_energy_q36;
+    u64 target_block = (u64)target32 * (u64)(u32)BLOCK_FRAMES_400MS;
 
     u64 ratio_q30;
     if (target_block >= measured_block) {
@@ -256,7 +258,9 @@ u64 meter_gain_q30(u64 target_energy_q36, u64 true_peak_ceiling_q16) {
         if (whole >= 16ULL) {
             ratio_q30 = 16ULL << 30;
         } else {
-            u64 rem = target_block - whole * measured_block;
+            u64 consumed = 0ULL;
+            for (u32 k = 0; k < (u32)whole; ++k) consumed += measured_block;
+            u64 rem = target_block - consumed;
             ratio_q30 = (whole << 30) +
                     udiv64(rem << 30, measured_block);
         }
@@ -274,7 +278,9 @@ u64 meter_gain_q30(u64 target_energy_q36, u64 true_peak_ceiling_q16) {
             if (whole >= 4ULL) {
                 peak_cap_q30 = 4ULL << 30;
             } else {
-                u64 rem = true_peak_ceiling_q16 - whole * g_true_peak_q16;
+                u64 consumed = 0ULL;
+                for (u32 k = 0; k < (u32)whole; ++k) consumed += g_true_peak_q16;
+                u64 rem = true_peak_ceiling_q16 - consumed;
                 peak_cap_q30 = (whole << 30) +
                         udiv64(rem << 30, g_true_peak_q16);
             }
