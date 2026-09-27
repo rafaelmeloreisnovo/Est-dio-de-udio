@@ -2,6 +2,7 @@
 
 typedef signed int i32;
 typedef signed long long i64;
+typedef unsigned int u32;
 typedef unsigned long long u64;
 typedef signed short i16;
 
@@ -142,13 +143,17 @@ void dsp_process(i16 *samples, int count, int channels) {
 
 void dsp_apply_gain_q30(i16 *samples, int count, u64 gain_q30) {
     if (samples == (void *)0 || count <= 0) return;
-    if (gain_q30 > (4ULL << 30)) gain_q30 = 4ULL << 30;
+    if (gain_q30 > 4294967295ULL) gain_q30 = 4294967295ULL;
+    u32 gain32 = (u32)gain_q30;
 
     for (int i = 0; i < count; ++i) {
-        i64 scaled = (i64)samples[i] * (i64)gain_q30;
-        i64 out = scaled >> 30;
-        if (out > 32767LL) out = 32767LL;
-        if (out < -32768LL) out = -32768LL;
+        i32 s = (i32)samples[i];
+        u32 mag = s < 0 ? (u32)(-s) : (u32)s;
+        u64 scaled = (u64)mag * (u64)gain32;
+        i32 out = (i32)(scaled >> 30);
+        if (s < 0) out = -out;
+        if (out > 32767) out = 32767;
+        if (out < -32768) out = -32768;
         samples[i] = (i16)out;
     }
 }
