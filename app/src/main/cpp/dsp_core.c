@@ -58,12 +58,12 @@ static i32 level_threshold_for_preset(void) {
 static i32 level_target(i32 env) {
     i32 t = level_threshold_for_preset();
 
-    if (env > t * 3) {
+    if ((i64)env > (i64)t * 3) {
         return g_preset == DSP_PRESET_WHATSAPP_VOICE
                 ? 1245540515
                 : 1610612735;
     }
-    if (env > t * 2) {
+    if ((i64)env > (i64)t * 2) {
         return g_preset == DSP_PRESET_WHATSAPP_VOICE
                 ? 1546188226
                 : 1825361100;
@@ -108,7 +108,7 @@ void dsp_process(i16 *samples, int count, int channels) {
         int c = i % channels;
         channel_state *st = &g_state[c];
 
-        i32 x = ((i32)samples[i]) << 16;
+        i32 x = (i32)((i64)samples[i] * 65536);
 
         i64 hp_input = (i64)st->hp_y + (i64)x - (i64)st->prev_x;
         i32 hp = mul_q31(alpha, clamp_q31(hp_input));
