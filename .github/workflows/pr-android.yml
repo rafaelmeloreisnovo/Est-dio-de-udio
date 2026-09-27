@@ -1,4 +1,4 @@
-name: Validate Audio Studio PR
+name: Audio Studio PR Gate
 
 on:
   pull_request:
@@ -6,36 +6,86 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+
     steps:
-      - name: Checkout PR
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Verify Android SDK
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" --version
 
       - name: SDK + NDK + CMake
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER"             "platforms;android-35"             "build-tools;35.0.0"             "ndk;27.2.12479018"             "cmake;3.22.1"
 
       - name: Host DSP smoke
         run: |
           clang -std=c11 -O2 -Wall -Wextra -Werror             -Iapp/src/main/cpp             native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c             -o dsp_smoke
           ./dsp_smoke
 
-      - name: ARMv7 freestanding undefined-symbol gate
+      - name: Host meter smoke when present
+        run: |
+          if test -f app/src/main/cpp/meter_core.c; then
+            clang -std=c11 -O2 -Wall -Wextra -Werror               -Iapp/src/main/cpp               native/tests/meter_smoke.c app/src/main/cpp/meter_core.c               -o meter_smoke
+            ./meter_smoke
+          fi
+
+      - name: Freestanding source dependency gate
+        run: |
+          FILES="app/src/main/cpp/dsp_core.c"
+          if test -f app/src/main/cpp/meter_core.c; then
+            FILES="$FILES app/src/main/cpp/meter_core.c"
+          fi
+          if grep -RE '\b(malloc|calloc|realloc|free|sqrt|pow|log|sin|cos)[[:space:]]*\(' $FILES; then
+            echo "Forbidden runtime dependency in freestanding core"
+            exit 1
+          fi
+
+      - name: ARMv7 zero-undefined gate
         run: |
           NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
           CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
           NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          "$CC" --target=armv7a-linux-androideabi29             -std=c11 -O3 -ffreestanding -fno-builtin             -ffunction-sections -fdata-sections -Wall -Wextra -Werror             -Iapp/src/main/cpp             -c app/src/main/cpp/dsp_core.c -o dsp_core_armv7.o
-          "$NM" -u dsp_core_armv7.o > undefined.txt
-          test ! -s undefined.txt
+          CORES="dsp_core"
+          if test -f app/src/main/cpp/meter_core.c; then CORES="$CORES meter_core"; fi
+          for SRC in $CORES; do
+            "$CC" --target=armv7a-linux-androideabi29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
+            "$NM" -u "$SRC.armv7.o" > "$SRC.armv7.undefined"
+            if test -s "$SRC.armv7.undefined"; then
+              cat "$SRC.armv7.undefined"
+              exit 1
+            fi
+          done
+
+      - name: AArch64 zero-undefined gate
+        run: |
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          CORES="dsp_core"
+          if test -f app/src/main/cpp/meter_core.c; then CORES="$CORES meter_core"; fi
+          for SRC in $CORES; do
+            "$CC" --target=aarch64-linux-android29               -std=c11 -O3 -ffreestanding -fno-builtin               -ffunction-sections -fdata-sections -Wall -Wextra -Werror               -Iapp/src/main/cpp               -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
+            "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
+            if test -s "$SRC.aarch64.undefined"; then
+              cat "$SRC.aarch64.undefined"
+              exit 1
+            fi
+          done
 
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -44,3 +94,9 @@ jobs:
 
       - name: Assemble debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rafaelia-audio-studio-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
