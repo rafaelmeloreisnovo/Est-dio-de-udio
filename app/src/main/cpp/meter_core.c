@@ -112,6 +112,24 @@ static u64 udiv64(u64 n, u64 d) {
     return q;
 }
 
+static u64 ufrac_q30(u64 n, u64 d) {
+    if (d == 0ULL || n == 0ULL) return 0ULL;
+    if (n >= d) return 1ULL << 30;
+
+    u64 r = n;
+    u64 q = 0ULL;
+    for (int bit = 0; bit < 30; ++bit) {
+        q <<= 1;
+        if (r >= d - r) {
+            r = r - (d - r);
+            q |= 1ULL;
+        } else {
+            r <<= 1;
+        }
+    }
+    return q;
+}
+
 static u64 isqrt64(u64 x) {
     u64 result = 0ULL;
     u64 bit = 1ULL << 62;
@@ -256,37 +274,37 @@ u64 meter_gain_q30(u64 target_energy_q36, u64 true_peak_ceiling_q16) {
     if (target_block >= measured_block) {
         u64 whole = udiv64(target_block, measured_block);
         if (whole >= 16ULL) {
-            ratio_q30 = 16ULL << 30;
+            ratio_q30 = (16ULL << 30) - 1ULL;
         } else {
             u64 consumed = 0ULL;
             for (u32 k = 0; k < (u32)whole; ++k) consumed += measured_block;
             u64 rem = target_block - consumed;
             ratio_q30 = (whole << 30) +
-                    udiv64(rem << 30, measured_block);
+                    ufrac_q30(rem, measured_block);
         }
     } else {
-        ratio_q30 = udiv64(target_block << 30, measured_block);
+        ratio_q30 = ufrac_q30(target_block, measured_block);
     }
 
     u64 gain_q30 = isqrt64(ratio_q30 << 30);
-    if (gain_q30 > (4ULL << 30)) gain_q30 = 4ULL << 30;
+    if (gain_q30 > 4294967295ULL) gain_q30 = 4294967295ULL;
 
     if (g_true_peak_q16 != 0ULL && true_peak_ceiling_q16 != 0ULL) {
         u64 peak_cap_q30;
         if (true_peak_ceiling_q16 >= g_true_peak_q16) {
             u64 whole = udiv64(true_peak_ceiling_q16, g_true_peak_q16);
             if (whole >= 4ULL) {
-                peak_cap_q30 = 4ULL << 30;
+                peak_cap_q30 = 4294967295ULL;
             } else {
                 u64 consumed = 0ULL;
                 for (u32 k = 0; k < (u32)whole; ++k) consumed += g_true_peak_q16;
                 u64 rem = true_peak_ceiling_q16 - consumed;
                 peak_cap_q30 = (whole << 30) +
-                        udiv64(rem << 30, g_true_peak_q16);
+                        ufrac_q30(rem, g_true_peak_q16);
             }
         } else {
             peak_cap_q30 =
-                    udiv64(true_peak_ceiling_q16 << 30, g_true_peak_q16);
+                    ufrac_q30(true_peak_ceiling_q16, g_true_peak_q16);
         }
         if (peak_cap_q30 < gain_q30) gain_q30 = peak_cap_q30;
     }
