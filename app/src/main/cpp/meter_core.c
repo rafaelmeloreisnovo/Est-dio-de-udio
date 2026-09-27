@@ -59,7 +59,7 @@ static const i32 TP_FIR_Q16[12][4] = {
     {  -544,  -1240,  -1912,    112}
 };
 
-/* 2*cos(2*pi*f/48000), Q30. */
+/* Precomputed Goertzel recurrence coefficients for 48 kHz, Q30. */
 static const i32 SPECTRUM_COEFF_Q30[METER_SPECTRUM_BANDS] = {
     2147365900, 2147196181, 2146747759, 2145658338,
     2142885721, 2135719508, 2118800422, 2074309917,
