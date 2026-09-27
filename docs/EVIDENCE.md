@@ -92,3 +92,12 @@ summary=wizard+narration+metering+truepeak+spectrum+normalization+playback
 evidence=source_commits+CI_pending
 gap=conformance_vectors|CI|physical_audio|whatsapp_roundtrip
 next=run_CI_and_fix_until_zero_undefined_plus_APK
+
+
+## CI route repair receipt
+- obsolete_setup_android_tools_package=FAIL_INFRA
+- android_sdk_root_unset=FAIL_INFRA
+- base_pr_workflow_repaired_on_main=true
+- sdk_root=/usr/local/lib/android/sdk
+- sdkmanager=/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager
+- next=rerun_PR_gate_against_repaired_base
