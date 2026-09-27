@@ -224,7 +224,7 @@ void meter_push(const i16 *samples, int count, int channels) {
     if (channels != 1 && channels != 2) return;
     if (channels != g_channels) return;
 
-    int frames = count / channels;
+    int frames = channels == 1 ? count : (count >> 1);
     for (int frame = 0; frame < frames; ++frame) {
         u64 frame_energy = 0ULL;
 
@@ -319,7 +319,7 @@ void meter_spectrum16(const i16 *samples, int count, int channels,
     if (samples == (const i16 *)0 || count <= 0) return;
     if (channels != 1 && channels != 2) return;
 
-    int frames = count / channels;
+    int frames = channels == 1 ? count : (count >> 1);
     if (frames > 2048) frames = 2048;
 
     for (int b = 0; b < METER_SPECTRUM_BANDS; ++b) {
