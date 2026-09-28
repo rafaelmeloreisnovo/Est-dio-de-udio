@@ -8,10 +8,16 @@ set_target_properties(dsp_core meter_core PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-target_compile_options(dsp_core PRIVATE
+set(RFA_CORE_FLAGS
     -O3
     -ffreestanding
     -fno-builtin
+    -nostdinc
+    -fno-stack-protector
+    -fno-unwind-tables
+    -fno-asynchronous-unwind-tables
+    -fno-common
+    -fvisibility=hidden
     -ffunction-sections
     -fdata-sections
     -Wall
@@ -19,16 +25,8 @@ target_compile_options(dsp_core PRIVATE
     -Werror
 )
 
-target_compile_options(meter_core PRIVATE
-    -O3
-    -ffreestanding
-    -fno-builtin
-    -ffunction-sections
-    -fdata-sections
-    -Wall
-    -Wextra
-    -Werror
-)
+target_compile_options(dsp_core PRIVATE ${RFA_CORE_FLAGS})
+target_compile_options(meter_core PRIVATE ${RFA_CORE_FLAGS})
 
 add_library(rafaelia_audio SHARED jni_bridge.c)
 

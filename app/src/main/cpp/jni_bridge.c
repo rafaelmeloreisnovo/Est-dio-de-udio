@@ -2,12 +2,19 @@
 #include "dsp_core.h"
 #include "meter_core.h"
 
+/*
+ * Platform-owned instances.
+ * Mutable state lives here, at the Android boundary, not in the freestanding cores.
+ */
+static dsp_state g_dsp_state;
+static meter_state g_meter_state;
+
 JNIEXPORT void JNICALL
 Java_io_rafaelia_audiostudio_NativeDsp_nativeReset(
         JNIEnv *env, jclass clazz, jint preset) {
     (void)env;
     (void)clazz;
-    dsp_reset((int)preset);
+    dsp_state_reset(&g_dsp_state, (int)preset);
 }
 
 JNIEXPORT void JNICALL
@@ -23,7 +30,8 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeProcess(
     jshort *data = (*env)->GetShortArrayElements(env, array, (jboolean *)0);
     if (data == (jshort *)0) return;
 
-    dsp_process((signed short *)data, (int)count, (int)channels);
+    dsp_state_process(&g_dsp_state, (rfa_i16 *)data,
+                      (int)count, (int)channels);
     (*env)->ReleaseShortArrayElements(env, array, data, 0);
 }
 
@@ -40,8 +48,7 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeApplyGain(
     jshort *data = (*env)->GetShortArrayElements(env, array, (jboolean *)0);
     if (data == (jshort *)0) return;
 
-    dsp_apply_gain_q30((signed short *)data, (int)count,
-                       (dsp_u64)gainQ30);
+    dsp_apply_gain_q30((rfa_i16 *)data, (int)count, (rfa_u64)gainQ30);
     (*env)->ReleaseShortArrayElements(env, array, data, 0);
 }
 
@@ -50,8 +57,8 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeMeterReset(
         JNIEnv *env, jclass clazz, jint channels, jlong gateBlockQ36) {
     (void)env;
     (void)clazz;
-    meter_reset((int)channels,
-                gateBlockQ36 < 0 ? 0ULL : (rfa_u64)gateBlockQ36);
+    meter_state_reset(&g_meter_state, (int)channels,
+                      gateBlockQ36 < 0 ? 0ULL : (rfa_u64)gateBlockQ36);
 }
 
 JNIEXPORT void JNICALL
@@ -67,7 +74,8 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeMeterPush(
     jshort *data = (*env)->GetShortArrayElements(env, array, (jboolean *)0);
     if (data == (jshort *)0) return;
 
-    meter_push((const signed short *)data, (int)count, (int)channels);
+    meter_state_push(&g_meter_state, (const rfa_i16 *)data,
+                     (int)count, (int)channels);
     (*env)->ReleaseShortArrayElements(env, array, data, JNI_ABORT);
 }
 
@@ -79,7 +87,7 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeMeterResult(
     if ((*env)->GetArrayLength(env, output) < 4) return;
 
     rfa_u64 values[4];
-    meter_result(values);
+    meter_state_result(&g_meter_state, values);
     jlong out[4];
     for (int i = 0; i < 4; ++i) out[i] = (jlong)values[i];
     (*env)->SetLongArrayRegion(env, output, 0, 4, out);
@@ -90,7 +98,7 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeMeterRelativeGate(
         JNIEnv *env, jclass clazz) {
     (void)env;
     (void)clazz;
-    return (jlong)meter_relative_gate_block();
+    return (jlong)meter_state_relative_gate_block(&g_meter_state);
 }
 
 JNIEXPORT jlong JNICALL
@@ -100,8 +108,9 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeMeterGain(
     (void)env;
     (void)clazz;
     if (targetEnergyQ36 <= 0 || ceilingQ16 <= 0) return (jlong)(1ULL << 30);
-    return (jlong)meter_gain_q30((rfa_u64)targetEnergyQ36,
-                                 (rfa_u64)ceilingQ16);
+    return (jlong)meter_state_gain_q30(&g_meter_state,
+                                       (rfa_u64)targetEnergyQ36,
+                                       (rfa_u64)ceilingQ16);
 }
 
 JNIEXPORT void JNICALL
@@ -120,7 +129,7 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeSpectrum(
     if (data == (jshort *)0) return;
 
     rfa_u64 bands[METER_SPECTRUM_BANDS];
-    meter_spectrum16((const signed short *)data, (int)count, (int)channels, bands);
+    meter_spectrum16((const rfa_i16 *)data, (int)count, (int)channels, bands);
     (*env)->ReleaseShortArrayElements(env, array, data, JNI_ABORT);
 
     jlong out[METER_SPECTRUM_BANDS];
