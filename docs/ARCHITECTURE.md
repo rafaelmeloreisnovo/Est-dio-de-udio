@@ -4,61 +4,86 @@
 
 SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM.
 
-O Android fornece captura, codecs, contêiner e armazenamento. O kernel DSP não faz chamadas Android.
+A arquitetura separa rigidamente duas zonas:
 
-## Fronteiras
+1. **CORE_AUTHORIAL_FREESTANDING** — DSP e medição sem runtime hospedado.
+2. **PLATFORM_ADAPTER** — Android/JNI, necessário apenas para microfone, UI, storage e codecs do sistema.
 
-### Camada Android
+Não se declara o APK inteiro como bare-metal. A propriedade freestanding pertence ao núcleo C auditado.
 
-Responsável por:
-- permissão de microfone;
-- AudioRecord;
-- Storage Access Framework;
-- MediaExtractor/MediaCodec;
-- MediaMuxer Ogg;
-- MediaStore;
-- share intent.
+## CORE_AUTHORIAL_FREESTANDING
 
-Essa camada não é freestanding e não deve ser descrita como bare metal.
+Arquivos:
+- `rfa_core_types.h`
+- `dsp_core.h/.c`
+- `meter_core.h/.c`
 
-### JNI
-
-Somente ponte de buffers.
-
-### dsp_core.c
-
-Contrato:
+Contrato verificável:
 - C11;
-- sem malloc/free;
-- sem libm;
+- `-ffreestanding`;
+- `-fno-builtin`;
+- `-nostdinc`;
+- sem headers de sistema;
+- sem libc/libm;
+- sem malloc/calloc/realloc/free;
 - sem stdio;
 - sem filesystem;
 - sem rede;
 - sem threads;
 - sem syscalls explícitas;
-- estado fixo para até dois canais;
-- PCM16 in-place;
-- aritmética principal Q31.
+- sem VST SDK ou biblioteca DSP de terceiros;
+- sem estado mutável global no core;
+- estado fornecido explicitamente pelo chamador;
+- buffers fornecidos pelo chamador;
+- fixed-point;
+- ARMv7 e AArch64 com zero símbolos indefinidos;
+- superfície ABI externa limitada por allowlist do CI.
 
-O workflow compila o objeto ARMv7 com -ffreestanding e exige zero símbolos indefinidos no objeto do núcleo.
+O core não conhece Android, Java, JNI, arquivos, sockets, relógio ou allocator.
 
-## Tuning
+## PLATFORM_ADAPTER
 
-Preset VOICE_WHATSAPP:
-- entrada e saída alvo: 48 kHz PCM16;
-- high-pass de primeira ordem aproximado ~70 Hz;
-- gate/expansão suave abaixo de aproximadamente -52 dBFS;
-- leveler conservador em três regiões;
-- limiter com joelho simples acima de aproximadamente -1 dBFS.
+### JNI
 
-Isso é um chain de voz determinístico. Não substitui medição BS.1770 nem um mastering musical completo.
+`jni_bridge.c` é a primeira camada hospedada. Ela possui as instâncias de `dsp_state` e `meter_state` usadas pelo aplicativo e somente converte buffers/tipos JNI para a API do core.
 
-## Perfis futuros
+Estado global de plataforma pode existir aqui porque esta camada não reivindica freestanding. Ele não atravessa para o core.
 
-VOICE_NATURAL: IMPLEMENTED_UNTESTED.
-MUSIC_CLEAN: IMPLEMENTED_UNTESTED.
-PODCAST_R128: PENDING.
-MUSIC_MASTER_STEREO: PENDING.
-RESTORATION_DEESSER: PENDING.
-PARAMETRIC_EQ: PENDING.
-TRUE_PEAK_OVERSAMPLING: PENDING.
+### Android
+
+Responsável por:
+- permissão de microfone;
+- AudioRecord / AudioTrack;
+- Storage Access Framework;
+- MediaExtractor / MediaCodec;
+- MediaMuxer Ogg;
+- MediaStore;
+- share intent.
+
+Essa camada é deliberadamente substituível. Um futuro adaptador Termux, Linux, firmware ou bare-metal pode chamar o mesmo core sem portar Android.
+
+## Estado explícito
+
+O DSP usa `dsp_state` e o meter usa `meter_state`. Isso elimina dependência de estado oculto entre execuções e permite:
+- múltiplas instâncias independentes;
+- testes determinísticos;
+- uso em firmware;
+- reentrância controlada pelo chamador;
+- memória estática, stack ou região fornecida externamente, sem heap.
+
+## Gate
+
+O PR gate deve falhar quando:
+- um header `<...>` entra no core;
+- aparece chamada para função hospedada proibida;
+- aparece variável `static` mutável em file-scope no core;
+- ARMv7/AArch64 geram símbolo indefinido;
+- a ABI exporta símbolo fora da allowlist;
+- smoke tests divergirem;
+- o APK deixar de compilar.
+
+## Limite de autoria
+
+Algoritmos, fixed-point, estados, filtros, medição e transformação podem ser autorais e vivem no core.
+
+Captura física do microfone, composição de tela, sandbox Android e acesso ao codec hardware/software do sistema são serviços da plataforma. Reimplementá-los dentro do APK sem Android não removeria a dependência do kernel/driver; apenas deslocaria a fronteira. Por isso a fronteira é explícita e auditável.
