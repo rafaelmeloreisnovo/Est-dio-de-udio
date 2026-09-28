@@ -4,111 +4,95 @@ Android 10+ audio workstation para captura, narração guiada, tratamento, medi�
 
 ## Estado operacional
 
-- MAIN_DELTA1: MERGED
-- DELTA2_BRANCH: feature/pro-audio-delta2-narration-metering
+- MAIN_BASE: 058a3a5a8f79d1103a224e484a4797d51d151966
+- MAIN_CI: PASS
+- DELTA3_FREESTANDING_CONTEXTS: IMPLEMENTED_UNTESTED
 - EXECUTION_TARGET: Android API 29+
-- DSP_CORE_DELTA1: PASS no gate previamente registrado
-- DSP_METER_DELTA2: IMPLEMENTED_UNTESTED
-- APK_BUILD_DELTA2: PENDING_CI
+- DSP_HOST_SMOKE_MAIN: PASS
+- METER_HOST_SMOKE_MAIN: PASS
+- ARMV7_ZERO_UNDEFINED_MAIN: PASS
+- AARCH64_ZERO_UNDEFINED_MAIN: PASS
+- APK_BUILD_MAIN: PASS
 - PHYSICAL_ANDROID10: NOT_RUN
 - WHATSAPP_REAL_ROUNDTRIP: NOT_RUN
-- claim_allowed: false para conformidade/qualidade end-to-end até CI + vetores + teste físico
+- BS1770_CONFORMANCE: PENDING
+- claim_allowed: false para conformidade/qualidade end-to-end até vetores + teste físico
 
-## Delta 2
+## Delta 3 — core autoral freestanding
 
-### Gravação
+O núcleo DSP/meter está sendo endurecido para uma fronteira explicitamente independente de plataforma:
+
+- tipos escalares próprios em `rfa_core_types.h`;
+- nenhum header de sistema no core;
+- compilação com `-nostdinc -ffreestanding -fno-builtin`;
+- sem heap/libc/libm/filesystem/network/threads;
+- estado DSP e meter fornecido pelo chamador;
+- nenhuma variável global mutável no core;
+- JNI possui o estado apenas na camada Android;
+- gate de zero símbolos indefinidos em ARMv7/AArch64;
+- allowlist da superfície ABI externa.
+
+Isso permite portar o mesmo core para Android, Termux, Linux, firmware ou bare-metal sem reescrever os algoritmos.
+
+## Gravação
+
 - PCM16 mono 48 kHz;
 - UNPROCESSED quando declarado pelo dispositivo;
 - VOICE_RECOGNITION como fallback;
-- tentativa best-effort de desativar AGC, NoiseSuppressor e AEC da sessão;
+- tentativa best-effort de desativar AGC, NoiseSuppressor e AEC;
 - raw PCM preservado antes da remasterização;
-- telemetria de sample peak, RMS bruto e samples clipados.
+- telemetria de sample peak, RMS bruto e clipping.
 
-### Wizard
-- pré-voo de permissão;
-- API Android;
-- suporte UNPROCESSED;
-- sample rate / frames-per-buffer reportados;
-- explicação dos targets e fluxo.
+## Narração
 
-### Narração
 - editor de roteiro;
 - teleprompter;
-- velocidade aproximada em WPM;
-- start/stop manual;
-- gravação com countdown;
+- velocidade em WPM;
+- countdown;
 - acompanhamento do roteiro durante a captura.
 
-### DSP rack interno
+## DSP rack
+
 - high-pass / DC cleanup;
 - gate / expansão suave;
 - speech leveler;
 - limiter;
-- ganho de normalização fixed-point.
+- normalização fixed-point.
 
-É um rack DSP interno. Não é declarado VST2/VST3 enquanto a ABI VST não existir.
+## Medição
 
-### Medição
-- K-weighting de duas etapas, coeficientes BS.1770-5 para 48 kHz quantizados Q29;
-- blocos de 400 ms;
-- overlap 75%;
-- gate absoluto -70 LKFS;
-- gate relativo -10 LU em potência;
-- true-peak 4x com FIR 48-tap / 4-phase do Annex 2;
-- espectrometria relativa de 16 centros via Goertzel fixed-point;
-- ceiling de normalização: -1 dBTP.
+- K-weighting 48 kHz Q29;
+- blocos 400 ms / overlap 75%;
+- gate absoluto e relativo;
+- true-peak 4x;
+- espectro de 16 bandas via Goertzel fixed-point;
+- ceiling -1 dBTP.
 
-A implementação ainda precisa de vetores de conformidade antes de receber PASS normativo.
-
-### Targets
-- Broadcast: -23 LUFS — EBU R128.
-- Narração: -18 LUFS — target de workflow.
-- WhatsApp/mobile: -16 LUFS — target de workflow.
-- Música clean: -18 LUFS conservador — não é mastering musical certificado.
+A implementação precisa de vetores formais antes de qualquer claim normativo BS.1770/EBU.
 
 ## Arquitetura
 
-1. Android I/O/UI:
-   AudioRecord, AudioTrack, MediaExtractor, MediaCodec, MediaMuxer, MediaStore.
-2. JNI:
-   ponte interna de buffers.
-3. dsp_core.c:
-   transformação fixed-point.
-4. meter_core.c:
-   K-weighting, gating, true-peak, spectrum e cálculo de ganho.
+```text
+Android I/O/UI/codecs
+        |
+      JNI
+        |
+  -----------------
+  |               |
+DSP core       Meter core
+freestanding   freestanding
+caller-state   caller-state
+fixed-point    fixed-point
+```
 
-O APK inteiro não pode ser freestanding/bare-metal porque depende do runtime Android para microfone, tela, armazenamento e codec. Os núcleos DSP/meter são os artefatos freestanding auditáveis.
-
-## Invariantes do núcleo
-
-- sem malloc/calloc/realloc/free;
-- sem libm;
-- sem stdio;
-- sem filesystem;
-- sem rede;
-- sem threads;
-- sem bibliotecas DSP de terceiros;
-- sem VST SDK;
-- buffers fornecidos pelo chamador;
-- fixed-point.
-
-## Build gate
-
-CI exige:
-1. DSP host smoke;
-2. meter host smoke;
-3. source dependency gate;
-4. ARMv7 zero undefined symbols;
-5. AArch64 zero undefined symbols;
-6. assembleDebug;
-7. APK artifact.
+O APK inteiro não é freestanding: microfone, tela, armazenamento e codec dependem da plataforma Android. O core é a unidade portátil e auditável.
 
 ## F_next
 
-- CI do Delta 2;
-- corrigir qualquer helper/compile error;
-- vetores BS.1770/EBU;
-- APK no Android 10 armeabi-v7a;
-- gravação física de narração;
-- round-trip Ogg/Opus real;
-- inspeção auditiva e clipping.
+1. executar CI do Delta 3;
+2. corrigir qualquer regressão de compilação/símbolo;
+3. promover apenas gates comprovados para PASS;
+4. instalar APK no Android 10 armeabi-v7a;
+5. captura física + Ogg/Opus round-trip;
+6. vetores BS.1770/EBU;
+7. inspeção de clipping/true-peak.
