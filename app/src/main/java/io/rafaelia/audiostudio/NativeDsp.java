@@ -1,9 +1,20 @@
+/*
+ * Copyright (c) 2026 Rafael Melo Reis.
+ * SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+ * Research/evaluation use: see LICENSE_RESEARCH_COMMERCIAL.md.
+ * Commercial use requires a separate written agreement with the rights holder.
+ */
+
 package io.rafaelia.audiostudio;
 
 final class NativeDsp {
     static final int PRESET_WHATSAPP_VOICE = 0;
     static final int PRESET_NATURAL_VOICE = 1;
     static final int PRESET_MUSIC_CLEAN = 2;
+
+    static final int CONTAINER_ZRF = 1;
+    static final int CONTAINER_CFR = 2;
+    static final long CHUNK_PCM = 0x204d4350L;
 
     static final long TARGET_EBU_R128_Q36 = 403_812_580L;    // -23 LUFS
     static final long TARGET_NARRATION_Q36 = 1_276_967_499L; // -18 LUFS custom
@@ -28,4 +39,13 @@ final class NativeDsp {
 
     static native void nativeSpectrum(
             short[] data, int count, int channels, long[] output);
+
+    static native byte[] nativeContainerHeader(
+            int kind, int channels, int matrixDim, int sampleRate,
+            int waveCount, int flags, int chunkCount,
+            long payloadBytes, int blockSamples);
+
+    static native byte[] nativeChunkHeader(
+            long type, long flags, long payloadBytes, long itemCount);
 }
+

@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026 Rafael Melo Reis.
+ * SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+ * Research/evaluation use: see LICENSE_RESEARCH_COMMERCIAL.md.
+ * Commercial use requires a separate written agreement with the rights holder.
+ */
+
 package io.rafaelia.audiostudio;
 
 import android.Manifest;
@@ -50,10 +57,13 @@ public final class MainActivity extends Activity {
     private TextView speedLabel;
     private Spinner profileSpinner;
     private SpectrumView spectrumView;
+    private StudioWorkspaceView studioWorkspaceView;
+    private final short[] liveWave = new short[512];
 
     private AudioRecorderEngine recorder;
     private File recordedPcm;
     private File lastMasteredPcm;
+    private File lastZrf;
     private int lastMasteredRate = 48000;
     private int lastMasteredChannels = 1;
     private Uri lastOutput;
@@ -85,6 +95,12 @@ public final class MainActivity extends Activity {
                     "\nPeak amostral: " + peakPct + "% FS" +
                     " | RMS bruto: " + rmsPct + "% FS" +
                     " | clipping samples: " + s.clipped);
+            if (studioWorkspaceView != null) {
+                int liveCount = recorder.copyLatest(liveWave);
+                studioWorkspaceView.setCaptureStats(
+                        peakPct, rmsPct, s.clipped, s.samples, s.source);
+                studioWorkspaceView.setWaveform(liveWave, liveCount);
+            }
             ui.postDelayed(this, 500);
         }
     };
@@ -124,6 +140,15 @@ public final class MainActivity extends Activity {
         status.setTextSize(16f);
         box.addView(status);
         refreshReadyState();
+
+        studioWorkspaceView = new StudioWorkspaceView(this);
+        studioWorkspaceView.setCalibrationState(
+                "CAL=DIGITAL+RELATIVE | ABS_SPL=TOKEN_VAZIO");
+        studioWorkspaceView.setContainerState(
+                "ZRF/CFR CORE=IMPLEMENTED_UNTESTED | RECORDING_WIRE=PENDING");
+        box.addView(studioWorkspaceView,
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, dp(520)));
 
         TextView profileTitle = new TextView(this);
         profileTitle.setText("\nPerfil de remasterização / normalização");
@@ -425,9 +450,31 @@ public final class MainActivity extends Activity {
 
         new Thread(() -> {
             File mastered = new File(getCacheDir(), "rafaelia_mastered_48k.pcm");
+            File zrf = new File(
+                    getCacheDir(), "rafaelia_session_" +
+                    System.currentTimeMillis() + ".zrf");
             Uri outputUri = null;
 
             try {
+                try {
+                    lastZrf = SessionContainerWriter.wrapRawPcmAsZrf(
+                            input, zrf, sampleRate, channels);
+                    runOnUiThread(() -> {
+                        if (studioWorkspaceView != null) {
+                            studioWorkspaceView.setContainerState(
+                                    "ZRF=RECORDED | CFR=FORMAT_READY_CAPTURE_PENDING");
+                        }
+                    });
+                } catch (Exception containerError) {
+                    lastZrf = null;
+                    runOnUiThread(() -> {
+                        if (studioWorkspaceView != null) {
+                            studioWorkspaceView.setContainerState(
+                                    "ZRF=FAIL | CFR=FORMAT_READY_CAPTURE_PENDING");
+                        }
+                    });
+                }
+
                 AudioPipeline.MasterResult result =
                         AudioPipeline.masterAndNormalize(
                                 input, mastered, sampleRate, channels,
@@ -464,6 +511,13 @@ public final class MainActivity extends Activity {
                 final Uri finalOutputUri = outputUri;
                 runOnUiThread(() -> {
                     spectrumView.setBands(result.spectrum);
+                    if (studioWorkspaceView != null) {
+                        studioWorkspaceView.setSpectrum(result.spectrum);
+                        studioWorkspaceView.setMasterState(
+                                "MASTER=" + targetLabel +
+                                " | blocks=" + result.gatedBlocks +
+                                " | gain=" + gainPct + "%");
+                    }
                     status.setText(
                             "MASTER GERADO — " + targetLabel +
                             "\nGanho final: " + gainPct + "%" +

@@ -1,6 +1,14 @@
+/*
+ * Copyright (c) 2026 Rafael Melo Reis.
+ * SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+ * Research/evaluation use: see LICENSE_RESEARCH_COMMERCIAL.md.
+ * Commercial use requires a separate written agreement with the rights holder.
+ */
+
 #include <jni.h>
 #include "dsp_core.h"
 #include "meter_core.h"
+#include "rfa_container_core.h"
 
 /*
  * Platform-owned instances.
@@ -135,4 +143,73 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeSpectrum(
     jlong out[METER_SPECTRUM_BANDS];
     for (int i = 0; i < METER_SPECTRUM_BANDS; ++i) out[i] = (jlong)bands[i];
     (*env)->SetLongArrayRegion(env, output, 0, METER_SPECTRUM_BANDS, out);
+}
+
+
+JNIEXPORT jbyteArray JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeContainerHeader(
+        JNIEnv *env, jclass clazz, jint kind, jint channels, jint matrixDim,
+        jint sampleRate, jint waveCount, jint flags, jint chunkCount,
+        jlong payloadBytes, jint blockSamples) {
+    rfa_container_desc desc;
+    rfa_u8 bytes[RFA_CONTAINER_HEADER_BYTES];
+    int written;
+    jbyteArray output;
+    (void)clazz;
+
+    if (payloadBytes < 0 || payloadBytes > 4294967295LL) return (jbyteArray)0;
+    if (waveCount < 0 || flags < 0 || chunkCount < 0 || blockSamples < 0) {
+        return (jbyteArray)0;
+    }
+
+    desc.kind = (int)kind;
+    desc.version = 1;
+    desc.channels = (int)channels;
+    desc.matrix_dim = (int)matrixDim;
+    desc.sample_rate = sampleRate < 0 ? 0U : (rfa_u32)sampleRate;
+    desc.wave_count = (rfa_u32)waveCount;
+    desc.flags = (rfa_u32)flags;
+    desc.chunk_count = (rfa_u32)chunkCount;
+    desc.payload_bytes = (rfa_u32)payloadBytes;
+    desc.block_samples = (rfa_u32)blockSamples;
+
+    written = rfa_container_write_header(
+            bytes, RFA_CONTAINER_HEADER_BYTES, &desc);
+    if (written != RFA_CONTAINER_HEADER_BYTES) return (jbyteArray)0;
+
+    output = (*env)->NewByteArray(env, RFA_CONTAINER_HEADER_BYTES);
+    if (output == (jbyteArray)0) return (jbyteArray)0;
+    (*env)->SetByteArrayRegion(
+            env, output, 0, RFA_CONTAINER_HEADER_BYTES, (const jbyte *)bytes);
+    return output;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeChunkHeader(
+        JNIEnv *env, jclass clazz, jlong type, jlong flags,
+        jlong payloadBytes, jlong itemCount) {
+    rfa_u8 bytes[RFA_CONTAINER_CHUNK_HEADER_BYTES];
+    int written;
+    jbyteArray output;
+    (void)clazz;
+
+    if (type < 0 || type > 4294967295LL ||
+        flags < 0 || flags > 4294967295LL ||
+        payloadBytes < 0 || payloadBytes > 4294967295LL ||
+        itemCount < 0 || itemCount > 4294967295LL) {
+        return (jbyteArray)0;
+    }
+
+    written = rfa_container_write_chunk_header(
+            bytes, RFA_CONTAINER_CHUNK_HEADER_BYTES,
+            (rfa_u32)type, (rfa_u32)flags,
+            (rfa_u32)payloadBytes, (rfa_u32)itemCount);
+    if (written != RFA_CONTAINER_CHUNK_HEADER_BYTES) return (jbyteArray)0;
+
+    output = (*env)->NewByteArray(env, RFA_CONTAINER_CHUNK_HEADER_BYTES);
+    if (output == (jbyteArray)0) return (jbyteArray)0;
+    (*env)->SetByteArrayRegion(
+            env, output, 0, RFA_CONTAINER_CHUNK_HEADER_BYTES,
+            (const jbyte *)bytes);
+    return output;
 }
