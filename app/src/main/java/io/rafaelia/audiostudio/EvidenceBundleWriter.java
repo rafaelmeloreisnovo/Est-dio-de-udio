@@ -46,6 +46,7 @@ final class EvidenceBundleWriter {
     static Result write(
             Context context,
             MicroDeltaVibrationProbe.Result vibration,
+            MicroDeltaMagnetometerProbe.Result magnetometer,
             File lastZrf,
             File lastCfr,
             File lastMasteredPcm) throws Exception {
@@ -67,7 +68,8 @@ final class EvidenceBundleWriter {
         boolean success = false;
         try (OutputStream out = context.getContentResolver().openOutputStream(uri, "w")) {
             if (out == null) throw new IllegalStateException("evidence stream unavailable");
-            String text = buildText(context, vibration, lastZrf, lastCfr, lastMasteredPcm);
+            String text = buildText(
+                    context, vibration, magnetometer, lastZrf, lastCfr, lastMasteredPcm);
             out.write(text.getBytes(StandardCharsets.UTF_8));
             out.flush();
             success = true;
@@ -83,6 +85,7 @@ final class EvidenceBundleWriter {
     private static String buildText(
             Context context,
             MicroDeltaVibrationProbe.Result vibration,
+            MicroDeltaMagnetometerProbe.Result magnetometer,
             File lastZrf,
             File lastCfr,
             File lastMasteredPcm) throws Exception {
@@ -169,6 +172,46 @@ final class EvidenceBundleWriter {
                     "OBSERVATION_ONLY; vibration/movement is not a hardware-fault diagnosis");
         }
 
+        section(b, "micro_delta_magnetic");
+        if (magnetometer == null) {
+            line(b, "state", "NOT_RUN");
+        } else {
+            line(b, "state", magnetometer.state);
+            line(b, "definition",
+                    "mu_delta=temporal magnetic-field delta operator; unit=microtesla");
+            line(b, "sensor", safe(magnetometer.sensorName));
+            line(b, "vendor", safe(magnetometer.vendor));
+            line(b, "sensor_version", Integer.toString(magnetometer.sensorVersion));
+            line(b, "samples", Integer.toString(magnetometer.samples));
+            line(b, "delta_samples", Integer.toString(magnetometer.deltaSamples));
+            line(b, "effective_hz", f6(magnetometer.effectiveHz));
+            line(b, "rms_delta_uT", f6(magnetometer.rmsDeltaUt));
+            line(b, "peak_delta_uT", f6(magnetometer.peakDeltaUt));
+            line(b, "x_min_uT", f6(magnetometer.minX));
+            line(b, "x_max_uT", f6(magnetometer.maxX));
+            line(b, "y_min_uT", f6(magnetometer.minY));
+            line(b, "y_max_uT", f6(magnetometer.maxY));
+            line(b, "z_min_uT", f6(magnetometer.minZ));
+            line(b, "z_max_uT", f6(magnetometer.maxZ));
+            line(b, "interpretation",
+                    "OBSERVATION_ONLY; magnetic change is not causal attribution");
+        }
+
+        section(b, "passive_connectivity");
+        PassiveRadioObservation.Result radio = PassiveRadioObservation.observe(context);
+        line(b, "state", radio.state);
+        line(b, "active_transports", radio.transports);
+        line(b, "telephony_feature", radio.telephonyFeature ? "PRESENT" : "NOT_REPORTED");
+        line(b, "policy",
+                "PASSIVE_PLATFORM_METADATA_ONLY; no scan/injection/modem/power/frequency control");
+
+        section(b, "audio_codec_inventory");
+        CodecCapabilityProbe.Result codecs = CodecCapabilityProbe.observe();
+        line(b, "encoders", codecs.audioEncoders);
+        line(b, "decoders", codecs.audioDecoders);
+        line(b, "policy",
+                "RUNTIME_REPORTED_CAPABILITY; presence does not imply Rafaelia implementation");
+
         section(b, "sensor_inventory");
         if (sensors == null) {
             line(b, "sensors", "UNAVAILABLE_SERVICE");
@@ -200,6 +243,9 @@ final class EvidenceBundleWriter {
         line(b, "cfr_relative_capture", "AVAILABLE_IN_APP");
         line(b, "absolute_spl", "PENDING_PHYSICAL_REFERENCE");
         line(b, "sensor_vibration", "OBSERVED_UNPROMOTED");
+        line(b, "sensor_magnetic", "OBSERVED_UNPROMOTED");
+        line(b, "passive_radio_metadata", "PLATFORM_OBSERVATION_ONLY");
+        line(b, "rac1_codec", "CORE_IMPLEMENTED_UNPROMOTED");
         line(b, "hardware_diagnosis", "NOT_CLAIMED");
         line(b, "installation_proof",
                 "package metadata + installed APK SHA-256 + source/CI provenance when embedded");

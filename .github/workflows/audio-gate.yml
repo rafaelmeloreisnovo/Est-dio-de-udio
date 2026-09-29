@@ -74,13 +74,14 @@ jobs:
             app/src/main/cpp/rfa_biquad_core.c \
             app/src/main/cpp/rfa_voice_core.c \
             app/src/main/cpp/rfa_measure_core.c \
+            app/src/main/cpp/rfa_rac1_core.c \
             -o manifold_smoke
           ./manifold_smoke
 
       - name: Authorial freestanding source gate
         run: |
-          CORE_C="app/src/main/cpp/dsp_core.c app/src/main/cpp/meter_core.c app/src/main/cpp/rfa_wave_core.c app/src/main/cpp/rfa_matrix_core.c app/src/main/cpp/rfa_block_core.c app/src/main/cpp/rfa_container_core.c app/src/main/cpp/rfa_fir_core.c app/src/main/cpp/rfa_time_core.c app/src/main/cpp/rfa_lms_core.c app/src/main/cpp/rfa_biquad_core.c app/src/main/cpp/rfa_voice_core.c app/src/main/cpp/rfa_measure_core.c"
-          CORE_ALL="$CORE_C app/src/main/cpp/dsp_core.h app/src/main/cpp/meter_core.h app/src/main/cpp/rfa_wave_core.h app/src/main/cpp/rfa_matrix_core.h app/src/main/cpp/rfa_block_core.h app/src/main/cpp/rfa_container_core.h app/src/main/cpp/rfa_fir_core.h app/src/main/cpp/rfa_time_core.h app/src/main/cpp/rfa_lms_core.h app/src/main/cpp/rfa_biquad_core.h app/src/main/cpp/rfa_voice_core.h app/src/main/cpp/rfa_measure_core.h app/src/main/cpp/rfa_sine_q15.h app/src/main/cpp/rfa_core_types.h"
+          CORE_C="app/src/main/cpp/dsp_core.c app/src/main/cpp/meter_core.c app/src/main/cpp/rfa_wave_core.c app/src/main/cpp/rfa_matrix_core.c app/src/main/cpp/rfa_block_core.c app/src/main/cpp/rfa_container_core.c app/src/main/cpp/rfa_fir_core.c app/src/main/cpp/rfa_time_core.c app/src/main/cpp/rfa_lms_core.c app/src/main/cpp/rfa_biquad_core.c app/src/main/cpp/rfa_voice_core.c app/src/main/cpp/rfa_measure_core.c app/src/main/cpp/rfa_rac1_core.c"
+          CORE_ALL="$CORE_C app/src/main/cpp/dsp_core.h app/src/main/cpp/meter_core.h app/src/main/cpp/rfa_wave_core.h app/src/main/cpp/rfa_matrix_core.h app/src/main/cpp/rfa_block_core.h app/src/main/cpp/rfa_container_core.h app/src/main/cpp/rfa_fir_core.h app/src/main/cpp/rfa_time_core.h app/src/main/cpp/rfa_lms_core.h app/src/main/cpp/rfa_biquad_core.h app/src/main/cpp/rfa_voice_core.h app/src/main/cpp/rfa_measure_core.h app/src/main/cpp/rfa_rac1_core.h app/src/main/cpp/rfa_sine_q15.h app/src/main/cpp/rfa_core_types.h"
 
           if grep -nRE '^[[:space:]]*#include[[:space:]]*<' $CORE_ALL; then
             echo "System header reached the freestanding core"
@@ -146,7 +147,7 @@ jobs:
           NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           FLAGS="-std=c11 -O3 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -fvisibility=hidden -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Iapp/src/main/cpp"
 
-          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core; do
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core rfa_rac1_core; do
             "$CC" --target=armv7a-linux-androideabi29 $FLAGS -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
             "$NM" -u "$SRC.armv7.o" > "$SRC.armv7.undefined"
             if test -s "$SRC.armv7.undefined"; then
@@ -156,7 +157,7 @@ jobs:
           done
 
           : > abi.actual
-          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core; do
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core rfa_rac1_core; do
             "$NM" --defined-only --extern-only "$SRC.armv7.o" | awk -v src="$SRC" '{print src ":" $NF}' >> abi.actual
           done
           sort -o abi.actual abi.actual
@@ -170,7 +171,7 @@ jobs:
           NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           FLAGS="-std=c11 -O3 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -fvisibility=hidden -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Iapp/src/main/cpp"
 
-          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core; do
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core rfa_rac1_core; do
             "$CC" --target=aarch64-linux-android29 $FLAGS -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
             "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
             if test -s "$SRC.aarch64.undefined"; then

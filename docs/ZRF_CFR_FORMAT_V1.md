@@ -56,6 +56,9 @@ SPEC  spectral analysis
 PHON  phonetic/voice feature record
 ROOM  room profile/correction state
 RCPT  evidence/receipt record
+CODE  codebook/schema metadata
+PROV  provenance/origin/version metadata
+RAC1  experimental RAC1-coded PCM payload
 ```
 
 Unknown required chunks must fail closed. Unknown optional chunks may be skipped only after their bounded length is validated.
@@ -176,4 +179,25 @@ The alignment search ranks candidates by absolute correlation while preserving t
 positive correlation -> same sync polarity
 negative correlation -> inverted sync polarity
 SIGNED_SYNC_CORRELATION != FULL_PHASE_RESPONSE
+```
+
+
+## 10. Multimodal/codebook extension
+
+V1 reserves three additional chunk identifiers:
+
+```text
+CODE -> versioned semantic/schema codebook
+PROV -> provenance coordinates
+RAC1 -> experimental lossless PCM16-coded payload
+```
+
+Registration does not require every ZRF to contain them.
+
+A RAC1 payload does not replace the immutable source by itself. If RAC1 is used as a derived representation, source preservation/provenance rules still apply.
+
+```text
+CODEBOOK != CONTENT
+HASH != AUTHORSHIP
+RAC1_ROUNDTRIP != SUPERIOR_COMPRESSION
 ```

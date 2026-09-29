@@ -215,6 +215,18 @@ public final class MainActivity extends Activity {
         tools.addView(share, weight());
         box.addView(tools);
 
+        LinearLayout interop = row();
+        Button rawExport = button("RAW PCM");
+        rawExport.setOnClickListener(v -> exportMasterRaw());
+        Button wavExport = button("WAV PCM16");
+        wavExport.setOnClickListener(v -> exportMasterWav());
+        Button opusShare = button("OPUS / SHARE");
+        opusShare.setOnClickListener(v -> shareLast());
+        interop.addView(rawExport, weight());
+        interop.addView(wavExport, weight());
+        interop.addView(opusShare, weight());
+        box.addView(interop);
+
         profileSpinner = new Spinner(this);
         ArrayAdapter<String> profiles = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item, PROFILES);
@@ -365,31 +377,34 @@ public final class MainActivity extends Activity {
                 "EVIDENCE — coletando instalação, build, sensores e μ∆ do acelerômetro…");
 
         MicroDeltaVibrationProbe.run(this, 2200L, vibration -> {
-            new Thread(() -> {
-                try {
-                    EvidenceBundleWriter.Result result = EvidenceBundleWriter.write(
-                            this,
-                            vibration,
-                            lastZrf,
-                            lastCfr,
-                            lastMasteredPcm);
-                    lastEvidenceUri = result.uri;
-                    runOnUiThread(() -> status.setText(
-                            "PROVAS GERADAS — " + result.displayName +
-                            "\ninstalação + APK SHA-256 + CI provenance + hardware + μ∆" +
-                            "\nVibração: " + vibration.state +
-                            " | samples=" + vibration.samples +
-                            " | RMS Δa=" +
-                            String.format(Locale.US, "%.6f", vibration.rmsDeltaMs2) +
-                            " m/s²" +
-                            "\nDocumento salvo em Downloads/RafaeliaAudio/Evidence."));
-                } catch (Exception e) {
-                    runOnUiThread(() ->
-                            status.setText("Falha ao gerar provas: " + e.getMessage()));
-                } finally {
-                    evidenceRunning = false;
-                }
-            }, "rafaelia-evidence-writer").start();
+            MicroDeltaMagnetometerProbe.run(this, 2200L, magnetometer -> {
+                new Thread(() -> {
+                    try {
+                        EvidenceBundleWriter.Result result = EvidenceBundleWriter.write(
+                                this,
+                                vibration,
+                                magnetometer,
+                                lastZrf,
+                                lastCfr,
+                                lastMasteredPcm);
+                        lastEvidenceUri = result.uri;
+                        runOnUiThread(() -> status.setText(
+                                "PROVAS GERADAS — " + result.displayName +
+                                "\ninstalação + APK SHA-256 + CI + hardware + μ∆" +
+                                "\nΔa RMS=" +
+                                String.format(Locale.US, "%.6f", vibration.rmsDeltaMs2) +
+                                " m/s² | ΔB RMS=" +
+                                String.format(Locale.US, "%.6f", magnetometer.rmsDeltaUt) +
+                                " µT" +
+                                "\nDocumento salvo em Downloads/RafaeliaAudio/Evidence."));
+                    } catch (Exception e) {
+                        runOnUiThread(() ->
+                                status.setText("Falha ao gerar provas: " + e.getMessage()));
+                    } finally {
+                        evidenceRunning = false;
+                    }
+                }, "rafaelia-evidence-writer").start();
+            });
         });
     }
 
@@ -718,6 +733,65 @@ public final class MainActivity extends Activity {
         ContentValues values = new ContentValues();
         values.put(MediaStore.Audio.Media.IS_PENDING, 0);
         getContentResolver().update(uri, values, null, null);
+    }
+
+    private void exportMasterRaw() {
+        exportMasterInterop(false);
+    }
+
+    private void exportMasterWav() {
+        exportMasterInterop(true);
+    }
+
+    private void exportMasterInterop(boolean wav) {
+        if (lastMasteredPcm == null || !lastMasteredPcm.isFile()) {
+            status.setText("Ainda não há master PCM para exportar.");
+            return;
+        }
+
+        String stamp = new SimpleDateFormat(
+                "yyyyMMdd_HHmmss", Locale.US).format(new Date());
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME,
+                "Rafaelia_Master_" + stamp + (wav ? ".wav" : ".pcm"));
+        values.put(MediaStore.MediaColumns.MIME_TYPE,
+                wav ? "audio/wav" : "application/octet-stream");
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH,
+                wav ? Environment.DIRECTORY_MUSIC + "/RafaeliaAudio" :
+                        Environment.DIRECTORY_DOWNLOADS + "/RafaeliaAudio/Raw");
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+        Uri collection = wav ?
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI :
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+        Uri uri = getContentResolver().insert(collection, values);
+        if (uri == null) {
+            status.setText("Falha ao criar destino " + (wav ? "WAV." : "RAW."));
+            return;
+        }
+
+        new Thread(() -> {
+            try (java.io.OutputStream out =
+                         getContentResolver().openOutputStream(uri, "w")) {
+                if (out == null) throw new IllegalStateException("stream indisponível");
+                long bytes = wav ?
+                        AudioInteropWriter.writeWav16(
+                                lastMasteredPcm, out,
+                                lastMasteredRate, lastMasteredChannels) :
+                        AudioInteropWriter.writeRaw(lastMasteredPcm, out);
+
+                ContentValues done = new ContentValues();
+                done.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                getContentResolver().update(uri, done, null, null);
+                runOnUiThread(() -> status.setText(
+                        (wav ? "WAV PCM16" : "RAW PCM") +
+                        " exportado: " + bytes + " bytes"));
+            } catch (Exception e) {
+                getContentResolver().delete(uri, null, null);
+                runOnUiThread(() ->
+                        status.setText("Falha no export: " + e.getMessage()));
+            }
+        }, wav ? "rafaelia-wav-export" : "rafaelia-raw-export").start();
     }
 
     private void shareLast() {

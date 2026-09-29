@@ -15,6 +15,7 @@
 #include "rfa_biquad_core.h"
 #include "rfa_voice_core.h"
 #include "rfa_measure_core.h"
+#include "rfa_rac1_core.h"
 
 static int same_i16(const rfa_i16 *a, const rfa_i16 *b, int count) {
     int i;
@@ -65,6 +66,13 @@ int main(void) {
     rfa_i16 sync_b[32];
     rfa_i16 sync_inverted[40];
     rfa_relative_transfer inverted_transfer;
+    rfa_i16 rac_input[16] = {
+        0,0, 100,-100, 200,-200, 300,-300,
+        301,-299, 302,-298, 1000,-1000, 0,0
+    };
+    rfa_i16 rac_output[16];
+    rfa_u8 rac_encoded[48];
+    int rac_bytes;
     int i;
 
     rfa_wave_bank_reset(&bank);
@@ -180,6 +188,15 @@ int main(void) {
             sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 69;
     if (transfer.best_lag != 5) return 70;
     if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 71;
+
+    if (rfa_rac1_bound_bytes(8, 2) != 48) return 80;
+    rac_bytes = rfa_rac1_encode_i16(rac_input, 8, 2, rac_encoded, 48);
+    if (rac_bytes <= 0 || rac_bytes > 48) return 81;
+    if (rfa_rac1_decode_i16(
+            rac_encoded, rac_bytes, 8, 2, rac_output, 16) != 16) return 82;
+    if (!same_i16(rac_input, rac_output, 16)) return 83;
+    if (rfa_rac1_decode_i16(
+            rac_encoded, rac_bytes - 1, 8, 2, rac_output, 16) != 0) return 84;
 
     return 0;
 }

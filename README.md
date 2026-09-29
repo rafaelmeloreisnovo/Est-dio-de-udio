@@ -251,3 +251,37 @@ Android SDK/DEX/platform APIs remain an irreducible shell for an Android applica
 Resolvable empty tokens now become explicit states such as `INPUT_IDLE`, `UNAVAILABLE_NOT_REPORTED`, `NOT_RUN` and `PENDING_PHYSICAL_REFERENCE`. Undefined semantics such as an unresolved NIU hardware definition remain `TOKEN_VAZIO`.
 
 See `docs/ADAPTIVE_STUDIO_UI_V1.md`, `docs/LOW_LEVEL_BOUNDARY_V1.md` and `docs/TOKEN_GAP_RECONCILIATION_V1.md`.
+
+
+## Delta 4.5 — Multimodal / storage / codec
+
+Canonical activation route applied:
+
+```text
+SOURCE
+-> OBSERVATION
+-> NORMALIZATION
+-> VECTOR/MATRIX
+-> CODEBOOK/INDEX
+-> PROVENANCE
+-> RECONSTRUCTION
+-> RECEIPT
+```
+
+Implemented in this delta:
+
+- magnetometer μ∆ (`ΔB`) observation;
+- passive Android connectivity metadata only — no RF control/transmission path;
+- runtime audio codec inventory via the platform;
+- authorial RAW PCM and WAV PCM16 export;
+- experimental freestanding RAC1 lossless PCM16 core;
+- exact RAC1 encode/decode smoke vector;
+- ZRF `CODE`, `PROV`, `RAC1` registered chunk types;
+- multimodal, interoperability, codebook/provenance and passive-RF contracts.
+
+```text
+RAC1_BETTER_THAN_MP3_OPUS = TOKEN_VAZIO
+RF_CONTROL = NOT_IMPLEMENTED
+MAGNETOMETER_PHYSICAL = NOT_RUN
+WAV_EXPORT_PHYSICAL = NOT_RUN
+```
