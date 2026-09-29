@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.media.AudioManager;
@@ -114,9 +115,22 @@ final class EvidenceBundleWriter {
         line(b, "ci_run_number", BuildConfig.CI_RUN_NUMBER);
         String apkPath = context.getApplicationInfo().sourceDir;
         line(b, "installed_apk_sha256", sha256File(new File(apkPath)));
+        line(b, "signing_mode", BuildConfig.SIGNING_MODE);
+        line(b, "signer_id", BuildConfig.SIGNER_ID);
+        line(b, "expected_signing_cert_sha256", BuildConfig.EXPECTED_CERT_SHA256);
+        String installedCert = installedSigningCertificateSha256(context);
+        line(b, "installed_signing_cert_sha256", installedCert);
+        line(b, "signing_cert_matches_expected",
+                signingMatch(installedCert, BuildConfig.EXPECTED_CERT_SHA256));
 
         section(b, "embedded_ci_provenance");
         appendAssetOrToken(context, b, "ci_provenance_v1.txt");
+
+        section(b, "component_origin");
+        appendAssetOrToken(context, b, "component_origin_v1.txt");
+
+        section(b, "permission_contract");
+        appendAssetOrToken(context, b, "permission_contract_v1.txt");
 
         section(b, "device_runtime");
         line(b, "manufacturer", safe(Build.MANUFACTURER));
@@ -130,6 +144,15 @@ final class EvidenceBundleWriter {
         line(b, "record_audio_permission",
                 context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                         PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT_GRANTED");
+        line(b, "activity_recognition_permission",
+                Build.VERSION.SDK_INT < 29 ? "PLATFORM_PRE29" :
+                (context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) ==
+                        PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT_GRANTED"));
+        line(b, "access_network_state_permission",
+                context.checkSelfPermission(Manifest.permission.ACCESS_NETWORK_STATE) ==
+                        PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT_GRANTED");
+        line(b, "high_sampling_rate_sensor_permission",
+                "NOT_REQUESTED_CURRENT_PROFILE");
         line(b, "microphone_feature",
                 pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE) ? "PRESENT" : "ABSENT");
         line(b, "audio_output_sample_rate",
