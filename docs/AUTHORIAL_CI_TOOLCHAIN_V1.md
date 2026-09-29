@@ -31,13 +31,13 @@ The canonical CI path no longer uses JavaScript Actions for:
 
 Those jobs are replaced with project-owned shell orchestration.
 
-One JavaScript Action remains isolated:
+The canonical workflow now permits **no external JavaScript Action**.
 
 ```text
-actions/upload-artifact@v4 = PLATFORM_EDGE
+EXTERNAL_JS_ACTIONS = NONE
 ```
 
-It is used only to transfer the already-built APK into GitHub's artifact store.
+Successful main builds publish the debug APK through the runner-provided GitHub CLI as a traceable prerelease. `gh` remains an external GitHub platform tool and is not reclassified as project-authored.
 
 ## Checkout
 
@@ -92,10 +92,10 @@ The workflow scans all workflow `uses:` entries.
 Permitted external JavaScript Action set:
 
 ```text
-{ actions/upload-artifact@v4 }
+{}
 ```
 
-Any additional external Action fails the gate.
+Any external Action fails the gate.
 
 Local reusable workflows remain allowed.
 
@@ -103,10 +103,10 @@ Local reusable workflows remain allowed.
 
 Possible later stages:
 
-1. replace GitHub artifact upload with a separately audited transport;
-2. pin runner image instead of the moving `ubuntu-latest` label;
-3. record SDK package digests/tool identities in the external post-build receipt;
-4. reproduce the build outside GitHub Actions.
+1. pin the runner image instead of the moving `ubuntu-latest` label;
+2. record deeper SDK package/tool identities in post-build receipts;
+3. reproduce the build outside GitHub Actions;
+4. compare GitHub CLI release transport with an independently hosted mirror.
 
 ```text
 NODEJS_AUTHORIAL_RUNTIME = NOT_IMPLEMENTED_NOT_REQUIRED
