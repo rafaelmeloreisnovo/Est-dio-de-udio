@@ -127,9 +127,7 @@ int main(void) {
 
     if (!rfa_lms_bind_q15(&lms, lms_weights, lms_history, 4, 512)) return 54;
     rfa_lms_cancel_block_q15(&lms, lms_primary, lms_reference, lms_out, 8);
-    for (i = 0; i < 8; ++i) {
-        if (lms_out[i] < -32768 || lms_out[i] > 32767) return 55;
-    }
+    if (lms_out[0] != lms_primary[0]) return 55;
 
     rfa_biquad_bank_reset_q30(&bq, 1);
     identity_bq.b0_q30 = (rfa_i32)(1U << 30);
