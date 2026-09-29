@@ -259,6 +259,28 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeSweepRender(
 }
 
 JNIEXPORT jint JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeSyncSequence(
+        JNIEnv *env, jclass clazz, jshortArray output,
+        jint count, jlong seed, jint gainQ15) {
+    jsize length;
+    jshort *data;
+    int produced;
+    (void)clazz;
+
+    if (output == (jshortArray)0 || count <= 0) return 0;
+    if (seed < 0 || seed > 4294967295LL) return 0;
+    length = (*env)->GetArrayLength(env, output);
+    if (count > length) return 0;
+
+    data = (*env)->GetShortArrayElements(env, output, (jboolean *)0);
+    if (data == (jshort *)0) return 0;
+    produced = rfa_sync_sequence_q15(
+            (rfa_i16 *)data, (int)count, (rfa_u32)seed, (rfa_i32)gainQ15);
+    (*env)->ReleaseShortArrayElements(env, output, data, 0);
+    return (jint)produced;
+}
+
+JNIEXPORT jint JNICALL
 Java_io_rafaelia_audiostudio_NativeDsp_nativeRelativeTransfer(
         JNIEnv *env, jclass clazz,
         jshortArray reference, jint referenceCount,
