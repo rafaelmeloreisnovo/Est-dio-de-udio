@@ -14,6 +14,7 @@
 #include "rfa_lms_core.h"
 #include "rfa_biquad_core.h"
 #include "rfa_voice_core.h"
+#include "rfa_measure_core.h"
 
 static int same_i16(const rfa_i16 *a, const rfa_i16 *b, int count) {
     int i;
@@ -56,6 +57,10 @@ int main(void) {
     rfa_i16 bq_data[8] = {-1000,-500,0,500,1000,500,0,-500};
     rfa_i16 voice_data[32];
     rfa_voice_features voice_features;
+    rfa_exp_sweep_q31 sweep;
+    rfa_i16 sweep_data[64];
+    rfa_i16 delayed_data[72];
+    rfa_relative_transfer transfer;
     int i;
 
     rfa_wave_bank_reset(&bank);
@@ -149,6 +154,15 @@ int main(void) {
     if (!rfa_voice_analyze_mono(voice_data, 32, 2, 8, &voice_features)) return 58;
     if (voice_features.best_period_samples != 4) return 59;
     if (voice_features.energy == 0ULL || voice_features.zero_crossings == 0U) return 60;
+
+    rfa_exp_sweep_reset_q31(&sweep, 89478485U, 2149631132U, 16384, 64);
+    if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 61;
+    for (i = 0; i < 72; ++i) delayed_data[i] = 0;
+    for (i = 0; i < 64; ++i) delayed_data[i + 5] = sweep_data[i];
+    if (!rfa_relative_transfer_search(
+            sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 62;
+    if (transfer.best_lag != 5) return 63;
+    if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 64;
 
     return 0;
 }
