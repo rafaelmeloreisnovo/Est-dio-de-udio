@@ -111,3 +111,27 @@ int rfa_container_read_header(const rfa_u8 *source, int length,
     if (desc->matrix_dim < 0 || desc->matrix_dim > 16) return 0;
     return 1;
 }
+
+int rfa_container_write_chunk_header(rfa_u8 *target, int capacity,
+                                     rfa_u32 type, rfa_u32 flags,
+                                     rfa_u32 payload_bytes, rfa_u32 item_count) {
+    if (target == (rfa_u8 *)0 || capacity < RFA_CONTAINER_CHUNK_HEADER_BYTES) return 0;
+    rfa_put_u32le(target + 0, type);
+    rfa_put_u32le(target + 4, flags);
+    rfa_put_u32le(target + 8, payload_bytes);
+    rfa_put_u32le(target + 12, item_count);
+    return RFA_CONTAINER_CHUNK_HEADER_BYTES;
+}
+
+int rfa_container_read_chunk_header(const rfa_u8 *source, int length,
+                                    rfa_u32 *type, rfa_u32 *flags,
+                                    rfa_u32 *payload_bytes, rfa_u32 *item_count) {
+    if (source == (const rfa_u8 *)0 || length < RFA_CONTAINER_CHUNK_HEADER_BYTES) return 0;
+    if (type == (rfa_u32 *)0 || flags == (rfa_u32 *)0 ||
+        payload_bytes == (rfa_u32 *)0 || item_count == (rfa_u32 *)0) return 0;
+    *type = rfa_get_u32le(source + 0);
+    *flags = rfa_get_u32le(source + 4);
+    *payload_bytes = rfa_get_u32le(source + 8);
+    *item_count = rfa_get_u32le(source + 12);
+    return 1;
+}
