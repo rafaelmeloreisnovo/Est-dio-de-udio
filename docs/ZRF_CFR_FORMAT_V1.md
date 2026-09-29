@@ -153,7 +153,7 @@ The speaker path additionally has pre/post silence; those are not duplicated in 
 | 4 | 4 | state flags; bit0 = RELATIVE |
 | 8 | 4 | best sync lag in samples |
 | 12 | 4 | captured response frames |
-| 16 | 8 | signed correlation |
+| 16 | 8 | signed correlation; sign may indicate global path polarity at sync |
 | 24 | 8 | sync reference energy |
 | 32 | 8 | aligned response energy |
 | 40 | 4 | sample rate |
@@ -165,4 +165,15 @@ This is evidence of a relative speaker-room-microphone-ADC path. It does not est
 RELATIVE_CAPTURE != ABSOLUTE_SPL
 SYNC_LAG != IMPULSE_RESPONSE
 SWEEP_CAPTURE != RT60
+```
+
+
+### Polarity note
+
+The alignment search ranks candidates by absolute correlation while preserving the signed value.
+
+```text
+positive correlation -> same sync polarity
+negative correlation -> inverted sync polarity
+SIGNED_SYNC_CORRELATION != FULL_PHASE_RESPONSE
 ```
