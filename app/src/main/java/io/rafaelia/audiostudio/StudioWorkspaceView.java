@@ -45,6 +45,8 @@ final class StudioWorkspaceView extends View {
 
     private int screen;
     private int waveBins;
+    private int densityMode;
+    private float uiScale = 1f;
     private int peakPct;
     private int rmsPct;
     private long clipped;
@@ -59,7 +61,7 @@ final class StudioWorkspaceView extends View {
         super(context);
         paint.setTypeface(android.graphics.Typeface.MONOSPACE);
         thin.setTypeface(android.graphics.Typeface.MONOSPACE);
-        setMinimumHeight(dp(500));
+        setMinimumHeight(dp(420));
         setFocusable(true);
     }
 
@@ -131,12 +133,31 @@ final class StudioWorkspaceView extends View {
     }
 
     @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        int shortEdge = w < h ? w : h;
+        densityMode = shortEdge < dp(360) ? 0 : (w > h ? 2 : 1);
+        uiScale = densityMode == 0 ? 0.84f : (densityMode == 2 ? 1.10f : 1f);
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        int wanted;
+        if (width <= dp(360)) wanted = dp(430);
+        else if (width <= dp(600)) wanted = dp(500);
+        else wanted = dp(560);
+        int height = resolveSize(wanted, heightMeasureSpec);
+        setMeasuredDimension(resolveSize(width, widthMeasureSpec), height);
+    }
+
+    @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         float w = getWidth();
         float h = getHeight();
-        float tabH = dp(50);
-        float bodyTop = tabH + dp(8);
+        float tabH = densityMode == 0 ? dp(42) : dp(50);
+        float bodyTop = tabH + dp(densityMode == 0 ? 4 : 8);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setARGB(255, 16, 18, 22);
@@ -156,26 +177,34 @@ final class StudioWorkspaceView extends View {
     }
 
     private void drawTabs(Canvas canvas, float width, float tabH) {
-        float slot = width / TABS.length;
+        int columns = densityMode == 0 ? 4 : TABS.length;
+        int rows = densityMode == 0 ? 2 : 1;
+        float slot = width / columns;
+        float rowH = tabH / rows;
         int i;
-        paint.setTextSize(dp(11));
+        paint.setTextSize(dp(densityMode == 0 ? 9 : 11));
         paint.setTextAlign(Paint.Align.CENTER);
         for (i = 0; i < TABS.length; ++i) {
             paint.setARGB(255, i == screen ? 52 : 28, i == screen ? 66 : 31,
                     i == screen ? 82 : 36);
-            rect.set(slot * i, 0, slot * (i + 1), tabH);
+            int column = i % columns;
+            int row = i / columns;
+            float x0 = slot * column;
+            float y0 = rowH * row;
+            rect.set(x0, y0, x0 + slot, y0 + rowH);
             canvas.drawRect(rect, paint);
             paint.setARGB(255, 235, 239, 244);
-            canvas.drawText(TABS[i], slot * (i + 0.5f), dp(31), paint);
+            canvas.drawText(TABS[i], x0 + slot * 0.5f,
+                    y0 + rowH * 0.68f, paint);
         }
         paint.setTextAlign(Paint.Align.LEFT);
     }
 
     private void drawHeader(Canvas canvas, float top, float width) {
-        paint.setTextSize(dp(15));
+        paint.setTextSize(dp(densityMode == 0 ? 13 : 15));
         paint.setARGB(255, 236, 240, 244);
         canvas.drawText(SCREEN_TITLES[screen], dp(12), top + dp(18), paint);
-        paint.setTextSize(dp(11));
+        paint.setTextSize(dp(densityMode == 0 ? 9 : 11));
         paint.setARGB(255, 150, 162, 176);
         canvas.drawText("48 kHz | PCM16 | " + inputSource,
                 dp(12), top + dp(38), paint);
@@ -184,7 +213,7 @@ final class StudioWorkspaceView extends View {
         long millis = ((capturedSamples % 48000L) * 1000L) / 48000L;
         String time = two(seconds / 60L) + ":" + two(seconds % 60L) + "." + three(millis);
         paint.setTextAlign(Paint.Align.RIGHT);
-        paint.setTextSize(dp(18));
+        paint.setTextSize(dp(densityMode == 0 ? 15 : 18));
         paint.setARGB(255, 236, 240, 244);
         canvas.drawText(time, width - dp(12), top + dp(28), paint);
         paint.setTextAlign(Paint.Align.LEFT);
@@ -405,9 +434,15 @@ final class StudioWorkspaceView extends View {
             performClick();
             return true;
         }
-        if (event.getAction() == MotionEvent.ACTION_UP && event.getY() <= dp(56)) {
-            float slot = getWidth() / (float)TABS.length;
-            int target = slot <= 0f ? 0 : (int)(event.getX() / slot);
+        if (event.getAction() == MotionEvent.ACTION_UP &&
+                event.getY() <= (densityMode == 0 ? dp(42) : dp(56))) {
+            int columns = densityMode == 0 ? 4 : TABS.length;
+            int rows = densityMode == 0 ? 2 : 1;
+            float slot = getWidth() / (float)columns;
+            float rowH = (densityMode == 0 ? dp(42) : dp(50)) / (float)rows;
+            int column = slot <= 0f ? 0 : (int)(event.getX() / slot);
+            int row = rowH <= 0f ? 0 : (int)(event.getY() / rowH);
+            int target = row * columns + column;
             if (target < 0) target = 0;
             if (target >= TABS.length) target = TABS.length - 1;
             screen = target;
