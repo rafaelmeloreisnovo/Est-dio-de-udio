@@ -7,14 +7,17 @@
 
 package io.rafaelia.audiostudio;
 
+import android.app.ActivityManager;
 import android.Manifest;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.pm.PackageInfo;
+import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.media.AudioManager;
+import android.media.AudioDeviceInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -128,11 +131,19 @@ final class EvidenceBundleWriter {
         line(b, "microphone_feature",
                 pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE) ? "PRESENT" : "ABSENT");
         line(b, "audio_output_sample_rate",
-                audio == null ? "TOKEN_VAZIO" :
-                        safe(audio.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)));
+                audio == null ? "UNAVAILABLE_SERVICE" :
+                        safeOrUnavailable(audio.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)));
         line(b, "audio_output_frames_per_buffer",
-                audio == null ? "TOKEN_VAZIO" :
-                        safe(audio.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)));
+                audio == null ? "UNAVAILABLE_SERVICE" :
+                        safeOrUnavailable(audio.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)));
+
+        section(b, "audio_input_devices");
+        appendAudioInputDevices(b, audio);
+
+        section(b, "hardware_acceleration");
+        appendGraphicsCapabilities(context, b, pm);
+        line(b, "npu_generic_query", "UNAVAILABLE_STANDARD_ANDROID_QUERY");
+        line(b, "numa_generic_query", "UNAVAILABLE_STANDARD_ANDROID_QUERY");
 
         section(b, "micro_delta_vibration");
         if (vibration == null) {
@@ -195,6 +206,66 @@ final class EvidenceBundleWriter {
                 "package metadata + installed APK SHA-256 + source/CI provenance when embedded");
 
         return b.toString();
+    }
+
+    private static void appendAudioInputDevices(
+            StringBuilder b, AudioManager audio) {
+        if (audio == null) {
+            line(b, "state", "UNAVAILABLE_SERVICE");
+            return;
+        }
+        AudioDeviceInfo[] devices = audio.getDevices(AudioManager.GET_DEVICES_INPUTS);
+        line(b, "count", Integer.toString(devices.length));
+        int i;
+        for (i = 0; i < devices.length; ++i) {
+            AudioDeviceInfo d = devices[i];
+            String prefix = "input." + i + ".";
+            line(b, prefix + "id", Integer.toString(d.getId()));
+            line(b, prefix + "type", Integer.toString(d.getType()));
+            CharSequence product = d.getProductName();
+            line(b, prefix + "product",
+                    product == null ? "UNAVAILABLE_NOT_REPORTED" : product.toString());
+            line(b, prefix + "sample_rates", joinInts(d.getSampleRates()));
+            line(b, prefix + "channel_counts", joinInts(d.getChannelCounts()));
+            line(b, prefix + "channel_masks", joinInts(d.getChannelMasks()));
+            line(b, prefix + "encodings", joinInts(d.getEncodings()));
+        }
+    }
+
+    private static void appendGraphicsCapabilities(
+            Context context, StringBuilder b, PackageManager pm) {
+        ActivityManager activity =
+                (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activity == null) {
+            line(b, "gles_required_version", "UNAVAILABLE_SERVICE");
+        } else {
+            ConfigurationInfo info = activity.getDeviceConfigurationInfo();
+            if (info == null) {
+                line(b, "gles_required_version", "UNAVAILABLE_NOT_REPORTED");
+            } else {
+                line(b, "gles_required_version",
+                        "0x" + Integer.toHexString(info.reqGlEsVersion));
+            }
+        }
+        line(b, "vulkan_feature",
+                pm.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL) ?
+                        "PRESENT" : "NOT_REPORTED");
+    }
+
+    private static String joinInts(int[] values) {
+        if (values == null || values.length == 0) return "UNAVAILABLE_NOT_REPORTED";
+        StringBuilder b = new StringBuilder();
+        int i;
+        for (i = 0; i < values.length; ++i) {
+            if (i != 0) b.append(',');
+            b.append(values[i]);
+        }
+        return b.toString();
+    }
+
+    private static String safeOrUnavailable(String value) {
+        return value == null || value.length() == 0 ?
+                "UNAVAILABLE_NOT_REPORTED" : value;
     }
 
     private static void appendAssetOrToken(
