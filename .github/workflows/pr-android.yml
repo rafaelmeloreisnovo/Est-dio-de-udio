@@ -8,3 +8,4 @@ jobs:
     uses: ./.github/workflows/audio-gate.yml
     with:
       source_sha: ${{ github.event.pull_request.head.sha }}
+      publish_live: false
