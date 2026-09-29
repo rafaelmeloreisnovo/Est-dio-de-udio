@@ -23,3 +23,16 @@ Update this matrix whenever a receipt materially promotes or demotes a state.
 | graphics capability query | implemented runtime query | build-gated | device-dependent | OBSERVED_UNPROMOTED |
 | Java third-party dependencies | none declared | CI gated | N/A | 0 |
 | R8/shrink path | disabled | CI gated | N/A | 0 |
+
+
+| RAW PCM export | implemented | build-gated | physical NOT_RUN | bounded source |
+| WAV PCM16 authorial export | implemented | build-gated | physical NOT_RUN | bounded source |
+| runtime codec inventory | implemented | build-gated | device-dependent | OBSERVED_UNPROMOTED |
+| MP3 decode | platform capability query/import path | build-gated | device-dependent | runtime-dependent |
+| MP3 encode | not implemented | N/A | NOT_RUN | NOT_IMPLEMENTED |
+| Opus encode | Android platform edge | build-gated | device-dependent | bounded platform path |
+| RAC1 lossless PCM16 core | implemented | host/ARM gated | UI export not wired | IMPLEMENTED_UNTESTED |
+| magnetometer μ∆ | implemented | build-gated | physical NOT_RUN | OBSERVED_UNPROMOTED when run |
+| passive connectivity metadata | implemented | build-gated | physical NOT_RUN | PLATFORM_OBSERVATION_ONLY |
+| RF transmit/control | not implemented | N/A | N/A | PROHIBITED_BY_PROJECT_BOUNDARY |
+| ZRF CODE/PROV/RAC1 chunk ids | registered | source-gated | serialization partial | IMPLEMENTED_PARTIAL |
