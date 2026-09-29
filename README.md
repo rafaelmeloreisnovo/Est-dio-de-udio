@@ -139,7 +139,7 @@ DELTA4_AARCH64_ZERO_UNDEFINED = PENDING_CI
 DELTA4_APK_BUILD = PENDING_CI
 DELTA4_PHYSICAL_ANDROID = NOT_RUN
 CFR_CALIBRATION_CAPTURE = PENDING
-ABSOLUTE_SPL = TOKEN_VAZIO
+ABSOLUTE_SPL = PENDING_PHYSICAL_REFERENCE
 claim_allowed = false
 ```
 
@@ -188,7 +188,7 @@ Current state:
 CFR_RELATIVE_SOURCE = IMPLEMENTED
 CFR_RELATIVE_CI = PASS
 CFR_RELATIVE_PHYSICAL_ANDROID = NOT_RUN
-ABSOLUTE_SPL = TOKEN_VAZIO
+ABSOLUTE_SPL = PENDING_PHYSICAL_REFERENCE
 FREQUENCY_TRANSFER_DECONVOLUTION = PENDING
 RT60 = PENDING
 ROOM_CORRECTION = PENDING
@@ -223,3 +223,31 @@ The app exposes **Gerar provas + teste μ∆**. It generates a shareable evidenc
 - hashes of available ZRF/CFR/master artifacts.
 
 `μ∆` is a temporal delta operator. Vibration observation is not promoted to hardware-fault diagnosis without a validated reference/model.
+
+
+## Delta 4.4 — Adaptive low UI + dependency boundary
+
+The primary studio surface is now auto-adaptive:
+
+- compact phone: top workspace tabs + central console + persistent transport;
+- wide/landscape: left workspace rail + central console + right inspector;
+- persistent actions: `REC | STOP | PLAY | CAL | PROOF`;
+- detailed legacy controls remain available below the console.
+
+Low-dependency state:
+
+```text
+JAVA_THIRD_PARTY_DEPS = 0
+ANDROIDX = 0
+KOTLIN = 0
+R8_SHRINK = 0
+JNI_IMPLEMENTATION_FILES = 1
+PHONE_ABIS = armeabi-v7a + arm64-v8a
+EVIDENCE_SHA256_PROVIDER = project-local LowSha256
+```
+
+Android SDK/DEX/platform APIs remain an irreducible shell for an Android application. They are not DSP/runtime-library dependencies of the freestanding core.
+
+Resolvable empty tokens now become explicit states such as `INPUT_IDLE`, `UNAVAILABLE_NOT_REPORTED`, `NOT_RUN` and `PENDING_PHYSICAL_REFERENCE`. Undefined semantics such as an unresolved NIU hardware definition remain `TOKEN_VAZIO`.
+
+See `docs/ADAPTIVE_STUDIO_UI_V1.md`, `docs/LOW_LEVEL_BOUNDARY_V1.md` and `docs/TOKEN_GAP_RECONCILIATION_V1.md`.
