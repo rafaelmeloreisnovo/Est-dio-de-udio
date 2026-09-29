@@ -362,6 +362,48 @@ final class EvidenceBundleWriter {
         line(b, key + ".sha256", sha256File(file));
     }
 
+    private static String installedSigningCertificateSha256(Context context) {
+        try {
+            PackageManager pm = context.getPackageManager();
+            PackageInfo pi = pm.getPackageInfo(
+                    context.getPackageName(),
+                    PackageManager.GET_SIGNING_CERTIFICATES);
+            if (pi.signingInfo == null) return "TOKEN_VAZIO_SIGNING_INFO";
+            Signature[] signatures = pi.signingInfo.hasMultipleSigners() ?
+                    pi.signingInfo.getApkContentsSigners() :
+                    pi.signingInfo.getSigningCertificateHistory();
+            if (signatures == null || signatures.length == 0) {
+                return "TOKEN_VAZIO_SIGNING_CERT";
+            }
+            LowSha256 sha = new LowSha256();
+            byte[] cert = signatures[0].toByteArray();
+            sha.update(cert, 0, cert.length);
+            return hex(sha.finish());
+        } catch (Exception e) {
+            return "UNAVAILABLE_SIGNING_QUERY";
+        }
+    }
+
+    private static String signingMatch(String installed, String expected) {
+        String e = normalizeHex(expected);
+        String i = normalizeHex(installed);
+        if (e.length() != 64 || i.length() != 64) return "TOKEN_VAZIO";
+        return e.equals(i) ? "PASS" : "FAIL";
+    }
+
+    private static String normalizeHex(String value) {
+        if (value == null) return "";
+        StringBuilder b = new StringBuilder(value.length());
+        int i;
+        for (i = 0; i < value.length(); ++i) {
+            char c = value.charAt(i);
+            if (c >= '0' && c <= '9') b.append(c);
+            else if (c >= 'a' && c <= 'f') b.append(c);
+            else if (c >= 'A' && c <= 'F') b.append((char)(c + ('a' - 'A')));
+        }
+        return b.toString();
+    }
+
     private static String sha256File(File file) throws Exception {
         LowSha256 sha = new LowSha256();
         try (FileInputStream in = new FileInputStream(file)) {
