@@ -41,3 +41,4 @@ rfa_lms_core:rfa_lms_reset_q15
 rfa_biquad_core:rfa_biquad_bank_process_q30
 rfa_biquad_core:rfa_biquad_bank_reset_q30
 rfa_biquad_core:rfa_biquad_bank_set_q30
+rfa_voice_core:rfa_voice_analyze_mono
