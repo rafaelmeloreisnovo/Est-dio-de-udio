@@ -22,10 +22,11 @@ final class StudioWorkspaceView extends View {
         void onPlayMaster();
         void onRunRelativeCalibration();
         void onGenerateEvidence();
+        void onRequestSensorAccess();
     }
 
     private static final String[] TABS = {
-            "REC", "EDIT", "CAL", "SPEC", "ROOM", "VOICE", "MASTER", "EXPORT"
+            "REC", "EDIT", "CAL", "SPEC", "ROOM", "VOICE", "MASTER", "EXPORT", "SYS"
     };
     private static final String[] SCREEN_TITLES = {
             "Recorder / transport",
@@ -35,7 +36,8 @@ final class StudioWorkspaceView extends View {
             "Impulse / room correction",
             "Voice / phoneme / timing",
             "DSP rack / A-B",
-            "ZRF / CFR / render"
+            "ZRF / CFR / render",
+            "System / permissions / origin"
     };
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -47,6 +49,7 @@ final class StudioWorkspaceView extends View {
     private final RectF transportPlay = new RectF();
     private final RectF transportCal = new RectF();
     private final RectF transportEvidence = new RectF();
+    private final RectF systemPermissionAction = new RectF();
 
     private float logicalWidth;
     private boolean wideLayout;
@@ -69,6 +72,9 @@ final class StudioWorkspaceView extends View {
     private String masterState = "MASTER=PENDING";
     private String calibrationState = "CAL=RELATIVE_ONLY";
     private String containerState = "ZRF/CFR=IMPLEMENTED_UNTESTED";
+    private String systemState = "SENSORS=OBSERVE | PERMISSIONS=MINIMAL";
+    private String originState = "ORIGIN=PROJECT+PLATFORM+TOOLCHAIN";
+    private String signatureState = "SIGNATURE=TOKEN_VAZIO";
     private ActionListener actionListener;
 
     StudioWorkspaceView(Context context) {
@@ -146,6 +152,38 @@ final class StudioWorkspaceView extends View {
         invalidate();
     }
 
+    void setSystemState(String state) {
+        systemState = state == null ? "SENSORS=UNAVAILABLE" : state;
+        invalidate();
+    }
+
+    void setOriginState(String state) {
+        originState = state == null ? "ORIGIN=UNAVAILABLE" : state;
+        invalidate();
+    }
+
+    void setSignatureState(String state) {
+        signatureState = state == null ? "SIGNATURE=UNAVAILABLE" : state;
+        invalidate();
+    }
+
+    private int tabColumns() {
+        if (densityMode == 0) return 3;
+        if (densityMode == 1) return 5;
+        return TABS.length;
+    }
+
+    private int tabRows() {
+        int columns = tabColumns();
+        return (TABS.length + columns - 1) / columns;
+    }
+
+    private float tabHeightPx() {
+        if (densityMode == 0) return dp(72);
+        if (densityMode == 1) return dp(64);
+        return dp(50);
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -173,7 +211,7 @@ final class StudioWorkspaceView extends View {
         float totalH = getHeight();
         float transportH = densityMode == 0 ? dp(56) : dp(62);
         float usableH = totalH - transportH;
-        float tabH = densityMode == 0 ? dp(42) : dp(50);
+        float tabH = tabHeightPx();
 
         wideLayout = densityMode == 2 && totalW >= dp(720);
 
@@ -228,7 +266,8 @@ final class StudioWorkspaceView extends View {
         else if (screen == 4) drawRoom(canvas, w, h);
         else if (screen == 5) drawVoice(canvas, w, h);
         else if (screen == 6) drawMaster(canvas, w, h);
-        else drawExport(canvas, w, h);
+        else if (screen == 7) drawExport(canvas, w, h);
+        else drawSystem(canvas, w, h);
     }
 
     private void drawSideTabs(Canvas canvas, float railW, float h) {
@@ -318,8 +357,8 @@ final class StudioWorkspaceView extends View {
     }
 
     private void drawTabs(Canvas canvas, float width, float tabH) {
-        int columns = densityMode == 0 ? 4 : TABS.length;
-        int rows = densityMode == 0 ? 2 : 1;
+        int columns = tabColumns();
+        int rows = tabRows();
         float slot = width / columns;
         float rowH = tabH / rows;
         int i;
@@ -466,6 +505,34 @@ final class StudioWorkspaceView extends View {
                 dp(12), h - dp(20), 11);
     }
 
+    private void drawSystem(Canvas canvas, float w, float h) {
+        float top = dp(120);
+        drawText(canvas, systemState, dp(12), top, 13);
+        drawWrappedState(canvas, originState, dp(12), top + dp(36), w - dp(24));
+        drawWrappedState(canvas, signatureState, dp(12), top + dp(92), w - dp(24));
+        drawPills(canvas, top + dp(150), new String[]{
+                "MIC", "ACCEL", "MOTION", "MAG", "LIGHT", "NET", "ORIGIN", "SIGN"
+        });
+        systemPermissionAction.set(
+                dp(12), top + dp(212), w - dp(12), top + dp(256));
+        paint.setARGB(255, 57, 78, 96);
+        canvas.drawRoundRect(systemPermissionAction, dp(7), dp(7), paint);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(dp(12));
+        paint.setARGB(255, 235, 239, 244);
+        canvas.drawText(
+                "REQUEST OPTIONAL MOTION SENSOR ACCESS",
+                systemPermissionAction.centerX(),
+                systemPermissionAction.top + dp(28), paint);
+        paint.setTextAlign(Paint.Align.LEFT);
+        drawText(canvas,
+                "No permission is invented for accelerometer/magnetometer/light/proximity.",
+                dp(12), h - dp(38), 10);
+        drawText(canvas,
+                "Android/platform/toolchain bytes remain externally attributed.",
+                dp(12), h - dp(20), 10);
+    }
+
     private void drawWave(Canvas canvas, float left, float top, float right, float bottom) {
         thin.setStrokeWidth(1f);
         thin.setARGB(255, 58, 67, 78);
@@ -609,6 +676,15 @@ final class StudioWorkspaceView extends View {
             }
         }
 
+        if (screen == 8) {
+            float localX = wideLayout ? x - wideRail : x;
+            if (systemPermissionAction.contains(localX, y)) {
+                if (actionListener != null) actionListener.onRequestSensorAccess();
+                performClick();
+                return true;
+            }
+        }
+
         if (wideLayout && x <= wideRail) {
             float usableH = getHeight() - dp(62);
             float slot = usableH / (float)TABS.length;
@@ -621,11 +697,11 @@ final class StudioWorkspaceView extends View {
             return true;
         }
         if (event.getAction() == MotionEvent.ACTION_UP &&
-                event.getY() <= (densityMode == 0 ? dp(42) : dp(56))) {
-            int columns = densityMode == 0 ? 4 : TABS.length;
-            int rows = densityMode == 0 ? 2 : 1;
+                event.getY() <= tabHeightPx()) {
+            int columns = tabColumns();
+            int rows = tabRows();
             float slot = getWidth() / (float)columns;
-            float rowH = (densityMode == 0 ? dp(42) : dp(50)) / (float)rows;
+            float rowH = tabHeightPx() / (float)rows;
             int column = slot <= 0f ? 0 : (int)(event.getX() / slot);
             int row = rowH <= 0f ? 0 : (int)(event.getY() / rowH);
             int target = row * columns + column;
