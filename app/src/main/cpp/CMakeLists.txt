@@ -13,6 +13,7 @@ add_library(rfa_manifold_core STATIC
     rfa_lms_core.c
     rfa_biquad_core.c
     rfa_voice_core.c
+    rfa_measure_core.c
 )
 
 set_target_properties(dsp_core meter_core rfa_manifold_core PROPERTIES
