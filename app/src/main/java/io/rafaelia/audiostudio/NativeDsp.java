@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026 Rafael Melo Reis.
+ * SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+ * Research/evaluation use: see LICENSE_RESEARCH_COMMERCIAL.md.
+ * Commercial use requires a separate written agreement with the rights holder.
+ */
+
 package io.rafaelia.audiostudio;
 
 final class NativeDsp {
