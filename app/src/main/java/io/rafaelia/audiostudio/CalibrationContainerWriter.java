@@ -25,6 +25,7 @@ final class CalibrationContainerWriter {
             long startStepQ32,
             long ratioQ31,
             int gainQ15,
+            int syncFrames,
             int preFrames,
             int postFrames,
             int maxLag,
@@ -93,7 +94,7 @@ final class CalibrationContainerWriter {
             writeU32(out, preFrames);
             writeU32(out, postFrames);
             writeU32(out, maxLag);
-            writeU32(out, 0L);
+            writeU32(out, syncFrames);
 
             out.write(calHeader);
             writeU32(out, 1L);
