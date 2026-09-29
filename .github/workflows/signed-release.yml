@@ -56,6 +56,45 @@ jobs:
           bash ci/rafaelia-toolchain.sh gradle
           bash ci/rafaelia-toolchain.sh report
 
+      - name: Require successful canonical gate for source SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          match="$(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$RFA_SOURCE_SHA/check-runs"               --jq '.check_runs[] | select(.name=="gate / build" and .status=="completed" and .conclusion=="success") | .id' |
+            head -n1
+          )"
+          test -n "$match" || {
+            echo "CANONICAL_GATE_FOR_SOURCE=TOKEN_VAZIO_OR_FAIL"
+            exit 1
+          }
+          echo "CANONICAL_GATE_FOR_SOURCE=PASS"
+
+      - name: Generate component-origin and permission assets
+        shell: bash
+        run: bash ci/rafaelia-origin-assets.sh
+
+      - name: Embed signed-build provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets
+          cat > app/src/main/assets/ci_provenance_v1.txt <<EOF
+          schema=rafaelia.ci-provenance/v1
+          source_sha=$RFA_SOURCE_SHA
+          run_id=$RFA_CI_RUN_ID
+          run_number=$RFA_CI_RUN_NUMBER
+          upstream_canonical_gate=PASS
+          authorial_toolchain_bootstrap=PASS
+          node_app_runtime=0
+          external_js_actions=NONE
+          signing_mode=AUTHORIAL_ANDROID_APKSIGNER
+          signing_certificate_match=PENDING_AT_EMBED
+          signed_release_publish=PENDING_AT_EMBED
+          EOF
+
       - name: Signing contract gate
         shell: bash
         run: |
