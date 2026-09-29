@@ -108,7 +108,8 @@ int rfa_rac1_decode_i16(
 
     if (encoded == (const rfa_u8 *)0 || output == (rfa_i16 *)0) return 0;
     if (frames < 0 || channels <= 0 || channels > RFA_RAC1_MAX_CHANNELS) return 0;
-    if (frames > 1073741823 / channels) return 0;
+    if (channels == 1 && frames > 1073741823) return 0;
+    if (channels == 2 && frames > 536870911) return 0;
     required = frames * channels;
     if (output_samples < required) return 0;
 
