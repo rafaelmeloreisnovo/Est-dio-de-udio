@@ -18,7 +18,8 @@ extern "C" {
 enum {
     RFA_CONTAINER_ZRF = 1,
     RFA_CONTAINER_CFR = 2,
-    RFA_CONTAINER_HEADER_BYTES = 40
+    RFA_CONTAINER_HEADER_BYTES = 40,
+    RFA_CONTAINER_CHUNK_HEADER_BYTES = 16
 };
 
 enum {
@@ -51,6 +52,12 @@ int rfa_container_write_header(rfa_u8 *target, int capacity,
                                const rfa_container_desc *desc);
 int rfa_container_read_header(const rfa_u8 *source, int length,
                               rfa_container_desc *desc);
+int rfa_container_write_chunk_header(rfa_u8 *target, int capacity,
+                                     rfa_u32 type, rfa_u32 flags,
+                                     rfa_u32 payload_bytes, rfa_u32 item_count);
+int rfa_container_read_chunk_header(const rfa_u8 *source, int length,
+                                    rfa_u32 *type, rfa_u32 *flags,
+                                    rfa_u32 *payload_bytes, rfa_u32 *item_count);
 
 #ifdef __cplusplus
 }
