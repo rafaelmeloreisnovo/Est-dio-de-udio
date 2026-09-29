@@ -17,30 +17,57 @@ jobs:
       RFA_CI_RUN_NUMBER: ${{ github.run_number }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.source_sha }}
-
-      - name: JDK 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Android SDK bootstrap
-        uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-
-      - name: SDK + NDK + CMake
+      - name: Authorial checkout — git shell only
+        shell: bash
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+          echo "RAFAELIA_CHECKOUT=PASS"
 
-      - name: Gradle runtime
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
+      - name: Authorial Java 17 bootstrap
+        shell: bash
+        run: bash ci/rafaelia-toolchain.sh java
+
+      - name: Authorial Android SDK bootstrap
+        shell: bash
+        run: bash ci/rafaelia-toolchain.sh android
+
+      - name: Authorial Gradle bootstrap
+        shell: bash
+        run: bash ci/rafaelia-toolchain.sh gradle
+
+      - name: Authorial toolchain report
+        shell: bash
+        run: bash ci/rafaelia-toolchain.sh report
+
+      - name: Node/Action boundary gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t external_uses < <(
+            grep -RhoE 'uses:[[:space:]]+[^[:space:]]+' .github/workflows |
+            awk '{print $2}' |
+            grep -v '^\./' |
+            sort -u || true
+          )
+
+          for action in "${external_uses[@]}"; do
+            case "$action" in
+              actions/upload-artifact@v4) ;;
+              *)
+                echo "UNAPPROVED_EXTERNAL_ACTION=$action"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "NODE_APP_RUNTIME=0"
+          echo "EXTERNAL_JS_ACTIONS=actions/upload-artifact@v4_ONLY"
 
       - name: Gradle authorial contract
         run: gradle :app:rafaeliaBuildContract --no-daemon --stacktrace
