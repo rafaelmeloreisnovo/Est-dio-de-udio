@@ -56,6 +56,7 @@ public final class MainActivity extends Activity {
     private AudioRecorderEngine recorder;
     private File recordedPcm;
     private File lastMasteredPcm;
+    private File lastZrf;
     private int lastMasteredRate = 48000;
     private int lastMasteredChannels = 1;
     private Uri lastOutput;
@@ -442,9 +443,31 @@ public final class MainActivity extends Activity {
 
         new Thread(() -> {
             File mastered = new File(getCacheDir(), "rafaelia_mastered_48k.pcm");
+            File zrf = new File(
+                    getCacheDir(), "rafaelia_session_" +
+                    System.currentTimeMillis() + ".zrf");
             Uri outputUri = null;
 
             try {
+                try {
+                    lastZrf = SessionContainerWriter.wrapRawPcmAsZrf(
+                            input, zrf, sampleRate, channels);
+                    runOnUiThread(() -> {
+                        if (studioWorkspaceView != null) {
+                            studioWorkspaceView.setContainerState(
+                                    "ZRF=RECORDED | CFR=FORMAT_READY_CAPTURE_PENDING");
+                        }
+                    });
+                } catch (Exception containerError) {
+                    lastZrf = null;
+                    runOnUiThread(() -> {
+                        if (studioWorkspaceView != null) {
+                            studioWorkspaceView.setContainerState(
+                                    "ZRF=FAIL | CFR=FORMAT_READY_CAPTURE_PENDING");
+                        }
+                    });
+                }
+
                 AudioPipeline.MasterResult result =
                         AudioPipeline.masterAndNormalize(
                                 input, mastered, sampleRate, channels,
