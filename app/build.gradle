@@ -27,15 +27,15 @@ android {
             abiFilters 'armeabi-v7a', 'arm64-v8a'
         }
 
-        buildFeatures {
-        buildConfig true
-    }
-
-    externalNativeBuild {
+        externalNativeBuild {
             cmake {
                 cFlags '-std=c11 -O3'
             }
         }
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     externalNativeBuild {
@@ -48,8 +48,20 @@ android {
     buildTypes {
         debug {
             minifyEnabled false
+            shrinkResources false
         }
+
+        lowDebug {
+            initWith debug
+            minifyEnabled false
+            shrinkResources false
+            debuggable true
+            matchingFallbacks = ['debug']
+        }
+
         release {
+            // Deliberately keep R8/resource shrinking out of the canonical low-level path.
+            // A separately gated optimized distribution profile may be added later.
             minifyEnabled false
             shrinkResources false
         }

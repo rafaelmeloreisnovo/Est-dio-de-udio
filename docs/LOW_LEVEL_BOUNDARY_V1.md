@@ -1,74 +1,75 @@
-# LOW_LEVEL_BOUNDARY_V1
+# Low-Level Boundary V1
 
 ## Goal
 
-Push every algorithm that can be platform-independent into small auditable cores, while keeping only the irreducible Android shell at the edge.
+Minimize hosted/runtime machinery without making false claims about Android.
 
-## Achieved
+## Core target
 
 ```text
-CORE_SYSTEM_HEADERS = 0
-CORE_LIBC = 0
-CORE_LIBM = 0
-CORE_HEAP = 0
-CORE_THREADS = 0
-CORE_FILESYSTEM = 0
-CORE_NETWORK = 0
-JAVA_THIRD_PARTY_DEPS = 0
-ANDROIDX = 0
-KOTLIN = 0
-R8_SHRINK = 0
-JNI_IMPLEMENTATION_FILES = 1
-PHONE_ABIS = armeabi-v7a + arm64-v8a
+C11 freestanding
+fixed-point/integer
+caller-owned state
+heap = 0
+libc = 0
+libm = 0
+hosted headers = 0
+mutable core globals = 0
+undefined core symbols = 0
 ```
 
-The evidence SHA-256 path uses the project-local integer/bitwise `LowSha256` instead of `java.security.MessageDigest`.
+The mathematical/data-path preference is linear memory + indices + explicit buffers. This follows the project's earlier matrix/index reduction direction.
 
-## Irreducible platform shell
+## Android irreducible edge
 
-An Android application still requires Android platform contracts for:
-
-- process/activity lifecycle;
-- screen/touch;
-- microphone and speaker;
-- sensors;
-- storage/content URIs;
-- package installation;
-- DEX/APK packaging.
+A normal Android APK cannot directly own the display controller, microphone ADC, accelerometer hardware, package installation or MediaStore. Those capabilities are exposed by the Android platform.
 
 Therefore:
 
 ```text
-ANDROID_PLATFORM_API != optional for Android app
-BUILD_TOOLCHAIN != runtime dependency
-JNI_EDGE != DSP dependency
+NO Android API at all + normal APK = contradiction
+NO build tool at all + APK packaging = contradiction
+NO platform ABI at all + microphone/sensor/UI = contradiction
 ```
 
-The project keeps JNI confined to `jni_bridge.c`. If the C core is removed from the APK, JNI can disappear, but then the app is no longer executing that C core.
-
-## Build tools
-
-Gradle/SDK/NDK are build-time tooling for the Android artifact, not signal-processing dependencies.
-
-The freestanding C cores are independently compiled by CI with Clang flags before Gradle is invoked. R8/minification is disabled.
-
-A future custom APK packer/compiler path may reduce build orchestration, but it cannot remove Android's required binary/package formats.
-
-## Java policy
-
-Java is a thin platform edge:
-
-- no AndroidX;
-- no Kotlin;
-- no third-party libraries;
-- no crypto provider for evidence SHA-256;
-- no signal DSP duplicated in Java;
-- custom-drawn studio console reduces widget hierarchy;
-- physical I/O remains explicit Android API use.
-
-## Claim
+The engineering target is instead:
 
 ```text
-"zero external DSP/runtime library dependencies in core" = supported
-"Android APK has zero platform dependency" = false by definition
+small Android edge
+-> explicit bridge
+-> freestanding core
 ```
+
+## JNI state
+
+JNI is currently PRESENT because Java calls the freestanding C DSP/measurement core.
+
+`JNI_REMOVED = TOKEN_VAZIO/NOT_IMPLEMENTED`
+
+Deleting `jni_bridge.c` without replacing the call boundary would disable the native DSP. A future direct-native/activity architecture may reduce Java/JNI further, but it remains a separately gated migration.
+
+## SDK / Gradle
+
+SDK and Gradle are BUILD-TIME tools in the canonical path, not DSP runtime dependencies.
+
+Current low profile:
+- only ARMv7 + AArch64 packaged;
+- R8 disabled;
+- resource shrinking disabled;
+- no third-party runtime libraries declared;
+- Java uses platform SDK only;
+- C core retains freestanding flags.
+
+## R8
+
+`R8_CANONICAL_PATH = OFF`.
+
+No minification/shrinking is needed to produce the canonical low-level test APK.
+
+## Evidence
+
+A dependency is only marked removed after:
+1. source/build reference removed;
+2. build succeeds;
+3. APK/package inspection confirms the intended absence;
+4. physical behavior is retested when the removed layer affected hardware I/O.

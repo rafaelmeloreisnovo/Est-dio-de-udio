@@ -123,31 +123,20 @@ public final class MainActivity extends Activity {
 
     private View buildUi() {
         ScrollView root = new ScrollView(this);
+        root.setFillViewport(true);
+
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(18);
+        int pad = dp(10);
         box.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Rafaelia Audio Studio — Audio Manifold");
-        title.setTextSize(25f);
+        title.setText("RAFAELIA AUDIO · μ∆");
+        title.setTextSize(20f);
         box.addView(title);
 
-        TextView subtitle = new TextView(this);
-        subtitle.setText(
-                "Narration workstation • 48 kHz • freestanding DSP core • Ogg/Opus");
-        box.addView(subtitle);
-
-        Button wizard = button("Abrir Wizard / pré-voo");
-        wizard.setOnClickListener(v -> StudioWizard.show(this, this::refreshReadyState));
-        box.addView(wizard);
-
-        Button shareEvidence = button("Compartilhar último bundle de provas");
-        shareEvidence.setOnClickListener(v -> shareEvidenceBundle());
-        box.addView(shareEvidence);
-
         status = new TextView(this);
-        status.setTextSize(16f);
+        status.setTextSize(13f);
         box.addView(status);
         refreshReadyState();
 
@@ -179,16 +168,52 @@ public final class MainActivity extends Activity {
         int studioHeight = landscape ? dp(430) : dp(560);
         box.addView(studioWorkspaceView,
                 new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, studioHeight));
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        TextView advancedTitle = new TextView(this);
-        advancedTitle.setText("\nCONTROLES DETALHADOS / AVANÇADO");
-        advancedTitle.setTextSize(16f);
-        box.addView(advancedTitle);
+        LinearLayout transport = row();
+        Button rawVoice = button("● REC");
+        rawVoice.setOnClickListener(v -> ensurePermissionAndRecord(false));
+        Button stop = button("■ MASTER");
+        stop.setOnClickListener(v -> stopAndMaster());
+        Button play = button("▶ PLAY");
+        play.setOnClickListener(v -> playMaster());
+        Button stopPlay = button("Ⅱ STOP");
+        stopPlay.setOnClickListener(v -> playback.stop());
+        transport.addView(rawVoice, weight());
+        transport.addView(stop, weight());
+        transport.addView(play, weight());
+        transport.addView(stopPlay, weight());
+        box.addView(transport);
 
-        TextView profileTitle = new TextView(this);
-        profileTitle.setText("\nPerfil de remasterização / normalização");
-        box.addView(profileTitle);
+        LinearLayout evidenceRow = row();
+        Button evidence = button("PROVAS + μ∆");
+        evidence.setOnClickListener(v -> generateEvidenceBundle());
+        Button shareEvidence = button("COMPARTILHAR");
+        shareEvidence.setOnClickListener(v -> shareEvidenceBundle());
+        evidenceRow.addView(evidence, weight());
+        evidenceRow.addView(shareEvidence, weight());
+        box.addView(evidenceRow);
+
+        TextView toolsTitle = new TextView(this);
+        toolsTitle.setText("FERRAMENTAS · toque somente no que precisar");
+        toolsTitle.setTextSize(12f);
+        box.addView(toolsTitle);
+
+        LinearLayout tools = row();
+        Button wizard = button("PRÉ-VOO");
+        wizard.setOnClickListener(v -> StudioWizard.show(this, this::refreshReadyState));
+        Button narration = button("NARRAÇÃO");
+        narration.setOnClickListener(v -> ensurePermissionAndRecord(true));
+        Button importAudio = button("IMPORTAR");
+        importAudio.setOnClickListener(v -> pickAudio());
+        Button share = button("EXPORTAR");
+        share.setOnClickListener(v -> shareLast());
+        tools.addView(wizard, weight());
+        tools.addView(narration, weight());
+        tools.addView(importAudio, weight());
+        tools.addView(share, weight());
+        box.addView(tools);
 
         profileSpinner = new Spinner(this);
         ArrayAdapter<String> profiles = new ArrayAdapter<>(
@@ -197,28 +222,30 @@ public final class MainActivity extends Activity {
         profileSpinner.setAdapter(profiles);
         box.addView(profileSpinner);
 
-        TextView scriptTitle = new TextView(this);
-        scriptTitle.setText("\nRoteiro da narração");
-        scriptTitle.setTextSize(19f);
-        box.addView(scriptTitle);
-
         scriptEdit = new EditText(this);
-        scriptEdit.setHint(
-                "Cole ou escreva aqui o texto. O original permanece editável.");
-        scriptEdit.setMinLines(5);
+        scriptEdit.setHint("Roteiro / teleprompter");
+        scriptEdit.setMinLines(2);
+        scriptEdit.setMaxLines(5);
         scriptEdit.setInputType(
                 InputType.TYPE_CLASS_TEXT |
                 InputType.TYPE_TEXT_FLAG_MULTI_LINE |
                 InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         box.addView(scriptEdit);
 
-        Button loadScript = button("Carregar texto no teleprompter");
+        LinearLayout promptButtons = row();
+        Button loadScript = button("CARREGAR TEXTO");
         loadScript.setOnClickListener(v -> loadPrompter());
-        box.addView(loadScript);
+        Button promptStart = button("▶ TEXTO");
+        promptStart.setOnClickListener(v -> startPrompter());
+        Button promptStop = button("■ TEXTO");
+        promptStop.setOnClickListener(v -> stopPrompter());
+        promptButtons.addView(loadScript, weight());
+        promptButtons.addView(promptStart, weight());
+        promptButtons.addView(promptStop, weight());
+        box.addView(promptButtons);
 
         speedLabel = new TextView(this);
         box.addView(speedLabel);
-
         speedSeek = new SeekBar(this);
         speedSeek.setMax(160);
         speedSeek.setProgress(60);
@@ -235,67 +262,24 @@ public final class MainActivity extends Activity {
         prompterScroll = new ScrollView(this);
         prompterScroll.setFillViewport(true);
         prompterText = new TextView(this);
-        prompterText.setTextSize(26f);
-        prompterText.setLineSpacing(10f, 1.15f);
-        prompterText.setPadding(dp(12), dp(16), dp(12), dp(80));
-        prompterText.setText(
-                "O teleprompter aparecerá aqui. Carregue o roteiro acima.");
+        prompterText.setTextSize(22f);
+        prompterText.setLineSpacing(8f, 1.10f);
+        prompterText.setPadding(dp(8), dp(8), dp(8), dp(30));
+        prompterText.setText("Teleprompter");
         prompterScroll.addView(prompterText);
         box.addView(prompterScroll,
                 new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, dp(300)));
-
-        LinearLayout promptButtons = row();
-        Button promptStart = button("▶ Rolar");
-        promptStart.setOnClickListener(v -> startPrompter());
-        Button promptStop = button("■ Parar texto");
-        promptStop.setOnClickListener(v -> stopPrompter());
-        promptButtons.addView(promptStart, weight());
-        promptButtons.addView(promptStop, weight());
-        box.addView(promptButtons);
-
-        Button narration = button("🎙 Gravar narração + roteiro (3s)");
-        narration.setOnClickListener(v -> ensurePermissionAndRecord(true));
-        box.addView(narration);
-
-        Button rawVoice = button("Gravar voz sem teleprompter");
-        rawVoice.setOnClickListener(v -> ensurePermissionAndRecord(false));
-        box.addView(rawVoice);
-
-        Button stop = button("Parar → remasterizar → normalizar");
-        stop.setOnClickListener(v -> stopAndMaster());
-        box.addView(stop);
-
-        Button importAudio = button("Importar áudio / WhatsApp / Ogg Opus");
-        importAudio.setOnClickListener(v -> pickAudio());
-        box.addView(importAudio);
-
-        LinearLayout playbackRow = row();
-        Button play = button("▶ Ouvir master");
-        play.setOnClickListener(v -> playMaster());
-        Button stopPlay = button("■ Parar áudio");
-        stopPlay.setOnClickListener(v -> playback.stop());
-        playbackRow.addView(play, weight());
-        playbackRow.addView(stopPlay, weight());
-        box.addView(playbackRow);
-
-        Button share = button("Compartilhar último Ogg/Opus");
-        share.setOnClickListener(v -> shareLast());
-        box.addView(share);
-
-        TextView spectrumTitle = new TextView(this);
-        spectrumTitle.setText("\nEspectrometria relativa — 16 centros, 80 Hz…22 kHz");
-        box.addView(spectrumTitle);
+                        LinearLayout.LayoutParams.MATCH_PARENT, dp(150)));
 
         spectrumView = new SpectrumView(this);
         box.addView(spectrumView);
 
         TextView note = new TextView(this);
         note.setText(
-                "\nGates: -23 LUFS é EBU R128. -18/-16 são targets de workflow. " +
-                "True-peak usa o FIR 4× do BS.1770-5, mas conformidade formal " +
-                "permanece PENDING até vetores normativos. O APK usa Android para I/O; " +
-                "o DSP/medidor C é o componente freestanding.");
+                "CORE: C freestanding/fixed-point. ANDROID EDGE: tela, toque, áudio, " +
+                "sensor, armazenamento e carregamento do core. " +
+                "TOKEN_VAZIO é preservado quando a evidência física não existe.");
+        note.setTextSize(11f);
         box.addView(note);
 
         root.addView(box);
