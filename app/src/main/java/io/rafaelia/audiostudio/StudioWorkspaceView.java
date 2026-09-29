@@ -349,7 +349,7 @@ final class StudioWorkspaceView extends View {
         drawText(canvas, calibrationState, dp(12), top, 13);
         drawText(canvas, "DIGITAL: dBFS / peak / RMS / noise / latency", dp(12), top + dp(28), 12);
         drawText(canvas, "RELATIVE: transfer / phase / coherence / L-R match", dp(12), top + dp(52), 12);
-        drawText(canvas, "ABS SPL: TOKEN_VAZIO until physical reference exists", dp(12), top + dp(76), 12);
+        drawText(canvas, "ABS SPL: PENDING_PHYSICAL_REFERENCE", dp(12), top + dp(76), 12);
         drawPills(canvas, top + dp(108), new String[]{
                 "SILENCE", "WHITE", "PINK", "SWEEP", "STEP", "REF MIC"
         });
