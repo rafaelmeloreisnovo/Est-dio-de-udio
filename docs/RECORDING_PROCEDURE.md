@@ -10,7 +10,7 @@ O primeiro uso apresenta:
 - frames por buffer quando informados pelo aparelho;
 - distinção entre target normativo e target de workflow.
 
-Ausência de propriedade reportada = TOKEN_VAZIO.
+Ausência de propriedade reportada = `UNAVAILABLE_NOT_REPORTED`; `TOKEN_VAZIO` is reserved for unresolved semantics/source.
 
 ## 2. Captura
 

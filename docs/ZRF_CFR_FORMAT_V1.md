@@ -99,7 +99,7 @@ CFR may carry:
 - correction filter;
 - physical reference metadata when absolute SPL is claimed.
 
-Without an acoustic reference, absolute SPL fields remain `TOKEN_VAZIO`.
+Without an acoustic reference, absolute SPL fields are `PENDING_PHYSICAL_REFERENCE`; no numeric SPL value is fabricated.
 
 ## 8. Integrity
 

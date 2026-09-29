@@ -21,3 +21,14 @@ Do not place a PASS statement in the embedded provenance for a later step that h
 Workflow syntax changes are material: malformed YAML can suppress all evidence. Prefer complete canonical reconstruction over repeated partial text substitution when workflow structure is damaged.
 
 Preserve FAIL history in receipts when it caused a corrective change.
+
+
+## Additional low gates
+
+The workflow must retain:
+
+- Low dependency boundary gate;
+- zero AndroidX/Kotlin/third-party Java runtime declarations;
+- R8/shrink disabled;
+- exactly one JNI implementation file at `jni_bridge.c`;
+- project-local `LowSha256` known-answer test before APK assembly.

@@ -77,6 +77,42 @@ jobs:
             exit 1
           fi
 
+      - name: Low dependency boundary gate
+        run: |
+          if grep -RInE '^[[:space:]]*import[[:space:]]+(androidx|kotlin|com\.google)\.' app/src/main/java; then
+            echo "External Java/UI framework dependency detected"
+            exit 1
+          fi
+
+          if grep -nE '^[[:space:]]*(implementation|api|compileOnly|runtimeOnly|kapt|ksp)[[:space:]]' app/build.gradle; then
+            echo "Gradle runtime/library dependency declaration detected"
+            exit 1
+          fi
+
+          if grep -nE 'minifyEnabled[[:space:]]+true|shrinkResources[[:space:]]+true' app/build.gradle; then
+            echo "R8/resource shrink path must remain disabled"
+            exit 1
+          fi
+
+          JNI_FILES="$(grep -RIl 'JNIEXPORT' app/src/main/cpp || true)"
+          JNI_COUNT="$(printf '%s\n' "$JNI_FILES" | sed '/^[[:space:]]*$/d' | wc -l)"
+          if test "$JNI_COUNT" -ne 1; then
+            echo "Expected exactly one JNI implementation file, got $JNI_COUNT"
+            printf '%s\n' "$JNI_FILES"
+            exit 1
+          fi
+          if test "$JNI_FILES" != "app/src/main/cpp/jni_bridge.c"; then
+            echo "JNI escaped the canonical platform edge"
+            printf '%s\n' "$JNI_FILES"
+            exit 1
+          fi
+
+          echo "JAVA_THIRD_PARTY_DEPS=0"
+          echo "ANDROIDX=0"
+          echo "KOTLIN=0"
+          echo "R8_SHRINK=0"
+          echo "JNI_IMPLEMENTATION_FILES=1"
+
       - name: ARMv7 zero-undefined + ABI surface
         run: |
           NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
@@ -138,6 +174,15 @@ jobs:
           assemble_debug=PENDING_AT_EMBED
           artifact_upload=PENDING_AT_EMBED
           EOF
+
+      - name: Low Java SHA-256 known-answer test
+        run: |
+          rm -rf /tmp/rfa_sha_test
+          mkdir -p /tmp/rfa_sha_test
+          javac -d /tmp/rfa_sha_test \
+            app/src/main/java/io/rafaelia/audiostudio/LowSha256.java \
+            native/tests/LowSha256Smoke.java
+          java -cp /tmp/rfa_sha_test io.rafaelia.audiostudio.LowSha256Smoke
 
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4

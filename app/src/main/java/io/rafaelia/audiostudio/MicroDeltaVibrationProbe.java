@@ -198,8 +198,8 @@ final class MicroDeltaVibrationProbe implements SensorEventListener {
         double hz = seconds > 0.0 && samples > 1 ?
                 (samples - 1) / seconds : 0.0;
         double rmsDelta = deltaSamples > 0 ?
-                Math.sqrt(sumDeltaSq / deltaSamples) : 0.0;
-        double peakDelta = Math.sqrt(peakDeltaSq);
+                sqrtLocal(sumDeltaSq / deltaSamples) : 0.0;
+        double peakDelta = sqrtLocal(peakDeltaSq);
 
         Result result = new Result(
                 samples > 1 ? "OBSERVED_UNPROMOTED" : "INSUFFICIENT_EVIDENCE",
@@ -221,6 +221,16 @@ final class MicroDeltaVibrationProbe implements SensorEventListener {
                 finiteOrZero(maxZ));
 
         main.post(() -> callback.onComplete(result));
+    }
+
+    private static double sqrtLocal(double value) {
+        if (!(value > 0.0)) return 0.0;
+        double x = value >= 1.0 ? value : 1.0;
+        int i;
+        for (i = 0; i < 12; ++i) {
+            x = 0.5 * (x + value / x);
+        }
+        return x;
     }
 
     private static float finiteOrZero(float value) {

@@ -37,9 +37,9 @@ final class StudioWizard {
 
     private static void stepCapabilities(Activity a, Runnable finish) {
         AudioManager am = (AudioManager) a.getSystemService(Context.AUDIO_SERVICE);
-        String sampleRate = am == null ? "TOKEN_VAZIO"
+        String sampleRate = am == null ? "UNAVAILABLE_SERVICE"
                 : am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
-        String frames = am == null ? "TOKEN_VAZIO"
+        String frames = am == null ? "UNAVAILABLE_SERVICE"
                 : am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
         boolean raw = am != null && "true".equals(am.getProperty(
                 AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED));
@@ -86,6 +86,6 @@ final class StudioWizard {
     }
 
     private static String value(String value) {
-        return value == null || value.length() == 0 ? "TOKEN_VAZIO" : value;
+        return value == null || value.length() == 0 ? "UNAVAILABLE_NOT_REPORTED" : value;
     }
 }

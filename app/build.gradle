@@ -4,7 +4,7 @@ plugins {
 
 def envOrToken = { String name ->
     def value = System.getenv(name)
-    return value == null || value.trim().isEmpty() ? 'TOKEN_VAZIO' : value.trim()
+    return value == null || value.trim().isEmpty() ? 'UNAVAILABLE_LOCAL_BUILD' : value.trim()
 }
 
 android {

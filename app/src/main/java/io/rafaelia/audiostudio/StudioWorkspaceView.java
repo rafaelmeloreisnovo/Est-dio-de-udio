@@ -17,7 +17,11 @@ import android.view.View;
 
 final class StudioWorkspaceView extends View {
     interface ActionListener {
+        void onRecord();
+        void onStopAndMaster();
+        void onPlayMaster();
         void onRunRelativeCalibration();
+        void onGenerateEvidence();
     }
 
     private static final String[] TABS = {
@@ -38,6 +42,16 @@ final class StudioWorkspaceView extends View {
     private final Paint thin = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final RectF calibrationAction = new RectF();
+    private final RectF transportRecord = new RectF();
+    private final RectF transportStop = new RectF();
+    private final RectF transportPlay = new RectF();
+    private final RectF transportCal = new RectF();
+    private final RectF transportEvidence = new RectF();
+
+    private float logicalWidth;
+    private boolean wideLayout;
+    private float wideRail;
+    private float wideInspector;
 
     private final short[] waveMin = new short[128];
     private final short[] waveMax = new short[128];
@@ -51,7 +65,7 @@ final class StudioWorkspaceView extends View {
     private int rmsPct;
     private long clipped;
     private long capturedSamples;
-    private String inputSource = "TOKEN_VAZIO";
+    private String inputSource = "INPUT_IDLE";
     private String masterState = "MASTER=PENDING";
     private String calibrationState = "CAL=RELATIVE_ONLY";
     private String containerState = "ZRF/CFR=IMPLEMENTED_UNTESTED";
@@ -74,7 +88,7 @@ final class StudioWorkspaceView extends View {
         rmsPct = rms;
         clipped = clip;
         capturedSamples = samples;
-        inputSource = source == null ? "TOKEN_VAZIO" : source;
+        inputSource = source == null ? "INPUT_UNAVAILABLE" : source;
         invalidate();
     }
 
@@ -118,17 +132,17 @@ final class StudioWorkspaceView extends View {
     }
 
     void setMasterState(String state) {
-        masterState = state == null ? "MASTER=TOKEN_VAZIO" : state;
+        masterState = state == null ? "MASTER=UNAVAILABLE" : state;
         invalidate();
     }
 
     void setCalibrationState(String state) {
-        calibrationState = state == null ? "CAL=TOKEN_VAZIO" : state;
+        calibrationState = state == null ? "CAL=UNAVAILABLE" : state;
         invalidate();
     }
 
     void setContainerState(String state) {
-        containerState = state == null ? "ZRF/CFR=TOKEN_VAZIO" : state;
+        containerState = state == null ? "ZRF/CFR=UNAVAILABLE" : state;
         invalidate();
     }
 
@@ -161,11 +175,41 @@ final class StudioWorkspaceView extends View {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setARGB(255, 16, 18, 22);
-        canvas.drawRect(0, 0, w, h, paint);
+        canvas.drawRect(0, 0, totalW, totalH, paint);
 
-        drawTabs(canvas, w, tabH);
-        drawHeader(canvas, bodyTop, w);
+        if (wideLayout) {
+            wideRail = dp(76);
+            wideInspector = dp(220);
+            float centerW = totalW - wideRail - wideInspector;
+            if (centerW < dp(360)) {
+                wideLayout = false;
+            } else {
+                logicalWidth = centerW;
+                drawSideTabs(canvas, wideRail, usableH);
+                canvas.save();
+                canvas.translate(wideRail, 0f);
+                drawHeader(canvas, dp(10), centerW);
+                drawWorkspaceBody(canvas, centerW, usableH);
+                canvas.restore();
+                drawInspector(canvas, totalW - wideInspector, 0f, wideInspector, usableH);
+            }
+        }
 
+        if (!wideLayout) {
+            float tabH = dp(50);
+            logicalWidth = totalW;
+            drawTabs(canvas, totalW, tabH);
+            drawHeader(canvas, tabH + dp(8), totalW);
+            canvas.save();
+            canvas.translate(0f, 0f);
+            drawWorkspaceBody(canvas, totalW, usableH);
+            canvas.restore();
+        }
+
+        drawTransport(canvas, totalW, totalH - transportH, transportH);
+    }
+
+    private void drawWorkspaceBody(Canvas canvas, float w, float h) {
         if (screen == 0) drawRecorder(canvas, w, h);
         else if (screen == 1) drawEditor(canvas, w, h);
         else if (screen == 2) drawCalibration(canvas, w, h);
@@ -174,6 +218,92 @@ final class StudioWorkspaceView extends View {
         else if (screen == 5) drawVoice(canvas, w, h);
         else if (screen == 6) drawMaster(canvas, w, h);
         else drawExport(canvas, w, h);
+    }
+
+    private void drawSideTabs(Canvas canvas, float railW, float h) {
+        float slot = h / TABS.length;
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(dp(10));
+        int i;
+        for (i = 0; i < TABS.length; ++i) {
+            paint.setARGB(255, i == screen ? 52 : 25, i == screen ? 66 : 29,
+                    i == screen ? 82 : 34);
+            rect.set(0f, slot * i, railW, slot * (i + 1));
+            canvas.drawRect(rect, paint);
+            paint.setARGB(255, 235, 239, 244);
+            canvas.drawText(TABS[i], railW * 0.5f, slot * (i + 0.5f) + dp(4), paint);
+        }
+        paint.setTextAlign(Paint.Align.LEFT);
+    }
+
+    private void drawInspector(
+            Canvas canvas, float left, float top, float width, float height) {
+        paint.setARGB(255, 20, 24, 29);
+        canvas.drawRect(left, top, left + width, top + height, paint);
+        float x = left + dp(12);
+        float y = top + dp(24);
+        drawText(canvas, "INSPECTOR", x, y, 12);
+        y += dp(30);
+        drawText(canvas, inputSource, x, y, 11);
+        y += dp(24);
+        drawText(canvas, "PEAK " + peakPct + "%FS", x, y, 11);
+        y += dp(22);
+        drawText(canvas, "RMS  " + rmsPct + "%FS", x, y, 11);
+        y += dp(22);
+        drawText(canvas, "CLIP " + clipped, x, y, 11);
+        y += dp(34);
+        drawWrappedState(canvas, calibrationState, x, y, width - dp(24));
+        y += dp(58);
+        drawWrappedState(canvas, masterState, x, y, width - dp(24));
+        y += dp(58);
+        drawWrappedState(canvas, containerState, x, y, width - dp(24));
+    }
+
+    private void drawWrappedState(
+            Canvas canvas, String value, float x, float y, float width) {
+        if (value == null) return;
+        paint.setTextSize(dp(9));
+        paint.setARGB(255, 165, 176, 188);
+        String text = value;
+        int split = text.length() > 30 ? 30 : text.length();
+        canvas.drawText(text.substring(0, split), x, y, paint);
+        if (split < text.length()) {
+            int end = text.length() > split + 30 ? split + 30 : text.length();
+            canvas.drawText(text.substring(split, end), x, y + dp(16), paint);
+        }
+    }
+
+    private void drawTransport(Canvas canvas, float width, float top, float height) {
+        paint.setARGB(255, 12, 14, 18);
+        canvas.drawRect(0f, top, width, top + height, paint);
+        float gap = dp(6);
+        float margin = dp(8);
+        float slot = (width - margin * 2f - gap * 4f) / 5f;
+        transportRecord.set(margin, top + dp(8), margin + slot, top + height - dp(8));
+        transportStop.set(transportRecord.right + gap, transportRecord.top,
+                transportRecord.right + gap + slot, transportRecord.bottom);
+        transportPlay.set(transportStop.right + gap, transportRecord.top,
+                transportStop.right + gap + slot, transportRecord.bottom);
+        transportCal.set(transportPlay.right + gap, transportRecord.top,
+                transportPlay.right + gap + slot, transportRecord.bottom);
+        transportEvidence.set(transportCal.right + gap, transportRecord.top,
+                transportCal.right + gap + slot, transportRecord.bottom);
+        drawTransportButton(canvas, transportRecord, "REC", 86, 45, 45);
+        drawTransportButton(canvas, transportStop, "STOP", 48, 54, 62);
+        drawTransportButton(canvas, transportPlay, "PLAY", 43, 69, 53);
+        drawTransportButton(canvas, transportCal, "CAL", 47, 64, 80);
+        drawTransportButton(canvas, transportEvidence, "PROOF", 48, 57, 72);
+    }
+
+    private void drawTransportButton(
+            Canvas canvas, RectF target, String label, int r, int g, int b) {
+        paint.setARGB(255, r, g, b);
+        canvas.drawRoundRect(target, dp(6), dp(6), paint);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(dp(11));
+        paint.setARGB(255, 240, 243, 246);
+        canvas.drawText(label, target.centerX(), target.centerY() + dp(4), paint);
+        paint.setTextAlign(Paint.Align.LEFT);
     }
 
     private void drawTabs(Canvas canvas, float width, float tabH) {
@@ -247,7 +377,7 @@ final class StudioWorkspaceView extends View {
         drawText(canvas, calibrationState, dp(12), top, 13);
         drawText(canvas, "DIGITAL: dBFS / peak / RMS / noise / latency", dp(12), top + dp(28), 12);
         drawText(canvas, "RELATIVE: transfer / phase / coherence / L-R match", dp(12), top + dp(52), 12);
-        drawText(canvas, "ABS SPL: TOKEN_VAZIO until physical reference exists", dp(12), top + dp(76), 12);
+        drawText(canvas, "ABS SPL: PENDING_PHYSICAL_REFERENCE", dp(12), top + dp(76), 12);
         drawPills(canvas, top + dp(108), new String[]{
                 "SILENCE", "WHITE", "PINK", "SWEEP", "STEP", "REF MIC"
         });
@@ -395,7 +525,10 @@ final class StudioWorkspaceView extends View {
             float x = left + (right - left) * i / 8f;
             canvas.drawLine(x, top, x, bottom, thin);
         }
-        drawText(canvas, "measured curve: TOKEN_VAZIO", left + dp(8), mid - dp(8), 10);
+        String curveState = calibrationState != null && calibrationState.contains("CAPTURED") ?
+                "raw CFR captured | transfer derivation PENDING" :
+                "measured curve: NOT_RUN";
+        drawText(canvas, curveState, left + dp(8), mid - dp(8), 10);
     }
 
     private void drawPills(Canvas canvas, float y, String[] labels) {
@@ -404,7 +537,7 @@ final class StudioWorkspaceView extends View {
         paint.setTextSize(dp(10));
         for (i = 0; i < labels.length; ++i) {
             float width = paint.measureText(labels[i]) + dp(20);
-            if (x + width > getWidth() - dp(12)) {
+            if (x + width > logicalWidth - dp(12)) {
                 x = dp(12);
                 y += dp(34);
             }
@@ -425,12 +558,54 @@ final class StudioWorkspaceView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_UP &&
-                screen == 2 &&
-                calibrationAction.contains(event.getX(), event.getY())) {
-            if (actionListener != null) {
-                actionListener.onRunRelativeCalibration();
+        if (event.getAction() != MotionEvent.ACTION_UP) return true;
+
+        float x = event.getX();
+        float y = event.getY();
+
+        if (transportRecord.contains(x, y)) {
+            if (actionListener != null) actionListener.onRecord();
+            performClick();
+            return true;
+        }
+        if (transportStop.contains(x, y)) {
+            if (actionListener != null) actionListener.onStopAndMaster();
+            performClick();
+            return true;
+        }
+        if (transportPlay.contains(x, y)) {
+            if (actionListener != null) actionListener.onPlayMaster();
+            performClick();
+            return true;
+        }
+        if (transportCal.contains(x, y)) {
+            if (actionListener != null) actionListener.onRunRelativeCalibration();
+            performClick();
+            return true;
+        }
+        if (transportEvidence.contains(x, y)) {
+            if (actionListener != null) actionListener.onGenerateEvidence();
+            performClick();
+            return true;
+        }
+
+        if (screen == 2) {
+            float localX = wideLayout ? x - wideRail : x;
+            if (calibrationAction.contains(localX, y)) {
+                if (actionListener != null) actionListener.onRunRelativeCalibration();
+                performClick();
+                return true;
             }
+        }
+
+        if (wideLayout && x <= wideRail) {
+            float usableH = getHeight() - dp(62);
+            float slot = usableH / (float)TABS.length;
+            int target = slot <= 0f ? 0 : (int)(y / slot);
+            if (target < 0) target = 0;
+            if (target >= TABS.length) target = TABS.length - 1;
+            screen = target;
+            invalidate();
             performClick();
             return true;
         }
@@ -450,6 +625,7 @@ final class StudioWorkspaceView extends View {
             performClick();
             return true;
         }
+
         return true;
     }
 
