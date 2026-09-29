@@ -39,6 +39,7 @@ import java.util.Locale;
 public final class MainActivity extends Activity {
     private static final int REQ_AUDIO = 100;
     private static final int REQ_PICK = 101;
+    private static final int REQ_ACTIVITY = 102;
 
     private static final String[] PROFILES = {
             "WhatsApp / voz — -16 LUFS workflow",
@@ -161,7 +162,11 @@ public final class MainActivity extends Activity {
             @Override public void onGenerateEvidence() {
                 generateEvidenceBundle();
             }
+            @Override public void onRequestSensorAccess() {
+                requestOptionalSensorAccess();
+            }
         });
+        refreshSystemPanel();
         boolean landscape =
                 getResources().getConfiguration().orientation ==
                         Configuration.ORIENTATION_LANDSCAPE;
@@ -323,6 +328,30 @@ public final class MainActivity extends Activity {
         status.setText(
                 "READY — fonte preservada, DSP pós-captura, normalização gated.\n" +
                 "Escolha um perfil, carregue o roteiro ou importe um áudio.");
+        refreshSystemPanel();
+    }
+
+    private void refreshSystemPanel() {
+        if (studioWorkspaceView == null) return;
+        studioWorkspaceView.setSystemState(SystemAccessSnapshot.describe(this));
+        studioWorkspaceView.setOriginState(SystemAccessSnapshot.originState());
+        studioWorkspaceView.setSignatureState(SystemAccessSnapshot.signatureState());
+    }
+
+    private void requestOptionalSensorAccess() {
+        if (android.os.Build.VERSION.SDK_INT >= 29 &&
+                checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.ACTIVITY_RECOGNITION},
+                    REQ_ACTIVITY);
+            return;
+        }
+
+        refreshSystemPanel();
+        status.setText(
+                "Sensores locais: permissões mínimas reconciliadas. " +
+                "Acelerômetro/magnetômetro/luz/proximidade não recebem permissões inventadas.");
     }
 
     private int currentWpm() {
@@ -852,6 +881,16 @@ public final class MainActivity extends Activity {
         } else if (requestCode == REQ_AUDIO) {
             pendingCalibration = false;
             status.setText("Permissão de microfone negada.");
+        } else if (requestCode == REQ_ACTIVITY) {
+            refreshSystemPanel();
+            if (grantResults.length > 0 &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                status.setText(
+                        "ACTIVITY_RECOGNITION concedida para sensores de movimento compatíveis.");
+            } else {
+                status.setText(
+                        "ACTIVITY_RECOGNITION negada; sensores que não exigem essa permissão continuam disponíveis.");
+            }
         }
     }
 
