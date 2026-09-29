@@ -12,6 +12,7 @@ import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -141,14 +142,9 @@ public final class MainActivity extends Activity {
         wizard.setOnClickListener(v -> StudioWizard.show(this, this::refreshReadyState));
         box.addView(wizard);
 
-        LinearLayout evidenceRow = row();
-        Button evidence = button("Gerar provas + teste μ∆");
-        evidence.setOnClickListener(v -> generateEvidenceBundle());
-        Button shareEvidence = button("Compartilhar provas");
+        Button shareEvidence = button("Compartilhar último bundle de provas");
         shareEvidence.setOnClickListener(v -> shareEvidenceBundle());
-        evidenceRow.addView(evidence, weight());
-        evidenceRow.addView(shareEvidence, weight());
-        box.addView(evidenceRow);
+        box.addView(shareEvidence);
 
         status = new TextView(this);
         status.setTextSize(16f);
@@ -157,13 +153,38 @@ public final class MainActivity extends Activity {
 
         studioWorkspaceView = new StudioWorkspaceView(this);
         studioWorkspaceView.setCalibrationState(
-                "CAL=DIGITAL+RELATIVE | ABS_SPL=TOKEN_VAZIO");
+                "CAL=DIGITAL+RELATIVE | ABS_SPL=PENDING_PHYSICAL_REFERENCE");
         studioWorkspaceView.setContainerState(
                 "ZRF=RECORDER_WIRED | CFR=RELATIVE_READY");
-        studioWorkspaceView.setActionListener(this::ensurePermissionAndCalibrate);
+        studioWorkspaceView.setActionListener(new StudioWorkspaceView.ActionListener() {
+            @Override public void onRecord() {
+                ensurePermissionAndRecord(false);
+            }
+            @Override public void onStopAndMaster() {
+                stopAndMaster();
+            }
+            @Override public void onPlayMaster() {
+                playMaster();
+            }
+            @Override public void onRunRelativeCalibration() {
+                ensurePermissionAndCalibrate();
+            }
+            @Override public void onGenerateEvidence() {
+                generateEvidenceBundle();
+            }
+        });
+        boolean landscape =
+                getResources().getConfiguration().orientation ==
+                        Configuration.ORIENTATION_LANDSCAPE;
+        int studioHeight = landscape ? dp(430) : dp(560);
         box.addView(studioWorkspaceView,
                 new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, dp(520)));
+                        LinearLayout.LayoutParams.MATCH_PARENT, studioHeight));
+
+        TextView advancedTitle = new TextView(this);
+        advancedTitle.setText("\nCONTROLES DETALHADOS / AVANÇADO");
+        advancedTitle.setTextSize(16f);
+        box.addView(advancedTitle);
 
         TextView profileTitle = new TextView(this);
         profileTitle.setText("\nPerfil de remasterização / normalização");
@@ -447,7 +468,7 @@ public final class MainActivity extends Activity {
                 "CALIBRAÇÃO RELATIVA — preparando sync + sweep em nível conservador…");
         if (studioWorkspaceView != null) {
             studioWorkspaceView.setCalibrationState(
-                    "CAL=RUNNING_RELATIVE | ABS_SPL=TOKEN_VAZIO");
+                    "CAL=RUNNING_RELATIVE | ABS_SPL=PENDING_PHYSICAL_REFERENCE");
         }
 
         new Thread(() -> {
@@ -465,7 +486,7 @@ public final class MainActivity extends Activity {
                                 "CAL=RELATIVE_CAPTURED | input=" + result.inputSource +
                                 " | lag=" + result.bestLag + " samples");
                         studioWorkspaceView.setContainerState(
-                                "CFR=RECORDED_RELATIVE | ABS_SPL=TOKEN_VAZIO");
+                                "CFR=RECORDED_RELATIVE | ABS_SPL=PENDING_PHYSICAL_REFERENCE");
                     }
                     status.setText(
                             "CFR RELATIVO GRAVADO" +
@@ -475,7 +496,7 @@ public final class MainActivity extends Activity {
                             "\npolarity=" + (result.correlation < 0L ? "INVERTED" : "NORMAL") +
                             " | captured=" + result.capturedFrames + " frames" +
                             "\ncorrelation=" + result.correlation +
-                            "\nABS_SPL=TOKEN_VAZIO — requer referência acústica física." +
+                            "\nABS_SPL=PENDING_PHYSICAL_REFERENCE — referência acústica física necessária." +
                             "\nCFR: " + result.cfrFile.getAbsolutePath());
                 });
             } catch (Exception e) {
