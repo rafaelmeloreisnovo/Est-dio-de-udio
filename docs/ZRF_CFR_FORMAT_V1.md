@@ -111,3 +111,58 @@ A stronger receipt may independently attach SHA-256/BLAKE3 or another declared d
 checksum != authenticity
 hash != authorship
 ```
+
+
+## 9. CFR relative calibration profile v1
+
+A physical relative-capture session writes four chunks in this order:
+
+```text
+WAVE flags=0
+CAL  flags=RELATIVE
+PCM  flags=REFERENCE
+PCM  flags=RESPONSE
+```
+
+### WAVE payload — 32 bytes
+
+| Offset | Bytes | Field |
+|---:|---:|---|
+| 0 | 4 | sweep start phase-step Q32 |
+| 4 | 4 | per-frame sweep ratio Q31 |
+| 8 | 4 | excitation gain Q15 |
+| 12 | 4 | reference/excitation frame count |
+| 16 | 4 | pre-silence frames |
+| 20 | 4 | post-silence frames |
+| 24 | 4 | maximum latency-search lag |
+| 28 | 4 | deterministic sync frame count |
+
+The reference PCM contains:
+
+```text
+sync -> zero guard -> exponential sweep
+```
+
+The speaker path additionally has pre/post silence; those are not duplicated in the reference PCM.
+
+### CAL payload — 48 bytes
+
+| Offset | Bytes | Field |
+|---:|---:|---|
+| 0 | 4 | CAL payload version (=1) |
+| 4 | 4 | state flags; bit0 = RELATIVE |
+| 8 | 4 | best sync lag in samples |
+| 12 | 4 | captured response frames |
+| 16 | 8 | signed correlation |
+| 24 | 8 | sync reference energy |
+| 32 | 8 | aligned response energy |
+| 40 | 4 | sample rate |
+| 44 | 4 | channels |
+
+This is evidence of a relative speaker-room-microphone-ADC path. It does not establish absolute sound pressure.
+
+```text
+RELATIVE_CAPTURE != ABSOLUTE_SPL
+SYNC_LAG != IMPULSE_RESPONSE
+SWEEP_CAPTURE != RT60
+```
