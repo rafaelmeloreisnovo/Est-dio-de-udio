@@ -68,10 +68,12 @@ public final class MainActivity extends Activity {
     private int lastMasteredRate = 48000;
     private int lastMasteredChannels = 1;
     private Uri lastOutput;
+    private Uri lastEvidenceUri;
 
     private boolean pendingNarration;
     private boolean pendingCalibration;
     private volatile boolean calibrationRunning;
+    private volatile boolean evidenceRunning;
     private boolean prompterRunning;
     private boolean telemetryRunning;
 
@@ -138,6 +140,15 @@ public final class MainActivity extends Activity {
         Button wizard = button("Abrir Wizard / pré-voo");
         wizard.setOnClickListener(v -> StudioWizard.show(this, this::refreshReadyState));
         box.addView(wizard);
+
+        LinearLayout evidenceRow = row();
+        Button evidence = button("Gerar provas + teste μ∆");
+        evidence.setOnClickListener(v -> generateEvidenceBundle());
+        Button shareEvidence = button("Compartilhar provas");
+        shareEvidence.setOnClickListener(v -> shareEvidenceBundle());
+        evidenceRow.addView(evidence, weight());
+        evidenceRow.addView(shareEvidence, weight());
+        box.addView(evidenceRow);
 
         status = new TextView(this);
         status.setTextSize(16f);
@@ -336,6 +347,58 @@ public final class MainActivity extends Activity {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("audio/*");
         startActivityForResult(intent, REQ_PICK);
+    }
+
+    private void generateEvidenceBundle() {
+        if (evidenceRunning) {
+            status.setText("Geração de provas já está em execução.");
+            return;
+        }
+
+        evidenceRunning = true;
+        status.setText(
+                "EVIDENCE — coletando instalação, build, sensores e μ∆ do acelerômetro…");
+
+        MicroDeltaVibrationProbe.run(this, 2200L, vibration -> {
+            new Thread(() -> {
+                try {
+                    EvidenceBundleWriter.Result result = EvidenceBundleWriter.write(
+                            this,
+                            vibration,
+                            lastZrf,
+                            lastCfr,
+                            lastMasteredPcm);
+                    lastEvidenceUri = result.uri;
+                    runOnUiThread(() -> status.setText(
+                            "PROVAS GERADAS — " + result.displayName +
+                            "\ninstalação + APK SHA-256 + CI provenance + hardware + μ∆" +
+                            "\nVibração: " + vibration.state +
+                            " | samples=" + vibration.samples +
+                            " | RMS Δa=" +
+                            String.format(Locale.US, "%.6f", vibration.rmsDeltaMs2) +
+                            " m/s²" +
+                            "\nDocumento salvo em Downloads/RafaeliaAudio/Evidence."));
+                } catch (Exception e) {
+                    runOnUiThread(() ->
+                            status.setText("Falha ao gerar provas: " + e.getMessage()));
+                } finally {
+                    evidenceRunning = false;
+                }
+            }, "rafaelia-evidence-writer").start();
+        });
+    }
+
+    private void shareEvidenceBundle() {
+        if (lastEvidenceUri == null) {
+            status.setText("Gere o bundle de provas antes de compartilhar.");
+            return;
+        }
+
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_STREAM, lastEvidenceUri);
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(send, "Compartilhar provas Rafaelia"));
     }
 
     private void ensurePermissionAndRecord(boolean narration) {
