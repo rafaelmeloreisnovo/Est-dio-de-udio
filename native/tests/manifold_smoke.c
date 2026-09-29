@@ -63,6 +63,8 @@ int main(void) {
     rfa_relative_transfer transfer;
     rfa_i16 sync_a[32];
     rfa_i16 sync_b[32];
+    rfa_i16 sync_inverted[40];
+    rfa_relative_transfer inverted_transfer;
     int i;
 
     rfa_wave_bank_reset(&bank);
@@ -163,6 +165,12 @@ int main(void) {
         if (sync_a[i] != sync_b[i]) return 63;
         if (sync_a[i] != 8192 && sync_a[i] != -8192) return 64;
     }
+    for (i = 0; i < 40; ++i) sync_inverted[i] = 0;
+    for (i = 0; i < 32; ++i) sync_inverted[i + 3] = (rfa_i16)-sync_a[i];
+    if (!rfa_relative_transfer_search(
+            sync_a, 32, sync_inverted, 40, 0, 6, &inverted_transfer)) return 71;
+    if (inverted_transfer.best_lag != 3) return 69;
+    if (inverted_transfer.correlation >= 0LL) return 70;
 
     rfa_exp_sweep_reset_q31(&sweep, 89478485U, 2149631132U, 16384, 64);
     if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 65;
