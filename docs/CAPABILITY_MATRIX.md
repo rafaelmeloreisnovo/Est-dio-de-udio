@@ -36,3 +36,10 @@ Update this matrix whenever a receipt materially promotes or demotes a state.
 | passive connectivity metadata | implemented | build-gated | physical NOT_RUN | PLATFORM_OBSERVATION_ONLY |
 | RF transmit/control | not implemented | N/A | N/A | PROHIBITED_BY_PROJECT_BOUNDARY |
 | ZRF CODE/PROV/RAC1 chunk ids | registered | source-gated | serialization partial | IMPLEMENTED_PARTIAL |
+
+
+| Node.js application runtime | absent | CI-gated | N/A | 0 |
+| npm/yarn/pnpm dependency graph | absent | CI-gated | N/A | 0 |
+| authorial CI orchestration | implemented | pending execution | N/A | IMPLEMENTED_UNTESTED |
+| checkout/setup Java/setup Android/setup Gradle JS Actions | removed from canonical gate | pending execution | N/A | SOURCE_REMOVED |
+| GitHub artifact upload edge | external Action isolated | pending execution | N/A | PLATFORM_EDGE |
