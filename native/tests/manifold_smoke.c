@@ -9,6 +9,10 @@
 #include "rfa_matrix_core.h"
 #include "rfa_block_core.h"
 #include "rfa_container_core.h"
+#include "rfa_fir_core.h"
+#include "rfa_time_core.h"
+#include "rfa_lms_core.h"
+#include "rfa_biquad_core.h"
 
 static int same_i16(const rfa_i16 *a, const rfa_i16 *b, int count) {
     int i;
@@ -33,6 +37,22 @@ int main(void) {
     rfa_u32 chunk_flags;
     rfa_u32 chunk_payload;
     rfa_u32 chunk_items;
+    rfa_i16 fir_coeff[1] = {32767};
+    rfa_i16 fir_history[1];
+    rfa_i16 fir_out[16];
+    rfa_fir_q15 fir;
+    rfa_time_map_q16 time_map;
+    rfa_i16 time_in[8] = {0,1000,2000,3000,4000,5000,6000,7000};
+    rfa_i16 time_out[8];
+    rfa_i16 lms_weights[4];
+    rfa_i16 lms_history[4];
+    rfa_i16 lms_primary[8] = {100,200,300,400,500,600,700,800};
+    rfa_i16 lms_reference[8] = {20,20,20,20,20,20,20,20};
+    rfa_i16 lms_out[8];
+    rfa_lms_q15 lms;
+    rfa_biquad_bank_q30 bq;
+    rfa_biquad_coeff_q30 identity_bq;
+    rfa_i16 bq_data[8] = {-1000,-500,0,500,1000,500,0,-500};
     int i;
 
     rfa_wave_bank_reset(&bank);
@@ -92,6 +112,34 @@ int main(void) {
     header_bytes[8] ^= 1U;
     if (rfa_container_read_header(header_bytes,
             RFA_CONTAINER_HEADER_BYTES, &decoded)) return 48;
+
+    if (!rfa_fir_bind_q15(&fir, fir_coeff, fir_history, 1)) return 50;
+    rfa_fir_process_block_q15(&fir, time_in, fir_out, 8);
+    for (i = 0; i < 8; ++i) {
+        int delta = fir_out[i] - time_in[i];
+        if (delta < 0) delta = -delta;
+        if (delta > 1) return 51;
+    }
+
+    rfa_time_map_reset_q16(&time_map, 65536U);
+    if (rfa_time_resample_linear_q16(&time_map, time_in, 8, 1, time_out, 7) != 7) return 52;
+    for (i = 0; i < 7; ++i) if (time_out[i] != time_in[i]) return 53;
+
+    if (!rfa_lms_bind_q15(&lms, lms_weights, lms_history, 4, 512)) return 54;
+    rfa_lms_cancel_block_q15(&lms, lms_primary, lms_reference, lms_out, 8);
+    for (i = 0; i < 8; ++i) {
+        if (lms_out[i] < -32768 || lms_out[i] > 32767) return 55;
+    }
+
+    rfa_biquad_bank_reset_q30(&bq, 1);
+    identity_bq.b0_q30 = (rfa_i32)(1U << 30);
+    identity_bq.b1_q30 = 0;
+    identity_bq.b2_q30 = 0;
+    identity_bq.a1_q30 = 0;
+    identity_bq.a2_q30 = 0;
+    if (!rfa_biquad_bank_set_q30(&bq, 0, &identity_bq)) return 56;
+    rfa_biquad_bank_process_q30(&bq, bq_data, 8, 1);
+    if (bq_data[0] != -1000 || bq_data[4] != 1000) return 57;
 
     return 0;
 }
