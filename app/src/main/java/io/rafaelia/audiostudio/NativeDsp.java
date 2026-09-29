@@ -60,6 +60,9 @@ final class NativeDsp {
     static native int nativeSweepRender(
             short[] output, int frames, int channels);
 
+    static native int nativeSyncSequence(
+            short[] output, int count, long seed, int gainQ15);
+
     static native int nativeRelativeTransfer(
             short[] reference, int referenceCount,
             short[] response, int responseCount,
