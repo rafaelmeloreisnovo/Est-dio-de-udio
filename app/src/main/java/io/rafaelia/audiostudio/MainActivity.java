@@ -64,11 +64,14 @@ public final class MainActivity extends Activity {
     private File recordedPcm;
     private File lastMasteredPcm;
     private File lastZrf;
+    private File lastCfr;
     private int lastMasteredRate = 48000;
     private int lastMasteredChannels = 1;
     private Uri lastOutput;
 
     private boolean pendingNarration;
+    private boolean pendingCalibration;
+    private volatile boolean calibrationRunning;
     private boolean prompterRunning;
     private boolean telemetryRunning;
 
@@ -123,7 +126,7 @@ public final class MainActivity extends Activity {
         box.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Rafaelia Audio Studio — Delta 2");
+        title.setText("Rafaelia Audio Studio — Audio Manifold");
         title.setTextSize(25f);
         box.addView(title);
 
@@ -145,7 +148,8 @@ public final class MainActivity extends Activity {
         studioWorkspaceView.setCalibrationState(
                 "CAL=DIGITAL+RELATIVE | ABS_SPL=TOKEN_VAZIO");
         studioWorkspaceView.setContainerState(
-                "ZRF/CFR CORE=IMPLEMENTED_UNTESTED | RECORDING_WIRE=PENDING");
+                "ZRF=RECORDER_WIRED | CFR=RELATIVE_READY");
+        studioWorkspaceView.setActionListener(this::ensurePermissionAndCalibrate);
         box.addView(studioWorkspaceView,
                 new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, dp(520)));
@@ -335,6 +339,7 @@ public final class MainActivity extends Activity {
     }
 
     private void ensurePermissionAndRecord(boolean narration) {
+        pendingCalibration = false;
         pendingNarration = narration;
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -348,6 +353,79 @@ public final class MainActivity extends Activity {
         } else {
             startRecording(false);
         }
+    }
+
+    private void ensurePermissionAndCalibrate() {
+        pendingNarration = false;
+        pendingCalibration = true;
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.RECORD_AUDIO}, REQ_AUDIO);
+            return;
+        }
+        pendingCalibration = false;
+        runRelativeCalibration();
+    }
+
+    private void runRelativeCalibration() {
+        if (calibrationRunning) {
+            status.setText("Calibração relativa já está em execução.");
+            return;
+        }
+        if (recorder != null) {
+            status.setText("Pare a gravação antes da calibração acústica.");
+            return;
+        }
+
+        calibrationRunning = true;
+        playback.stop();
+        status.setText(
+                "CALIBRAÇÃO RELATIVA — preparando sync + sweep em nível conservador…");
+        if (studioWorkspaceView != null) {
+            studioWorkspaceView.setCalibrationState(
+                    "CAL=RUNNING_RELATIVE | ABS_SPL=TOKEN_VAZIO");
+        }
+
+        new Thread(() -> {
+            try {
+                File cfr = new File(
+                        getCacheDir(),
+                        "rafaelia_cal_" + System.currentTimeMillis() + ".cfr");
+                RelativeCalibrationEngine.Result result =
+                        RelativeCalibrationEngine.run(this, cfr);
+                lastCfr = result.cfrFile;
+
+                runOnUiThread(() -> {
+                    if (studioWorkspaceView != null) {
+                        studioWorkspaceView.setCalibrationState(
+                                "CAL=RELATIVE_CAPTURED | input=" + result.inputSource +
+                                " | lag=" + result.bestLag + " samples");
+                        studioWorkspaceView.setContainerState(
+                                "CFR=RECORDED_RELATIVE | ABS_SPL=TOKEN_VAZIO");
+                    }
+                    status.setText(
+                            "CFR RELATIVO GRAVADO" +
+                            "\ninput=" + result.inputSource +
+                            " | lag=" + result.bestLag + " samples" +
+                            " | latency=" + result.latencyMicros() + " us" +
+                            "\ncaptured=" + result.capturedFrames + " frames" +
+                            " | correlation=" + result.correlation +
+                            "\nABS_SPL=TOKEN_VAZIO — requer referência acústica física." +
+                            "\nCFR: " + result.cfrFile.getAbsolutePath());
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (studioWorkspaceView != null) {
+                        studioWorkspaceView.setCalibrationState(
+                                "CAL=FAIL | ABS_SPL=TOKEN_VAZIO");
+                    }
+                    status.setText("Falha na calibração relativa: " + e.getMessage());
+                });
+            } finally {
+                calibrationRunning = false;
+            }
+        }, "rafaelia-relative-calibration").start();
     }
 
     private void countdown(int value) {
@@ -620,9 +698,16 @@ public final class MainActivity extends Activity {
         if (requestCode == REQ_AUDIO &&
                 grantResults.length > 0 &&
                 grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            if (pendingNarration) countdown(3);
-            else startRecording(false);
+            if (pendingCalibration) {
+                pendingCalibration = false;
+                runRelativeCalibration();
+            } else if (pendingNarration) {
+                countdown(3);
+            } else {
+                startRecording(false);
+            }
         } else if (requestCode == REQ_AUDIO) {
+            pendingCalibration = false;
             status.setText("Permissão de microfone negada.");
         }
     }
