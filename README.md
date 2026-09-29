@@ -97,7 +97,11 @@ Branch de implementação: `feature/audio-manifold-zrf-cfr-v1`.
 - `rfa_wave_core`: banco de até 16 senoides Q15 por acumulador de fase, sem `libm`;
 - `rfa_matrix_core`: matriz Q15 caller-owned até 16×16;
 - `rfa_block_core`: ring buffer caller-owned e perfis 128/512/4096;
-- `rfa_container_core`: cabeçalhos ZRF/CFR, chunks tipados e checksum bounded.
+- `rfa_container_core`: cabeçalhos ZRF/CFR, chunks tipados e checksum bounded;
+- `rfa_fir_core`: FIR/convolution caller-owned para IR/reverb/correction;
+- `rfa_time_core`: time-map/resampling linear Q16 (não pitch-preserving);
+- `rfa_lms_core`: cancelamento adaptativo LMS com referência;
+- `rfa_biquad_core`: banco de até 16 seções Q30 para EQ/filtros com coeficientes explícitos.
 
 Todos entram no mesmo gate `-nostdinc -ffreestanding -fno-builtin` dos núcleos existentes.
 
@@ -117,7 +121,8 @@ O workspace recebe waveform vivo limitado, telemetria da captura e espectro/mast
 - antes do mastering, a origem processada também recebe um sidecar `ZRF1`;
 - ZRF v1 já contém cabeçalho + chunk PCM real;
 - WAVE/MATR/CAL/IR/SPEC/PHON/ROOM/RCPT estão registrados como tipos de chunk;
-- CFR possui codec de cabeçalho/chunk, mas captura de calibração permanece `PENDING`.
+- CFR possui codec de cabeçalho/chunk, mas captura de calibração permanece `PENDING`;
+- FIR/LMS/time-map/biquad são kernels de referência e ainda não estão todos ligados ao workflow visual.
 
 Ver `docs/ZRF_CFR_FORMAT_V1.md`.
 
