@@ -9,6 +9,7 @@
 #include "dsp_core.h"
 #include "meter_core.h"
 #include "rfa_container_core.h"
+#include "rfa_measure_core.h"
 
 /*
  * Platform-owned instances.
@@ -16,6 +17,7 @@
  */
 static dsp_state g_dsp_state;
 static meter_state g_meter_state;
+static rfa_exp_sweep_q31 g_sweep_state;
 
 JNIEXPORT void JNICALL
 Java_io_rafaelia_audiostudio_NativeDsp_nativeReset(
@@ -212,4 +214,118 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeChunkHeader(
             env, output, 0, RFA_CONTAINER_CHUNK_HEADER_BYTES,
             (const jbyte *)bytes);
     return output;
+}
+
+
+JNIEXPORT void JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeSweepReset(
+        JNIEnv *env, jclass clazz, jlong startStepQ32, jlong ratioQ31,
+        jint gainQ15, jint frames) {
+    (void)env;
+    (void)clazz;
+    if (startStepQ32 < 0 || startStepQ32 > 4294967295LL) return;
+    if (ratioQ31 < 0 || ratioQ31 > 4294967295LL) return;
+    rfa_exp_sweep_reset_q31(
+            &g_sweep_state,
+            (rfa_u32)startStepQ32,
+            (rfa_u32)ratioQ31,
+            (rfa_i32)gainQ15,
+            (int)frames);
+}
+
+JNIEXPORT jint JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeSweepRender(
+        JNIEnv *env, jclass clazz, jshortArray output,
+        jint frames, jint channels) {
+    jsize length;
+    jshort *data;
+    int required;
+    int produced;
+    (void)clazz;
+
+    if (output == (jshortArray)0) return 0;
+    if (frames <= 0 || channels <= 0 || channels > 2) return 0;
+    if (frames > 1073741823 / channels) return 0;
+    required = (int)frames * (int)channels;
+    length = (*env)->GetArrayLength(env, output);
+    if (required > length) return 0;
+
+    data = (*env)->GetShortArrayElements(env, output, (jboolean *)0);
+    if (data == (jshort *)0) return 0;
+    produced = rfa_exp_sweep_render_q15(
+            &g_sweep_state, (rfa_i16 *)data, (int)frames, (int)channels);
+    (*env)->ReleaseShortArrayElements(env, output, data, 0);
+    return (jint)produced;
+}
+
+JNIEXPORT jint JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeSyncSequence(
+        JNIEnv *env, jclass clazz, jshortArray output,
+        jint count, jlong seed, jint gainQ15) {
+    jsize length;
+    jshort *data;
+    int produced;
+    (void)clazz;
+
+    if (output == (jshortArray)0 || count <= 0) return 0;
+    if (seed < 0 || seed > 4294967295LL) return 0;
+    length = (*env)->GetArrayLength(env, output);
+    if (count > length) return 0;
+
+    data = (*env)->GetShortArrayElements(env, output, (jboolean *)0);
+    if (data == (jshort *)0) return 0;
+    produced = rfa_sync_sequence_q15(
+            (rfa_i16 *)data, (int)count, (rfa_u32)seed, (rfa_i32)gainQ15);
+    (*env)->ReleaseShortArrayElements(env, output, data, 0);
+    return (jint)produced;
+}
+
+JNIEXPORT jint JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeRelativeTransfer(
+        JNIEnv *env, jclass clazz,
+        jshortArray reference, jint referenceCount,
+        jshortArray response, jint responseCount,
+        jint minLag, jint maxLag, jlongArray output) {
+    jsize refLength;
+    jsize respLength;
+    jshort *refData;
+    jshort *respData;
+    rfa_relative_transfer result;
+    jlong values[5];
+    int ok;
+    (void)clazz;
+
+    if (reference == (jshortArray)0 ||
+        response == (jshortArray)0 ||
+        output == (jlongArray)0) return 0;
+    if ((*env)->GetArrayLength(env, output) < 5) return 0;
+
+    refLength = (*env)->GetArrayLength(env, reference);
+    respLength = (*env)->GetArrayLength(env, response);
+    if (referenceCount < 0 || referenceCount > refLength) return 0;
+    if (responseCount < 0 || responseCount > respLength) return 0;
+
+    refData = (*env)->GetShortArrayElements(env, reference, (jboolean *)0);
+    if (refData == (jshort *)0) return 0;
+    respData = (*env)->GetShortArrayElements(env, response, (jboolean *)0);
+    if (respData == (jshort *)0) {
+        (*env)->ReleaseShortArrayElements(env, reference, refData, JNI_ABORT);
+        return 0;
+    }
+
+    ok = rfa_relative_transfer_search(
+            (const rfa_i16 *)refData, (int)referenceCount,
+            (const rfa_i16 *)respData, (int)responseCount,
+            (int)minLag, (int)maxLag, &result);
+
+    (*env)->ReleaseShortArrayElements(env, reference, refData, JNI_ABORT);
+    (*env)->ReleaseShortArrayElements(env, response, respData, JNI_ABORT);
+
+    values[0] = (jlong)result.correlation;
+    values[1] = (jlong)result.reference_energy;
+    values[2] = (jlong)result.response_energy;
+    values[3] = (jlong)result.best_lag;
+    values[4] = (jlong)result.analyzed;
+    (*env)->SetLongArrayRegion(env, output, 0, 5, values);
+    return ok ? 1 : 0;
 }

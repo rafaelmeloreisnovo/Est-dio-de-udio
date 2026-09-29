@@ -61,6 +61,10 @@ int main(void) {
     rfa_i16 sweep_data[64];
     rfa_i16 delayed_data[72];
     rfa_relative_transfer transfer;
+    rfa_i16 sync_a[32];
+    rfa_i16 sync_b[32];
+    rfa_i16 sync_inverted[40];
+    rfa_relative_transfer inverted_transfer;
     int i;
 
     rfa_wave_bank_reset(&bank);
@@ -155,14 +159,27 @@ int main(void) {
     if (voice_features.best_period_samples != 4) return 59;
     if (voice_features.energy == 0ULL || voice_features.zero_crossings == 0U) return 60;
 
+    if (rfa_sync_sequence_q15(sync_a, 32, 0x51f15e5dU, 8192) != 32) return 61;
+    if (rfa_sync_sequence_q15(sync_b, 32, 0x51f15e5dU, 8192) != 32) return 62;
+    for (i = 0; i < 32; ++i) {
+        if (sync_a[i] != sync_b[i]) return 63;
+        if (sync_a[i] != 8192 && sync_a[i] != -8192) return 64;
+    }
+    for (i = 0; i < 40; ++i) sync_inverted[i] = 0;
+    for (i = 0; i < 32; ++i) sync_inverted[i + 3] = (rfa_i16)-sync_a[i];
+    if (!rfa_relative_transfer_search(
+            sync_a, 32, sync_inverted, 40, 0, 6, &inverted_transfer)) return 65;
+    if (inverted_transfer.best_lag != 3) return 66;
+    if (inverted_transfer.correlation >= 0LL) return 67;
+
     rfa_exp_sweep_reset_q31(&sweep, 89478485U, 2149631132U, 16384, 64);
-    if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 61;
+    if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 68;
     for (i = 0; i < 72; ++i) delayed_data[i] = 0;
     for (i = 0; i < 64; ++i) delayed_data[i + 5] = sweep_data[i];
     if (!rfa_relative_transfer_search(
-            sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 62;
-    if (transfer.best_lag != 5) return 63;
-    if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 64;
+            sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 69;
+    if (transfer.best_lag != 5) return 70;
+    if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 71;
 
     return 0;
 }

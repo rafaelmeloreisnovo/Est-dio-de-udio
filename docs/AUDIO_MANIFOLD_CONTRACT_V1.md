@@ -140,7 +140,8 @@ Calibration states:
 
 ```text
 CAL_DIGITAL      -> dBFS/peak/RMS/clipping
-CAL_RELATIVE     -> transfer/phase/channel matching
+CAL_RELATIVE     -> raw speaker-room-mic capture + latency alignment implemented;
+                    transfer/phase/coherence derivation remains staged
 CAL_ABSOLUTE_SPL -> requires a physical acoustic reference
 ```
 
@@ -149,6 +150,22 @@ Without a physical reference:
 ```text
 ABS_SPL = TOKEN_VAZIO
 ```
+
+### 12.1 Relative physical capture
+
+The first physical calibration route uses:
+
+```text
+pre-silence
+-> deterministic sync
+-> zero guard
+-> fixed-point exponential sweep
+-> post-silence
+```
+
+The microphone capture is stored in CFR together with the exact digital excitation.
+Sync correlation estimates the discrete path latency. This does not yet constitute
+an impulse response, calibrated transfer function, RT60, or absolute SPL measurement.
 
 ## 13. Phoneme / phonetics
 

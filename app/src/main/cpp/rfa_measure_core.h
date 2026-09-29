@@ -38,6 +38,8 @@ void rfa_exp_sweep_reset_q31(rfa_exp_sweep_q31 *state,
                              int frames);
 int rfa_exp_sweep_render_q15(rfa_exp_sweep_q31 *state,
                              rfa_i16 *output, int frames, int channels);
+int rfa_sync_sequence_q15(rfa_i16 *output, int count,
+                          rfa_u32 seed, rfa_i32 gain_q15);
 int rfa_relative_transfer_search(const rfa_i16 *reference, int reference_count,
                                  const rfa_i16 *response, int response_count,
                                  int min_lag, int max_lag,

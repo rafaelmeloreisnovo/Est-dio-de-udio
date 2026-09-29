@@ -15,6 +15,12 @@ final class NativeDsp {
     static final int CONTAINER_ZRF = 1;
     static final int CONTAINER_CFR = 2;
     static final long CHUNK_PCM = 0x204d4350L;
+    static final long CHUNK_WAVE = 0x45564157L;
+    static final long CHUNK_CAL = 0x204c4143L;
+
+    static final long CHUNK_FLAG_REFERENCE = 1L;
+    static final long CHUNK_FLAG_RESPONSE = 2L;
+    static final int CFR_FLAG_RELATIVE = 1;
 
     static final long TARGET_EBU_R128_Q36 = 403_812_580L;    // -23 LUFS
     static final long TARGET_NARRATION_Q36 = 1_276_967_499L; // -18 LUFS custom
@@ -47,5 +53,20 @@ final class NativeDsp {
 
     static native byte[] nativeChunkHeader(
             long type, long flags, long payloadBytes, long itemCount);
+
+    static native void nativeSweepReset(
+            long startStepQ32, long ratioQ31, int gainQ15, int frames);
+
+    static native int nativeSweepRender(
+            short[] output, int frames, int channels);
+
+    static native int nativeSyncSequence(
+            short[] output, int count, long seed, int gainQ15);
+
+    static native int nativeRelativeTransfer(
+            short[] reference, int referenceCount,
+            short[] response, int responseCount,
+            int minLag, int maxLag, long[] output);
 }
+
 

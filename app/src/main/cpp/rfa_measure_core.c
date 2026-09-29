@@ -7,7 +7,7 @@
  */
 
 #include "rfa_measure_core.h"
-#include "rfa_wave_core.h"
+#include "rfa_sine_q15.h"
 
 static rfa_i16 rfa_measure_clip_i16(rfa_i64 value) {
     if (value > 32767) return (rfa_i16)32767;
@@ -37,7 +37,7 @@ int rfa_exp_sweep_render_q15(rfa_exp_sweep_q31 *state,
     if (frames <= 0 || channels <= 0 || channels > 2) return 0;
 
     while (produced < frames && state->frames_left > 0) {
-        rfa_i16 sine = rfa_wave_sine_q15(state->phase);
+        rfa_i16 sine = rfa_sine_lookup_q15(state->phase);
         rfa_i64 scaled = ((rfa_i64)sine * (rfa_i64)state->gain_q15) >> 15;
         int channel;
         rfa_u64 next_step;
@@ -56,6 +56,26 @@ int rfa_exp_sweep_render_q15(rfa_exp_sweep_q31 *state,
     return produced;
 }
 
+int rfa_sync_sequence_q15(rfa_i16 *output, int count,
+                          rfa_u32 seed, rfa_i32 gain_q15) {
+    rfa_u32 state;
+    int i;
+    if (output == (rfa_i16 *)0 || count <= 0) return 0;
+    if (gain_q15 < 0) {
+        gain_q15 = gain_q15 < -32767 ? 32767 : -gain_q15;
+    }
+    if (gain_q15 > 32767) gain_q15 = 32767;
+    state = seed == 0U ? 0x6d2b79f5U : seed;
+    for (i = 0; i < count; ++i) {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        output[i] = (state & 1U) != 0U ?
+                (rfa_i16)gain_q15 : (rfa_i16)-gain_q15;
+    }
+    return count;
+}
+
 int rfa_relative_transfer_search(const rfa_i16 *reference, int reference_count,
                                  const rfa_i16 *response, int response_count,
                                  int min_lag, int max_lag,
@@ -63,6 +83,7 @@ int rfa_relative_transfer_search(const rfa_i16 *reference, int reference_count,
     int lag;
     int best_lag = 0;
     rfa_i64 best_corr = 0LL;
+    rfa_u64 best_abs_corr = 0ULL;
     rfa_u64 best_ref_energy = 0ULL;
     rfa_u64 best_resp_energy = 0ULL;
 
@@ -90,11 +111,16 @@ int rfa_relative_transfer_search(const rfa_i16 *reference, int reference_count,
             ref_energy += (rfa_u64)(a * a);
             resp_energy += (rfa_u64)(b * b);
         }
-        if (corr > best_corr) {
-            best_corr = corr;
-            best_lag = lag;
-            best_ref_energy = ref_energy;
-            best_resp_energy = resp_energy;
+        {
+            rfa_u64 abs_corr = corr < 0LL ?
+                    (rfa_u64)(-(corr + 1LL)) + 1ULL : (rfa_u64)corr;
+            if (abs_corr > best_abs_corr) {
+                best_abs_corr = abs_corr;
+                best_corr = corr;
+                best_lag = lag;
+                best_ref_energy = ref_energy;
+                best_resp_energy = resp_energy;
+            }
         }
     }
 
@@ -102,6 +128,6 @@ int rfa_relative_transfer_search(const rfa_i16 *reference, int reference_count,
     result->reference_energy = best_ref_energy;
     result->response_energy = best_resp_energy;
     result->best_lag = best_lag;
-    result->analyzed = best_corr != 0LL ? 1 : 0;
+    result->analyzed = best_abs_corr != 0ULL ? 1 : 0;
     return result->analyzed;
 }

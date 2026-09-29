@@ -16,6 +16,10 @@ import android.view.MotionEvent;
 import android.view.View;
 
 final class StudioWorkspaceView extends View {
+    interface ActionListener {
+        void onRunRelativeCalibration();
+    }
+
     private static final String[] TABS = {
             "REC", "EDIT", "CAL", "SPEC", "ROOM", "VOICE", "MASTER", "EXPORT"
     };
@@ -33,6 +37,7 @@ final class StudioWorkspaceView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint thin = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
+    private final RectF calibrationAction = new RectF();
 
     private final short[] waveMin = new short[128];
     private final short[] waveMax = new short[128];
@@ -48,6 +53,7 @@ final class StudioWorkspaceView extends View {
     private String masterState = "MASTER=PENDING";
     private String calibrationState = "CAL=RELATIVE_ONLY";
     private String containerState = "ZRF/CFR=IMPLEMENTED_UNTESTED";
+    private ActionListener actionListener;
 
     StudioWorkspaceView(Context context) {
         super(context);
@@ -55,6 +61,10 @@ final class StudioWorkspaceView extends View {
         thin.setTypeface(android.graphics.Typeface.MONOSPACE);
         setMinimumHeight(dp(500));
         setFocusable(true);
+    }
+
+    void setActionListener(ActionListener listener) {
+        actionListener = listener;
     }
 
     void setCaptureStats(int peak, int rms, long clip, long samples, String source) {
@@ -212,7 +222,17 @@ final class StudioWorkspaceView extends View {
         drawPills(canvas, top + dp(108), new String[]{
                 "SILENCE", "WHITE", "PINK", "SWEEP", "STEP", "REF MIC"
         });
-        drawMiniResponse(canvas, dp(12), top + dp(160), w - dp(12), top + dp(310));
+        drawMiniResponse(canvas, dp(12), top + dp(160), w - dp(12), top + dp(300));
+        calibrationAction.set(dp(12), top + dp(316), w - dp(12), top + dp(358));
+        paint.setARGB(255, 57, 78, 96);
+        canvas.drawRoundRect(calibrationAction, dp(7), dp(7), paint);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(dp(12));
+        paint.setARGB(255, 235, 239, 244);
+        canvas.drawText("RUN RELATIVE CAL — SAFE LEVEL",
+                (calibrationAction.left + calibrationAction.right) * 0.5f,
+                calibrationAction.top + dp(27), paint);
+        paint.setTextAlign(Paint.Align.LEFT);
         drawText(canvas, "speaker -> room -> mic -> ADC is measured as one chain unless referenced",
                 dp(12), h - dp(20), 11);
     }
@@ -376,6 +396,15 @@ final class StudioWorkspaceView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_UP &&
+                screen == 2 &&
+                calibrationAction.contains(event.getX(), event.getY())) {
+            if (actionListener != null) {
+                actionListener.onRunRelativeCalibration();
+            }
+            performClick();
+            return true;
+        }
         if (event.getAction() == MotionEvent.ACTION_UP && event.getY() <= dp(56)) {
             float slot = getWidth() / (float)TABS.length;
             int target = slot <= 0f ? 0 : (int)(event.getX() / slot);
