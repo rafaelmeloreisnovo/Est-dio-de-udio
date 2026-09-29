@@ -4,15 +4,18 @@ Android 10+ audio workstation para captura, narração guiada, tratamento, medi�
 
 ## Estado operacional
 
-- MAIN_BASE: 058a3a5a8f79d1103a224e484a4797d51d151966
-- MAIN_CI: PASS
-- DELTA3_FREESTANDING_CONTEXTS: IMPLEMENTED_UNTESTED
+- MAIN_HEAD_AFTER_PR7: 452de8d1276137b093b05fc2d956f565757620db
+- LAST_VALIDATED_SOURCE_HEAD: 356bafe81f148e972ece53274dde86208864b90b
+- LAST_VALIDATED_PR_GATE: PASS (run 36528458788 / #84)
 - EXECUTION_TARGET: Android API 29+
-- DSP_HOST_SMOKE_MAIN: PASS
-- METER_HOST_SMOKE_MAIN: PASS
-- ARMV7_ZERO_UNDEFINED_MAIN: PASS
-- AARCH64_ZERO_UNDEFINED_MAIN: PASS
-- APK_BUILD_MAIN: PASS
+- DSP_HOST_SMOKE_VALIDATED: PASS
+- METER_HOST_SMOKE_VALIDATED: PASS
+- MANIFOLD_HOST_SMOKE_VALIDATED: PASS
+- ARMV7_ZERO_UNDEFINED_VALIDATED: PASS
+- ARMV7_ABI_MANIFEST_VALIDATED: PASS
+- AARCH64_ZERO_UNDEFINED_VALIDATED: PASS
+- APK_BUILD_VALIDATED: PASS
+- CFR_RELATIVE_CAPTURE_SOURCE: PASS_CI
 - PHYSICAL_ANDROID10: NOT_RUN
 - WHATSAPP_REAL_ROUNDTRIP: NOT_RUN
 - BS1770_CONFORMANCE: PENDING
@@ -183,7 +186,7 @@ Current state:
 
 ```text
 CFR_RELATIVE_SOURCE = IMPLEMENTED
-CFR_RELATIVE_CI = PENDING
+CFR_RELATIVE_CI = PASS
 CFR_RELATIVE_PHYSICAL_ANDROID = NOT_RUN
 ABSOLUTE_SPL = TOKEN_VAZIO
 FREQUENCY_TRANSFER_DECONVOLUTION = PENDING
@@ -192,3 +195,31 @@ ROOM_CORRECTION = PENDING
 ```
 
 The captured CFR is deliberately sufficient for later re-analysis: the original excitation and microphone response are preserved rather than only storing a derived curve.
+
+
+## Documentation & evidence product layer
+
+Canonical route: `docs/START_HERE.md`.
+
+The project now ships a publication-grade documentation family:
+
+- product/public: `PRODUCT_OVERVIEW.md`, `PUBLIC_PRODUCT_BRIEF.md`, `USER_GUIDE.md`;
+- technical: `DEVELOPER_GUIDE.md`, `AUDIO_MANIFOLD_CONTRACT_V1.md`, `ZRF_CFR_FORMAT_V1.md`;
+- assurance: `VERIFICATION_AND_EVIDENCE.md`, `INSTALLATION_VALIDATION.md`, `RELEASE_READINESS.md`;
+- hardware: `HARDWARE_TEST_PROTOCOL.md`, `MICRO_DELTA_VIBRATION_V1.md`;
+- navigation: `PUBLICATION_INDEX.md`, `DOCUMENT_PRODUCTS.md`, `CONCEPT_FAMILY_ATLAS.md`, `GLOSSARY.md`, `FAQ.md`;
+- governance: scoped `AGENTS.md` files at repository, app, C core, Java platform, docs and CI levels.
+
+### In-app proof bundle
+
+The app exposes **Gerar provas + teste μ∆**. It generates a shareable evidence file with:
+
+- installed APK SHA-256;
+- package/version/install/update metadata;
+- embedded source SHA / CI coordinates when built by canonical CI;
+- Android/ABI/audio capability data;
+- sensor inventory;
+- bounded accelerometer μ∆ vibration observation;
+- hashes of available ZRF/CFR/master artifacts.
+
+`μ∆` is a temporal delta operator. Vibration observation is not promoted to hardware-fault diagnosis without a validated reference/model.
