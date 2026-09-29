@@ -30,6 +30,8 @@ The PR/main workflows now include the manifold sources in:
 - mutable file-scope-state gate;
 - ARMv7 zero-undefined inspection;
 - AArch64 zero-undefined inspection;
+- versioned public ABI manifest at `native/abi/public_symbols_v1.txt`;
+- exact ARMv7 exported-symbol diff against that manifest;
 - `manifold_smoke` round-trip tests;
 - Android APK build.
 
@@ -62,7 +64,6 @@ Source hashing must never be described as automatically proving infringement, au
 
 Next candidate:
 
-- per-micromodule ABI allowlist;
 - deterministic object digest matrix for ARMv7/AArch64/x86_64;
 - performance envelope;
 - property/fuzz vectors;
