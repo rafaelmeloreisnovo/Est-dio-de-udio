@@ -16,6 +16,10 @@ The evidence button writes a UTF-8 `key=value` document to:
 - source_sha
 - ci_run_id / ci_run_number
 - installed_apk_sha256
+- signing_mode / signer_id
+- expected_signing_cert_sha256
+- installed_signing_cert_sha256
+- signing_cert_matches_expected
 
 ### embedded_ci_provenance
 
@@ -23,13 +27,21 @@ When canonical CI built the APK, `ci_provenance_v1.txt` is embedded after host/A
 
 The asset may state earlier gates as PASS. APK assembly/upload are intentionally not marked PASS inside that pre-build asset.
 
+### component_origin
+
+Embedded `component_origin_v1.txt` classifies project source, generated APK components, Android platform and external toolchain boundaries.
+
+### permission_contract
+
+Embedded `permission_contract_v1.txt` records which permissions are required, optional, or deliberately not requested.
+
 ### device_runtime
 
 Manufacturer, model, Android version, SDK and supported ABIs.
 
 ### permissions_and_audio
 
-Microphone feature/permission and Android audio output properties.
+Microphone feature/permission, optional activity-recognition permission, passive network-state permission and Android audio output properties.
 
 ### micro_delta_vibration
 

@@ -1,0 +1,135 @@
+name: Rafaelia Signed Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Optional exact source SHA; blank uses the selected workflow ref SHA.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    env:
+      RFA_SOURCE_SHA_INPUT: ${{ inputs.source_sha }}
+      RFA_CI_RUN_ID: ${{ github.run_id }}
+      RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+      RFA_SIGNING_MODE: AUTHORIAL_ANDROID_APKSIGNER
+      RFA_SIGNER_ID: ${{ vars.RAFAELIA_SIGNER_ID }}
+      RFA_EXPECTED_CERT_SHA256: ${{ vars.RAFAELIA_EXPECTED_CERT_SHA256 }}
+      RFA_ANDROID_KEY_ALIAS: ${{ vars.RAFAELIA_ANDROID_KEY_ALIAS }}
+      RFA_ANDROID_KEYSTORE_B64: ${{ secrets.RAFAELIA_ANDROID_KEYSTORE_B64 }}
+      RFA_ANDROID_STORE_PASSWORD: ${{ secrets.RAFAELIA_ANDROID_STORE_PASSWORD }}
+      RFA_ANDROID_KEY_PASSWORD: ${{ secrets.RAFAELIA_ANDROID_KEY_PASSWORD }}
+      RFA_PAGES_REPO: ${{ vars.RAFAELIA_PAGES_REPO }}
+      RFA_PAGES_PAT: ${{ secrets.RAFAELIA_PAGES_PAT }}
+
+    steps:
+      - name: Resolve exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$RFA_SOURCE_SHA_INPUT"
+          if [ -z "$sha" ]; then sha="$GITHUB_SHA"; fi
+          echo "RFA_SOURCE_SHA=$sha" >> "$GITHUB_ENV"
+
+      - name: Authorial checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+
+      - name: Authorial toolchain
+        shell: bash
+        run: |
+          bash ci/rafaelia-toolchain.sh java
+          bash ci/rafaelia-toolchain.sh android
+          bash ci/rafaelia-toolchain.sh gradle
+          bash ci/rafaelia-toolchain.sh report
+
+      - name: Require successful canonical gate for source SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          match="$(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$RFA_SOURCE_SHA/check-runs"               --jq '.check_runs[] | select(.name=="gate / build" and .status=="completed" and .conclusion=="success") | .id' |
+            head -n1
+          )"
+          test -n "$match" || {
+            echo "CANONICAL_GATE_FOR_SOURCE=TOKEN_VAZIO_OR_FAIL"
+            exit 1
+          }
+          echo "CANONICAL_GATE_FOR_SOURCE=PASS"
+
+      - name: Generate component-origin and permission assets
+        shell: bash
+        run: bash ci/rafaelia-origin-assets.sh
+
+      - name: Embed signed-build provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets
+          cat > app/src/main/assets/ci_provenance_v1.txt <<EOF
+          schema=rafaelia.ci-provenance/v1
+          source_sha=$RFA_SOURCE_SHA
+          run_id=$RFA_CI_RUN_ID
+          run_number=$RFA_CI_RUN_NUMBER
+          upstream_canonical_gate=PASS
+          authorial_toolchain_bootstrap=PASS
+          node_app_runtime=0
+          external_js_actions=NONE
+          signing_mode=AUTHORIAL_ANDROID_APKSIGNER
+          signing_certificate_match=PENDING_AT_EMBED
+          signed_release_publish=PENDING_AT_EMBED
+          EOF
+
+      - name: Signing contract gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RFA_SIGNER_ID" || { echo "RAFAELIA_SIGNER_ID=TOKEN_VAZIO"; exit 1; }
+          test -n "$RFA_EXPECTED_CERT_SHA256" || { echo "RAFAELIA_EXPECTED_CERT_SHA256=TOKEN_VAZIO"; exit 1; }
+          test -n "$RFA_ANDROID_KEY_ALIAS" || { echo "RAFAELIA_ANDROID_KEY_ALIAS=TOKEN_VAZIO"; exit 1; }
+          test -n "$RFA_ANDROID_KEYSTORE_B64" || { echo "RAFAELIA_ANDROID_KEYSTORE_B64=TOKEN_VAZIO"; exit 1; }
+          test -n "$RFA_ANDROID_STORE_PASSWORD" || { echo "RAFAELIA_ANDROID_STORE_PASSWORD=TOKEN_VAZIO"; exit 1; }
+          test -n "$RFA_ANDROID_KEY_PASSWORD" || { echo "RAFAELIA_ANDROID_KEY_PASSWORD=TOKEN_VAZIO"; exit 1; }
+
+      - name: Build unsigned release
+        shell: bash
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Sign and verify exact certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          unsigned="app/build/outputs/apk/release/app-release-unsigned.apk"
+          signed="$RUNNER_TEMP/rafaelia-audio-studio-signed.apk"
+          receipt="$RUNNER_TEMP/rafaelia_signed_release_receipt_v1.txt"
+          bash ci/rafaelia-sign-apk.sh "$unsigned" "$signed" "$receipt"
+          echo "RFA_SIGNED_APK=$signed" >> "$GITHUB_ENV"
+          echo "RFA_SIGNED_RECEIPT=$receipt" >> "$GITHUB_ENV"
+
+      - name: Publish signed prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="rafaelia-signed-$RFA_CI_RUN_ID"
+          gh release create "$tag"             "$RFA_SIGNED_APK#Authorially signed Rafaelia Audio Studio APK"             "$RFA_SIGNED_RECEIPT#Signing receipt"             --repo "$GITHUB_REPOSITORY"             --target "$RFA_SOURCE_SHA"             --prerelease             --title "Rafaelia Signed $RFA_CI_RUN_ID"             --notes-file "$RFA_SIGNED_RECEIPT"
+
+      - name: Publish verification receipt to RafGitTools Pages source
+        shell: bash
+        run: bash ci/publish-signing-page.sh "$RFA_SIGNED_RECEIPT"

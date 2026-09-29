@@ -7,6 +7,11 @@ on:
         description: Exact source SHA bound into BuildConfig and evidence.
         required: true
         type: string
+      publish_live:
+        description: Publish a traceable prerelease after a successful main build.
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -15,6 +20,9 @@ jobs:
       RFA_SOURCE_SHA: ${{ inputs.source_sha }}
       RFA_CI_RUN_ID: ${{ github.run_id }}
       RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+      RFA_SIGNING_MODE: DEBUG_NONAUTHORIAL
+      RFA_SIGNER_ID: UNAVAILABLE_DEBUG_BUILD
+      RFA_EXPECTED_CERT_SHA256: TOKEN_VAZIO
 
     steps:
       - name: Authorial checkout — git shell only
@@ -56,18 +64,13 @@ jobs:
             sort -u || true
           )
 
-          for action in "${external_uses[@]}"; do
-            case "$action" in
-              actions/upload-artifact@v4) ;;
-              *)
-                echo "UNAPPROVED_EXTERNAL_ACTION=$action"
-                exit 1
-                ;;
-            esac
-          done
+          if test "${#external_uses[@]}" -ne 0; then
+            printf 'UNAPPROVED_EXTERNAL_ACTION=%s\n' "${external_uses[@]}"
+            exit 1
+          fi
 
           echo "NODE_APP_RUNTIME=0"
-          echo "EXTERNAL_JS_ACTIONS=actions/upload-artifact@v4_ONLY"
+          echo "EXTERNAL_JS_ACTIONS=NONE"
 
       - name: Gradle authorial contract
         run: gradle :app:rafaeliaBuildContract --no-daemon --stacktrace
@@ -216,6 +219,10 @@ jobs:
             native/tests/LowSha256Smoke.java
           java -cp /tmp/rfa_sha_test io.rafaelia.audiostudio.LowSha256Smoke
 
+      - name: Generate component-origin and permission assets
+        shell: bash
+        run: bash ci/rafaelia-origin-assets.sh
+
       - name: Embed CI provenance asset
         run: |
           mkdir -p app/src/main/assets
@@ -233,20 +240,92 @@ jobs:
           low_dependency_gate=PASS
           authorial_toolchain_bootstrap=PASS
           node_app_runtime=0
-          external_js_actions=actions/upload-artifact@v4_ONLY
+          external_js_actions=NONE
           armv7_zero_undefined=PASS
           armv7_abi_manifest=PASS
           aarch64_zero_undefined=PASS
           low_java_sha256_kat=PASS
           assemble_debug=PENDING_AT_EMBED
-          artifact_upload=PENDING_AT_EMBED
+          live_release_publish=PENDING_AT_EMBED
           EOF
 
       - name: Gradle authorial APK
         run: gradle :app:rafaeliaDebugApk --no-daemon --stacktrace
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: rafaelia-audio-studio-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Create binary origin receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          APK_SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          ENTRY_MANIFEST="$RUNNER_TEMP/apk-entry-sha256.txt"
+          : > "$ENTRY_MANIFEST"
+
+          while IFS= read -r entry; do
+            case "$entry" in
+              */) continue ;;
+            esac
+            digest="$(unzip -p "$APK" "$entry" | sha256sum | awk '{print $1}')"
+            printf '%s  %s\n' "$digest" "$entry" >> "$ENTRY_MANIFEST"
+          done < <(unzip -Z1 "$APK" | LC_ALL=C sort)
+
+          ENTRY_MANIFEST_SHA="$(sha256sum "$ENTRY_MANIFEST" | awk '{print $1}')"
+          ENTRY_COUNT="$(wc -l < "$ENTRY_MANIFEST" | tr -d ' ')"
+
+          cat > "$RUNNER_TEMP/binary_origin_receipt_v1.txt" <<EOF
+          schema=rafaelia.binary-origin/v1
+          source_sha=$RFA_SOURCE_SHA
+          run_id=$RFA_CI_RUN_ID
+          apk_sha256=$APK_SHA
+          apk_entry_manifest_sha256=$ENTRY_MANIFEST_SHA
+          apk_entry_count=$ENTRY_COUNT
+          classes.dex=GENERATED_DEX_MIXED_PROJECT_BYTECODE_PLATFORM_REFERENCES
+          lib/*/librafaelia_audio.so=PROJECT_NATIVE_BINARY_WITH_ANDROID_ABI_EDGE
+          AndroidManifest.xml=GENERATED_FROM_PROJECT_MANIFEST
+          resources.arsc=GENERATED_ANDROID_RESOURCE_TABLE
+          META-INF/*=BUILD_OR_SIGNATURE_METADATA
+          claim=BYTE_ORIGIN_CLASSIFICATION_NOT_THIRD_PARTY_AUTHORSHIP_ERASURE
+          EOF
+
+          echo "RFA_APK_SHA256=$APK_SHA" >> "$GITHUB_ENV"
+          echo "RFA_BINARY_RECEIPT=$RUNNER_TEMP/binary_origin_receipt_v1.txt" >> "$GITHUB_ENV"
+          echo "RFA_ENTRY_MANIFEST=$ENTRY_MANIFEST" >> "$GITHUB_ENV"
+
+      - name: Publish live prerelease — GitHub CLI, no JS Action
+        if: ${{ inputs.publish_live }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          command -v gh >/dev/null 2>&1 || {
+            echo "GH_CLI_UNAVAILABLE"
+            exit 1
+          }
+
+          short_sha="$(printf '%s' "$RFA_SOURCE_SHA" | cut -c1-12)"
+          tag="rafaelia-live-$RFA_CI_RUN_ID"
+          apk_name="rafaelia-audio-studio-$short_sha.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/$apk_name"
+
+          cat > "$RUNNER_TEMP/live_release_receipt_v1.txt" <<EOF
+          schema=rafaelia.live-release/v1
+          source_sha=$RFA_SOURCE_SHA
+          run_id=$RFA_CI_RUN_ID
+          run_number=$RFA_CI_RUN_NUMBER
+          apk_sha256=$RFA_APK_SHA256
+          signing_mode=DEBUG_NONAUTHORIAL
+          external_js_actions=NONE
+          EOF
+
+          gh release create "$tag" \
+            "$RUNNER_TEMP/$apk_name#Rafaelia Audio Studio debug APK" \
+            "$RFA_BINARY_RECEIPT#Binary origin receipt" \
+            "$RFA_ENTRY_MANIFEST#APK entry SHA-256 manifest" \
+            "$RUNNER_TEMP/live_release_receipt_v1.txt#Live release receipt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RFA_SOURCE_SHA" \
+            --prerelease \
+            --title "Rafaelia Live $short_sha" \
+            --notes-file "$RUNNER_TEMP/live_release_receipt_v1.txt"

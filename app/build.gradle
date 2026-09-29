@@ -22,6 +22,10 @@ android {
         buildConfigField 'String', 'CI_RUN_ID', '"'+envOrToken('RFA_CI_RUN_ID')+'"'
         buildConfigField 'String', 'CI_RUN_NUMBER', '"'+envOrToken('RFA_CI_RUN_NUMBER')+'"'
         buildConfigField 'String', 'EVIDENCE_SCHEMA', '"rafaelia.evidence/v1"'
+        buildConfigField 'String', 'SIGNING_MODE', '"'+envOrToken('RFA_SIGNING_MODE')+'"'
+        buildConfigField 'String', 'SIGNER_ID', '"'+envOrToken('RFA_SIGNER_ID')+'"'
+        buildConfigField 'String', 'EXPECTED_CERT_SHA256', '"'+envOrToken('RFA_EXPECTED_CERT_SHA256')+'"'
+        buildConfigField 'String', 'COMPONENT_ORIGIN_SCHEMA', '"rafaelia.component-origin/v1"'
 
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a'

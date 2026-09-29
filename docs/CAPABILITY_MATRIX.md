@@ -42,4 +42,9 @@ Update this matrix whenever a receipt materially promotes or demotes a state.
 | npm/yarn/pnpm dependency graph | absent | CI-gated | N/A | 0 |
 | authorial CI orchestration | implemented | pending execution | N/A | IMPLEMENTED_UNTESTED |
 | checkout/setup Java/setup Android/setup Gradle JS Actions | removed from canonical gate | pending execution | N/A | SOURCE_REMOVED |
-| GitHub artifact upload edge | external Action isolated | pending execution | N/A | PLATFORM_EDGE |
+| external JavaScript Actions | none in canonical workflow | pending CI | N/A | 0 |
+| GitHub CLI release transport | implemented platform edge | pending CI | N/A | PLATFORM_EDGE |
+| installed APK signing certificate evidence | implemented | build-gated | device-dependent | bounded |
+| real authorial signed release | workflow implemented | requires real secrets/vars | NOT_RUN | TOKEN_VAZIO_UNTIL_CONFIGURED |
+| component-origin manifest | implemented | pending CI | embedded + post-build | bounded |
+| SYS permissions/origin/signature workspace | implemented | pending CI | physical NOT_RUN | bounded source |

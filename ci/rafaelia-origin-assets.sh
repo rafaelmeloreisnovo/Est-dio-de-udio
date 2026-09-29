@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="${1:-app/src/main/assets}"
+mkdir -p "$root" "${RUNNER_TEMP:-/tmp}/rafaelia-origin"
+tmp="${RUNNER_TEMP:-/tmp}/rafaelia-origin"
+
+find app/src/main/java -type f -name '*.java' -print0 |
+  sort -z |
+  xargs -0 sha256sum > "$tmp/java.sha256"
+find app/src/main/cpp -type f \( -name '*.c' -o -name '*.h' \) -print0 |
+  sort -z |
+  xargs -0 sha256sum > "$tmp/c.sha256"
+
+java_tree_sha="$(sha256sum "$tmp/java.sha256" | awk '{print $1}')"
+c_tree_sha="$(sha256sum "$tmp/c.sha256" | awk '{print $1}')"
+
+gradle_bin="$(command -v gradle || true)"
+java_bin="$(command -v java || true)"
+clang_bin="${ANDROID_SDK_ROOT:-UNAVAILABLE}/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+
+cat > "$root/component_origin_v1.txt" <<EOF
+schema=rafaelia.component-origin/v1
+project_package=io.rafaelia.audiostudio
+project_java_tree_sha256=$java_tree_sha
+project_c_tree_sha256=$c_tree_sha
+project_source_class=PROJECT_AUTHORED
+dex_class=GENERATED_FROM_PROJECT_JAVA_WITH_ANDROID_PLATFORM_REFERENCES
+native_so_class=PROJECT_CORE_PLUS_ANDROID_NDK_LINK_EDGE
+android_manifest_class=PROJECT_SOURCE_COMPILED_BY_EXTERNAL_ANDROID_TOOLCHAIN
+resources_class=PROJECT_SOURCE_GENERATED_BY_EXTERNAL_ANDROID_TOOLCHAIN
+android_platform=EXTERNAL_PLATFORM
+android_gradle_plugin=EXTERNAL_TOOLCHAIN:8.9.2
+gradle=EXTERNAL_TOOLCHAIN:8.11.1
+java_binary=$java_bin
+gradle_binary=$gradle_bin
+clang_binary=$clang_bin
+authorship_rule=ONLY_PROJECT_SOURCE_AND_PROJECT_FORMATS_ARE_MARKED_PROJECT_AUTHORED
+EOF
+
+cat > "$root/permission_contract_v1.txt" <<EOF
+schema=rafaelia.permission-contract/v1
+RECORD_AUDIO=ASK_ON_EXPLICIT_AUDIO_ACTION
+ACCESS_NETWORK_STATE=NORMAL_PASSIVE_METADATA_ONLY
+ACTIVITY_RECOGNITION=ASK_ONLY_FROM_SYS_OPTIONAL_SENSOR_ACTION
+ACCELEROMETER=NO_RUNTIME_PERMISSION_REQUIRED
+MAGNETOMETER=NO_RUNTIME_PERMISSION_REQUIRED
+LIGHT=NO_RUNTIME_PERMISSION_REQUIRED
+PROXIMITY=NO_RUNTIME_PERMISSION_REQUIRED
+HIGH_SAMPLING_RATE_SENSORS=NOT_REQUESTED_CURRENT_PROFILE
+RF_TRANSMIT_CONTROL=NOT_IMPLEMENTED
+EOF
+
+printf 'RAFAELIA_ORIGIN_ASSETS=PASS\n'
+printf 'RAFAELIA_PROJECT_JAVA_TREE_SHA256=%s\n' "$java_tree_sha"
+printf 'RAFAELIA_PROJECT_C_TREE_SHA256=%s\n' "$c_tree_sha"
