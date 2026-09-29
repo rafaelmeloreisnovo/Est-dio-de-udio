@@ -89,13 +89,43 @@ jobs:
             fi
           done
 
-          "$NM" --defined-only --extern-only dsp_core.armv7.o | awk '{print $NF}' | sort > dsp.actual
-          printf '%s\n' dsp_apply_gain_q30 dsp_state_process dsp_state_reset | sort > dsp.expected
-          diff -u dsp.expected dsp.actual
+          : > abi.actual
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core; do
+            "$NM" --defined-only --extern-only "$SRC.armv7.o" | awk -v src="$SRC" '{print src ":" $NF}' >> abi.actual
+          done
+          sort -o abi.actual abi.actual
+          grep -v '^[[:space:]]*#' native/abi/public_symbols_v1.txt | grep -v '^[[:space:]]*
+      - name: AArch64 zero-undefined
+        run: |
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          FLAGS="-std=c11 -O3 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -fvisibility=hidden -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Iapp/src/main/cpp"
 
-          "$NM" --defined-only --extern-only meter_core.armv7.o | awk '{print $NF}' | sort > meter.actual
-          printf '%s\n' meter_spectrum16 meter_state_gain_q30 meter_state_push meter_state_relative_gate_block meter_state_reset meter_state_result | sort > meter.expected
-          diff -u meter.expected meter.actual
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core; do
+            "$CC" --target=aarch64-linux-android29 $FLAGS -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
+            "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
+            if test -s "$SRC.aarch64.undefined"; then
+              cat "$SRC.aarch64.undefined"
+              exit 1
+            fi
+          done
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Assemble debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rafaelia-audio-studio-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+ | sort > abi.expected
+          diff -u abi.expected abi.actual
 
       - name: AArch64 zero-undefined
         run: |
