@@ -65,7 +65,11 @@ Current freestanding additions:
 - `rfa_wave_core`: up to 16 deterministic Q15 sine voices using phase accumulators and a fixed quarter-wave table;
 - `rfa_matrix_core`: caller-owned Q15 matrix up to 16×16;
 - `rfa_block_core`: caller-owned ring buffer and block profiles 128/512/4096;
-- `rfa_container_core`: bounded ZRF/CFR headers and typed chunks.
+- `rfa_container_core`: bounded ZRF/CFR headers and typed chunks;
+- `rfa_fir_core`: caller-owned FIR/convolution kernel for IR/reverb/correction;
+- `rfa_time_core`: Q16 linear time-map/resampler; explicitly not pitch-preserving;
+- `rfa_lms_core`: bounded adaptive LMS noise-cancellation reference;
+- `rfa_biquad_core`: up to 16 Q30 biquad sections with explicit coefficients.
 
 These modules have no heap, libc, libm, filesystem, network or threading dependency.
 
