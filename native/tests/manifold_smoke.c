@@ -13,6 +13,7 @@
 #include "rfa_time_core.h"
 #include "rfa_lms_core.h"
 #include "rfa_biquad_core.h"
+#include "rfa_voice_core.h"
 
 static int same_i16(const rfa_i16 *a, const rfa_i16 *b, int count) {
     int i;
@@ -53,6 +54,8 @@ int main(void) {
     rfa_biquad_bank_q30 bq;
     rfa_biquad_coeff_q30 identity_bq;
     rfa_i16 bq_data[8] = {-1000,-500,0,500,1000,500,0,-500};
+    rfa_i16 voice_data[32];
+    rfa_voice_features voice_features;
     int i;
 
     rfa_wave_bank_reset(&bank);
@@ -138,6 +141,14 @@ int main(void) {
     if (!rfa_biquad_bank_set_q30(&bq, 0, &identity_bq)) return 56;
     rfa_biquad_bank_process_q30(&bq, bq_data, 8, 1);
     if (bq_data[0] != -1000 || bq_data[4] != 1000) return 57;
+
+    for (i = 0; i < 32; ++i) {
+        int phase = i & 3;
+        voice_data[i] = phase == 0 ? 1000 : (phase == 2 ? -1000 : 0);
+    }
+    if (!rfa_voice_analyze_mono(voice_data, 32, 2, 8, &voice_features)) return 58;
+    if (voice_features.best_period_samples != 4) return 59;
+    if (voice_features.energy == 0ULL || voice_features.zero_crossings == 0U) return 60;
 
     return 0;
 }
