@@ -168,10 +168,14 @@ final class StudioWorkspaceView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float w = getWidth();
-        float h = getHeight();
+
+        float totalW = getWidth();
+        float totalH = getHeight();
+        float transportH = densityMode == 0 ? dp(56) : dp(62);
+        float usableH = totalH - transportH;
         float tabH = densityMode == 0 ? dp(42) : dp(50);
-        float bodyTop = tabH + dp(densityMode == 0 ? 4 : 8);
+
+        wideLayout = densityMode == 2 && totalW >= dp(720);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setARGB(255, 16, 18, 22);
@@ -181,29 +185,36 @@ final class StudioWorkspaceView extends View {
             wideRail = dp(76);
             wideInspector = dp(220);
             float centerW = totalW - wideRail - wideInspector;
+
             if (centerW < dp(360)) {
                 wideLayout = false;
             } else {
                 logicalWidth = centerW;
                 drawSideTabs(canvas, wideRail, usableH);
+
                 canvas.save();
                 canvas.translate(wideRail, 0f);
                 drawHeader(canvas, dp(10), centerW);
                 drawWorkspaceBody(canvas, centerW, usableH);
                 canvas.restore();
-                drawInspector(canvas, totalW - wideInspector, 0f, wideInspector, usableH);
+
+                drawInspector(
+                        canvas,
+                        totalW - wideInspector,
+                        0f,
+                        wideInspector,
+                        usableH);
             }
         }
 
         if (!wideLayout) {
-            float tabH = dp(50);
             logicalWidth = totalW;
             drawTabs(canvas, totalW, tabH);
-            drawHeader(canvas, tabH + dp(8), totalW);
-            canvas.save();
-            canvas.translate(0f, 0f);
+            drawHeader(
+                    canvas,
+                    tabH + dp(densityMode == 0 ? 4 : 8),
+                    totalW);
             drawWorkspaceBody(canvas, totalW, usableH);
-            canvas.restore();
         }
 
         drawTransport(canvas, totalW, totalH - transportH, transportH);

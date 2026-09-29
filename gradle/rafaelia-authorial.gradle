@@ -1,0 +1,36 @@
+/*
+ * RAFAELIA authorial Gradle task surface.
+ * This file does not replace the Android Gradle Plugin; it defines the
+ * project-owned task names and ordering used by CI and local development.
+ */
+
+tasks.register("rafaeliaJavaGate") {
+    group = "rafaelia verification"
+    description = "Compile the Android Java edge early and fail before full APK work."
+    dependsOn("compileDebugJavaWithJavac")
+}
+
+tasks.register("rafaeliaDebugApk") {
+    group = "rafaelia build"
+    description = "Build the canonical debug APK with R8/resource shrinking disabled."
+    dependsOn("assembleDebug")
+}
+
+tasks.register("rafaeliaLowApk") {
+    group = "rafaelia build"
+    description = "Build the explicit lowDebug profile."
+    dependsOn("assembleLowDebug")
+}
+
+tasks.register("rafaeliaBuildContract") {
+    group = "rafaelia verification"
+    description = "Print the canonical build boundary for receipts."
+    doLast {
+        println("RAFAELIA_BUILD_CONTRACT=V1")
+        println("JAVA_EDGE=ANDROID_PLATFORM_ONLY")
+        println("C_CORE=FREESTANDING")
+        println("R8=OFF")
+        println("RESOURCE_SHRINK=OFF")
+        println("ABIS=armeabi-v7a,arm64-v8a")
+    }
+}

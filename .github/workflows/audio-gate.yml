@@ -1,0 +1,221 @@
+name: Audio Studio Reusable Gate
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Exact source SHA bound into BuildConfig and evidence.
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      RFA_SOURCE_SHA: ${{ inputs.source_sha }}
+      RFA_CI_RUN_ID: ${{ github.run_id }}
+      RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK bootstrap
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: SDK + NDK + CMake
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Gradle runtime
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Gradle authorial contract
+        run: gradle :app:rafaeliaBuildContract --no-daemon --stacktrace
+
+      - name: Gradle authorial Java gate
+        run: gradle :app:rafaeliaJavaGate --no-daemon --stacktrace
+
+      - name: Host DSP smoke — freestanding headers only
+        run: |
+          CORE_CFLAGS="-std=c11 -O2 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -Wall -Wextra -Werror -Iapp/src/main/cpp"
+          clang $CORE_CFLAGS native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c -o dsp_smoke
+          ./dsp_smoke
+
+      - name: Host meter smoke — freestanding headers only
+        run: |
+          CORE_CFLAGS="-std=c11 -O2 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -Wall -Wextra -Werror -Iapp/src/main/cpp"
+          clang $CORE_CFLAGS native/tests/meter_smoke.c app/src/main/cpp/meter_core.c -o meter_smoke
+          ./meter_smoke
+
+      - name: Host manifold smoke — freestanding headers only
+        run: |
+          CORE_CFLAGS="-std=c11 -O2 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -Wall -Wextra -Werror -Iapp/src/main/cpp"
+          clang $CORE_CFLAGS native/tests/manifold_smoke.c \
+            app/src/main/cpp/rfa_wave_core.c \
+            app/src/main/cpp/rfa_matrix_core.c \
+            app/src/main/cpp/rfa_block_core.c \
+            app/src/main/cpp/rfa_container_core.c \
+            app/src/main/cpp/rfa_fir_core.c \
+            app/src/main/cpp/rfa_time_core.c \
+            app/src/main/cpp/rfa_lms_core.c \
+            app/src/main/cpp/rfa_biquad_core.c \
+            app/src/main/cpp/rfa_voice_core.c \
+            app/src/main/cpp/rfa_measure_core.c \
+            -o manifold_smoke
+          ./manifold_smoke
+
+      - name: Authorial freestanding source gate
+        run: |
+          CORE_C="app/src/main/cpp/dsp_core.c app/src/main/cpp/meter_core.c app/src/main/cpp/rfa_wave_core.c app/src/main/cpp/rfa_matrix_core.c app/src/main/cpp/rfa_block_core.c app/src/main/cpp/rfa_container_core.c app/src/main/cpp/rfa_fir_core.c app/src/main/cpp/rfa_time_core.c app/src/main/cpp/rfa_lms_core.c app/src/main/cpp/rfa_biquad_core.c app/src/main/cpp/rfa_voice_core.c app/src/main/cpp/rfa_measure_core.c"
+          CORE_ALL="$CORE_C app/src/main/cpp/dsp_core.h app/src/main/cpp/meter_core.h app/src/main/cpp/rfa_wave_core.h app/src/main/cpp/rfa_matrix_core.h app/src/main/cpp/rfa_block_core.h app/src/main/cpp/rfa_container_core.h app/src/main/cpp/rfa_fir_core.h app/src/main/cpp/rfa_time_core.h app/src/main/cpp/rfa_lms_core.h app/src/main/cpp/rfa_biquad_core.h app/src/main/cpp/rfa_voice_core.h app/src/main/cpp/rfa_measure_core.h app/src/main/cpp/rfa_sine_q15.h app/src/main/cpp/rfa_core_types.h"
+
+          if grep -nRE '^[[:space:]]*#include[[:space:]]*<' $CORE_ALL; then
+            echo "System header reached the freestanding core"
+            exit 1
+          fi
+
+          if grep -nRE '\b(malloc|calloc|realloc|free|memcpy|memmove|memset|memcmp|printf|fprintf|snprintf|puts|open|close|read|write|sqrt|pow|log|exp|sin|cos|tan)[[:space:]]*\(' $CORE_C; then
+            echo "Forbidden hosted/runtime dependency in freestanding core"
+            exit 1
+          fi
+
+          if grep -nP '^\s*static\s+(?!const\b)[^({]*;' $CORE_C; then
+            echo "Mutable file-scope state is forbidden in freestanding core"
+            exit 1
+          fi
+
+      - name: Low dependency + Gradle boundary gate
+        run: |
+          if grep -RInE '^[[:space:]]*import[[:space:]]+(androidx|kotlin|com\.google)\.' app/src/main/java; then
+            echo "External Java/UI framework dependency detected"
+            exit 1
+          fi
+
+          if grep -nE '^[[:space:]]*(implementation|api|compileOnly|runtimeOnly|kapt|ksp)[[:space:]]' app/build.gradle; then
+            echo "Gradle runtime/library dependency declaration detected"
+            exit 1
+          fi
+
+          if grep -nE 'minifyEnabled[[:space:]]+true|shrinkResources[[:space:]]+true' app/build.gradle; then
+            echo "R8/resource shrink path must remain disabled"
+            exit 1
+          fi
+
+          test -f gradle/rafaelia-authorial.gradle
+          grep -Fq 'apply from: rootProject.file("gradle/rafaelia-authorial.gradle")' app/build.gradle
+          grep -Fq 'tasks.register("rafaeliaJavaGate")' gradle/rafaelia-authorial.gradle
+          grep -Fq 'tasks.register("rafaeliaDebugApk")' gradle/rafaelia-authorial.gradle
+
+          JNI_FILES="$(grep -RIl 'JNIEXPORT' app/src/main/cpp || true)"
+          JNI_COUNT="$(printf '%s\n' "$JNI_FILES" | sed '/^[[:space:]]*$/d' | wc -l)"
+          if test "$JNI_COUNT" -ne 1; then
+            echo "Expected exactly one JNI implementation file, got $JNI_COUNT"
+            printf '%s\n' "$JNI_FILES"
+            exit 1
+          fi
+          if test "$JNI_FILES" != "app/src/main/cpp/jni_bridge.c"; then
+            echo "JNI escaped the canonical platform edge"
+            printf '%s\n' "$JNI_FILES"
+            exit 1
+          fi
+
+          echo "JAVA_THIRD_PARTY_DEPS=0"
+          echo "ANDROIDX=0"
+          echo "KOTLIN=0"
+          echo "R8_SHRINK=0"
+          echo "AUTHORIAL_GRADLE=V1"
+          echo "JNI_IMPLEMENTATION_FILES=1"
+
+      - name: ARMv7 zero-undefined + ABI surface
+        run: |
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          FLAGS="-std=c11 -O3 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -fvisibility=hidden -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Iapp/src/main/cpp"
+
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core; do
+            "$CC" --target=armv7a-linux-androideabi29 $FLAGS -c "app/src/main/cpp/$SRC.c" -o "$SRC.armv7.o"
+            "$NM" -u "$SRC.armv7.o" > "$SRC.armv7.undefined"
+            if test -s "$SRC.armv7.undefined"; then
+              cat "$SRC.armv7.undefined"
+              exit 1
+            fi
+          done
+
+          : > abi.actual
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core; do
+            "$NM" --defined-only --extern-only "$SRC.armv7.o" | awk -v src="$SRC" '{print src ":" $NF}' >> abi.actual
+          done
+          sort -o abi.actual abi.actual
+          grep -v '^[[:space:]]*#' native/abi/public_symbols_v1.txt | grep -v '^[[:space:]]*$' | sort > abi.expected
+          diff -u abi.expected abi.actual
+
+      - name: AArch64 zero-undefined
+        run: |
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          NM="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          FLAGS="-std=c11 -O3 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -fvisibility=hidden -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Iapp/src/main/cpp"
+
+          for SRC in dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core rfa_biquad_core rfa_voice_core rfa_measure_core; do
+            "$CC" --target=aarch64-linux-android29 $FLAGS -c "app/src/main/cpp/$SRC.c" -o "$SRC.aarch64.o"
+            "$NM" -u "$SRC.aarch64.o" > "$SRC.aarch64.undefined"
+            if test -s "$SRC.aarch64.undefined"; then
+              cat "$SRC.aarch64.undefined"
+              exit 1
+            fi
+          done
+
+      - name: Low Java SHA-256 known-answer test
+        run: |
+          rm -rf /tmp/rfa_sha_test
+          mkdir -p /tmp/rfa_sha_test
+          javac -d /tmp/rfa_sha_test \
+            app/src/main/java/io/rafaelia/audiostudio/LowSha256.java \
+            native/tests/LowSha256Smoke.java
+          java -cp /tmp/rfa_sha_test io.rafaelia.audiostudio.LowSha256Smoke
+
+      - name: Embed CI provenance asset
+        run: |
+          mkdir -p app/src/main/assets
+          cat > app/src/main/assets/ci_provenance_v1.txt <<EOF
+          schema=rafaelia.ci-provenance/v1
+          source_sha=${RFA_SOURCE_SHA}
+          run_id=${RFA_CI_RUN_ID}
+          run_number=${RFA_CI_RUN_NUMBER}
+          gradle_authorial_contract=PASS
+          java_compile_gate=PASS
+          host_dsp_smoke=PASS
+          host_meter_smoke=PASS
+          host_manifold_smoke=PASS
+          freestanding_source_gate=PASS
+          low_dependency_gate=PASS
+          armv7_zero_undefined=PASS
+          armv7_abi_manifest=PASS
+          aarch64_zero_undefined=PASS
+          low_java_sha256_kat=PASS
+          assemble_debug=PENDING_AT_EMBED
+          artifact_upload=PENDING_AT_EMBED
+          EOF
+
+      - name: Gradle authorial APK
+        run: gradle :app:rafaeliaDebugApk --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rafaelia-audio-studio-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
