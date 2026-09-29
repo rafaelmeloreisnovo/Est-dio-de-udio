@@ -61,3 +61,21 @@ sensor values -> runtime observations
 ```
 
 None of those alone prove standards conformance, acoustic calibration or hardware health.
+
+
+## Runtime capability resolution
+
+The current bundle resolves additional phone capabilities when Android reports them:
+
+- audio input device IDs/types/product names;
+- advertised sample rates;
+- channel counts/masks;
+- encodings;
+- OpenGL ES required version;
+- Vulkan feature presence.
+
+Generic NPU and NUMA discovery are recorded as
+`UNAVAILABLE_STANDARD_ANDROID_QUERY` when no portable Android query exists.
+
+Known absence states use `UNAVAILABLE_*`, `NOT_RUN`, `NOT_CREATED_IN_SESSION`,
+or `PENDING_PHYSICAL_REFERENCE`; `TOKEN_VAZIO` is reserved for genuinely unresolved semantics.
