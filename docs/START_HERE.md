@@ -36,3 +36,10 @@ The evidence button inside the app creates an installation/hardware/development 
 - `ADAPTIVE_STUDIO_UI_V1.md` — responsive studio console.
 - `LOW_LEVEL_BOUNDARY_V1.md` — freestanding core vs irreducible Android shell.
 - `TOKEN_GAP_RECONCILIATION_V1.md` — when to resolve, classify or retain an empty token.
+
+
+## System / origin / signing
+
+- `AUTHORIAL_BINARY_ORIGIN_V1.md` — project/platform/toolchain/generated binary boundary.
+- `SENSOR_PERMISSION_MATRIX_V2.md` — minimal permission policy.
+- `SIGNED_RELEASE_V1.md` — real signing, certificate verification and public receipt.
