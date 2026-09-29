@@ -63,10 +63,10 @@ int rfa_biquad_bank_set_q30(rfa_biquad_bank_q30 *bank, int section,
 void rfa_biquad_bank_process_q30(rfa_biquad_bank_q30 *bank,
                                  rfa_i16 *samples, int count, int channels) {
     int i;
+    int channel = 0;
     if (bank == (rfa_biquad_bank_q30 *)0 || samples == (rfa_i16 *)0) return;
     if (count <= 0 || channels <= 0 || channels > 2) return;
     for (i = 0; i < count; ++i) {
-        int channel = i % channels;
         rfa_i32 value = samples[i];
         int section;
         for (section = 0; section < bank->sections; ++section) {
@@ -85,5 +85,7 @@ void rfa_biquad_bank_process_q30(rfa_biquad_bank_q30 *bank,
             value = y;
         }
         samples[i] = rfa_bq_clip_i16(value);
+        ++channel;
+        if (channel >= channels) channel = 0;
     }
 }
