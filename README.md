@@ -165,3 +165,30 @@ Pesquisa/avaliação não comercial é permitida nos termos de `LICENSE_RESEARCH
 5. captura física + Ogg/Opus round-trip;
 6. vetores BS.1770/EBU;
 7. inspeção de clipping/true-peak.
+
+
+## Delta 4.2 — CFR relative physical capture
+
+Implemented on `feature/cfr-relative-calibration-v1`:
+
+- deterministic Q15 sync sequence for bounded latency alignment;
+- fixed-point exponential sweep already produced by `rfa_measure_core`;
+- Android `AudioTrack -> room -> AudioRecord` I/O edge at 48 kHz mono;
+- `UNPROCESSED` input with `MIC` fallback;
+- conservative excitation gain and output volume cap;
+- CFR recording with `WAVE + CAL + PCM(reference) + PCM(response)`;
+- CAL workspace action wired to the measurement path.
+
+Current state:
+
+```text
+CFR_RELATIVE_SOURCE = IMPLEMENTED
+CFR_RELATIVE_CI = PENDING
+CFR_RELATIVE_PHYSICAL_ANDROID = NOT_RUN
+ABSOLUTE_SPL = TOKEN_VAZIO
+FREQUENCY_TRANSFER_DECONVOLUTION = PENDING
+RT60 = PENDING
+ROOM_CORRECTION = PENDING
+```
+
+The captured CFR is deliberately sufficient for later re-analysis: the original excitation and microphone response are preserved rather than only storing a derived curve.
