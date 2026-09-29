@@ -13,7 +13,8 @@ checkout
 -> AArch64 zero-undefined
 -> embed provenance
 -> assemble APK
--> upload artifact
+-> binary origin receipt
+-> optional GH CLI prerelease publish
 ```
 
 Do not place a PASS statement in the embedded provenance for a later step that has not executed yet.
@@ -32,3 +33,16 @@ The workflow must retain:
 - R8/shrink disabled;
 - exactly one JNI implementation file at `jni_bridge.c`;
 - project-local `LowSha256` known-answer test before APK assembly.
+
+
+## External Action boundary
+
+Canonical workflows require:
+
+```text
+external JavaScript Actions = zero
+local reusable workflows = allowed
+GitHub CLI = external platform edge
+```
+
+Real signing must fail closed when the expected certificate fingerprint or private signing Secrets are absent.
