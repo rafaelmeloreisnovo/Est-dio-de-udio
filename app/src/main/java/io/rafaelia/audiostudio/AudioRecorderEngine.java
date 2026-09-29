@@ -47,6 +47,8 @@ final class AudioRecorderEngine {
     private volatile long energyScaled;
     private volatile long sampleCount;
     private volatile long clipped;
+    private final short[] latest = new short[512];
+    private volatile int latestCount;
     private String sourceName = "TOKEN_VAZIO";
 
     AudioRecorderEngine(Context context, File output) {
@@ -68,6 +70,14 @@ final class AudioRecorderEngine {
         long rmsSquare = meanScaled << 8;
         int rms = (int) isqrt(rmsSquare);
         return new CaptureStats(peak, rms, count, clipped, sourceName);
+    }
+
+    int copyLatest(short[] out) {
+        if (out == null) return 0;
+        int count = latestCount;
+        if (count > out.length) count = out.length;
+        for (int i = 0; i < count; ++i) out[i] = latest[i];
+        return count;
     }
 
     void start() throws IOException {
@@ -121,6 +131,7 @@ final class AudioRecorderEngine {
         energyScaled = 0;
         sampleCount = 0;
         clipped = 0;
+        latestCount = 0;
         running = true;
         recorder.startRecording();
 
@@ -186,6 +197,11 @@ final class AudioRecorderEngine {
                 energyScaled = localEnergy;
                 clipped = localClipped;
                 sampleCount += n;
+
+                int copy = n < latest.length ? n : latest.length;
+                int start = n - copy;
+                for (int i = 0; i < copy; ++i) latest[i] = samples[start + i];
+                latestCount = copy;
 
                 out.write(bytes, 0, n * 2);
             }
