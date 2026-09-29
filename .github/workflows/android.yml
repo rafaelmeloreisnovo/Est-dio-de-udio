@@ -117,6 +117,28 @@ jobs:
             fi
           done
 
+      - name: Embed CI provenance asset
+        run: |
+          mkdir -p app/src/main/assets
+          echo "RFA_SOURCE_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "RFA_CI_RUN_ID=$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "RFA_CI_RUN_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          cat > app/src/main/assets/ci_provenance_v1.txt <<EOF
+          schema=rafaelia.ci-provenance/v1
+          source_sha=$GITHUB_SHA
+          run_id=$GITHUB_RUN_ID
+          run_number=$GITHUB_RUN_NUMBER
+          host_dsp_smoke=PASS
+          host_meter_smoke=PASS
+          host_manifold_smoke=PASS
+          freestanding_source_gate=PASS
+          armv7_zero_undefined=PASS
+          armv7_abi_manifest=PASS
+          aarch64_zero_undefined=PASS
+          assemble_debug=PENDING_AT_EMBED
+          artifact_upload=PENDING_AT_EMBED
+          EOF
+
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

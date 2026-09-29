@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
+def envOrToken = { String name ->
+    def value = System.getenv(name)
+    return value == null || value.trim().isEmpty() ? 'TOKEN_VAZIO' : value.trim()
+}
+
 android {
     namespace 'io.rafaelia.audiostudio'
     compileSdk 35
@@ -13,11 +18,20 @@ android {
         versionCode 1
         versionName '0.1.0-delta1'
 
+        buildConfigField 'String', 'SOURCE_SHA', '"'+envOrToken('RFA_SOURCE_SHA')+'"'
+        buildConfigField 'String', 'CI_RUN_ID', '"'+envOrToken('RFA_CI_RUN_ID')+'"'
+        buildConfigField 'String', 'CI_RUN_NUMBER', '"'+envOrToken('RFA_CI_RUN_NUMBER')+'"'
+        buildConfigField 'String', 'EVIDENCE_SCHEMA', '"rafaelia.evidence/v1"'
+
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
         }
 
-        externalNativeBuild {
+        buildFeatures {
+        buildConfig true
+    }
+
+    externalNativeBuild {
             cmake {
                 cFlags '-std=c11 -O3'
             }
