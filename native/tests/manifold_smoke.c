@@ -168,18 +168,18 @@ int main(void) {
     for (i = 0; i < 40; ++i) sync_inverted[i] = 0;
     for (i = 0; i < 32; ++i) sync_inverted[i + 3] = (rfa_i16)-sync_a[i];
     if (!rfa_relative_transfer_search(
-            sync_a, 32, sync_inverted, 40, 0, 6, &inverted_transfer)) return 71;
-    if (inverted_transfer.best_lag != 3) return 69;
-    if (inverted_transfer.correlation >= 0LL) return 70;
+            sync_a, 32, sync_inverted, 40, 0, 6, &inverted_transfer)) return 65;
+    if (inverted_transfer.best_lag != 3) return 66;
+    if (inverted_transfer.correlation >= 0LL) return 67;
 
     rfa_exp_sweep_reset_q31(&sweep, 89478485U, 2149631132U, 16384, 64);
-    if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 65;
+    if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 68;
     for (i = 0; i < 72; ++i) delayed_data[i] = 0;
     for (i = 0; i < 64; ++i) delayed_data[i + 5] = sweep_data[i];
     if (!rfa_relative_transfer_search(
-            sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 66;
-    if (transfer.best_lag != 5) return 67;
-    if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 68;
+            sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 69;
+    if (transfer.best_lag != 5) return 70;
+    if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 71;
 
     return 0;
 }
