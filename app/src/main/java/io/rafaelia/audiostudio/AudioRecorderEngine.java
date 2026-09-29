@@ -56,7 +56,7 @@ final class AudioRecorderEngine {
     private volatile long clipped;
     private final short[] latest = new short[512];
     private volatile int latestCount;
-    private String sourceName = "TOKEN_VAZIO";
+    private String sourceName = "NOT_STARTED";
 
     AudioRecorderEngine(Context context, File output) {
         this.context = context.getApplicationContext();

@@ -31,3 +31,12 @@ The evidence writer may include:
 - bounded μ∆ observations.
 
 It must retain `TOKEN_VAZIO` when evidence is unavailable.
+
+
+## Java-low policy
+
+Prefer custom drawing and direct platform calls over UI frameworks.
+Do not add AndroidX/Kotlin/third-party libraries.
+Do not duplicate DSP in Java.
+Provider-free local algorithms are preferred when small and testable; `LowSha256` must retain its KAT.
+Java remains a platform language and necessarily uses Android/Java classes for I/O/lifecycle.

@@ -23,3 +23,12 @@ The embedded CI asset only states gates that executed before APK assembly.
 
 Actions with physical effects must be explicit.
 Calibration uses conservative speaker level and is not intended for headphones/in-ear use.
+
+
+## Low-dependency shell
+
+No AndroidX, Kotlin or third-party runtime libraries.
+R8/resource shrinking is disabled.
+Physical phone ABIs are ARMv7 and AArch64.
+
+Gradle/SDK/NDK are build tooling, not DSP dependencies. Do not claim they can be removed while still producing a standard Android APK unless a replacement toolchain is actually implemented and tested.

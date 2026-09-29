@@ -4,7 +4,7 @@ plugins {
 
 def envOrToken = { String name ->
     def value = System.getenv(name)
-    return value == null || value.trim().isEmpty() ? 'TOKEN_VAZIO' : value.trim()
+    return value == null || value.trim().isEmpty() ? 'UNAVAILABLE_LOCAL_BUILD' : value.trim()
 }
 
 android {
@@ -24,7 +24,7 @@ android {
         buildConfigField 'String', 'EVIDENCE_SCHEMA', '"rafaelia.evidence/v1"'
 
         ndk {
-            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
         }
 
         buildFeatures {
@@ -50,9 +50,8 @@ android {
             minifyEnabled false
         }
         release {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }

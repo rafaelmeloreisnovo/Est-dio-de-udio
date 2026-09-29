@@ -29,3 +29,10 @@ evidence is not every possible claim
 ```
 
 The evidence button inside the app creates an installation/hardware/development bundle, including installed APK SHA-256 and a bounded accelerometer μ∆ observation.
+
+
+## Low/adaptive implementation route
+
+- `ADAPTIVE_STUDIO_UI_V1.md` — responsive studio console.
+- `LOW_LEVEL_BOUNDARY_V1.md` — freestanding core vs irreducible Android shell.
+- `TOKEN_GAP_RECONCILIATION_V1.md` — when to resolve, classify or retain an empty token.

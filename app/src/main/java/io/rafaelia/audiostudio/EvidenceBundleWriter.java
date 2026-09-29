@@ -7,14 +7,17 @@
 
 package io.rafaelia.audiostudio;
 
+import android.app.ActivityManager;
 import android.Manifest;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.pm.PackageInfo;
+import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.media.AudioManager;
+import android.media.AudioDeviceInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -25,9 +28,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
-import java.util.Locale;
 
 final class EvidenceBundleWriter {
     static final class Result {
@@ -101,7 +102,7 @@ final class EvidenceBundleWriter {
 
         section(b, "installed_application");
         line(b, "package", context.getPackageName());
-        line(b, "version_name", pi.versionName == null ? "TOKEN_VAZIO" : pi.versionName);
+        line(b, "version_name", pi.versionName == null ? "UNAVAILABLE_NOT_REPORTED" : pi.versionName);
         line(b, "version_code", Long.toString(pi.getLongVersionCode()));
         line(b, "first_install_epoch_ms", Long.toString(pi.firstInstallTime));
         line(b, "last_update_epoch_ms", Long.toString(pi.lastUpdateTime));
@@ -129,15 +130,23 @@ final class EvidenceBundleWriter {
         line(b, "microphone_feature",
                 pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE) ? "PRESENT" : "ABSENT");
         line(b, "audio_output_sample_rate",
-                audio == null ? "TOKEN_VAZIO" :
-                        safe(audio.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)));
+                audio == null ? "UNAVAILABLE_SERVICE" :
+                        safeOrUnavailable(audio.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)));
         line(b, "audio_output_frames_per_buffer",
-                audio == null ? "TOKEN_VAZIO" :
-                        safe(audio.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)));
+                audio == null ? "UNAVAILABLE_SERVICE" :
+                        safeOrUnavailable(audio.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)));
+
+        section(b, "audio_input_devices");
+        appendAudioInputDevices(b, audio);
+
+        section(b, "hardware_acceleration");
+        appendGraphicsCapabilities(context, b, pm);
+        line(b, "npu_generic_query", "UNAVAILABLE_STANDARD_ANDROID_QUERY");
+        line(b, "numa_generic_query", "UNAVAILABLE_STANDARD_ANDROID_QUERY");
 
         section(b, "micro_delta_vibration");
         if (vibration == null) {
-            line(b, "state", "TOKEN_VAZIO");
+            line(b, "state", "NOT_RUN");
         } else {
             line(b, "state", vibration.state);
             line(b, "definition",
@@ -162,7 +171,7 @@ final class EvidenceBundleWriter {
 
         section(b, "sensor_inventory");
         if (sensors == null) {
-            line(b, "sensors", "TOKEN_VAZIO");
+            line(b, "sensors", "UNAVAILABLE_SERVICE");
         } else {
             List<Sensor> all = sensors.getSensorList(Sensor.TYPE_ALL);
             line(b, "sensor_count", Integer.toString(all.size()));
@@ -189,13 +198,73 @@ final class EvidenceBundleWriter {
         line(b, "freestanding_core",
                 "BUILT_IN; runtime proof depends on embedded CI provenance");
         line(b, "cfr_relative_capture", "AVAILABLE_IN_APP");
-        line(b, "absolute_spl", "TOKEN_VAZIO_WITHOUT_PHYSICAL_REFERENCE");
+        line(b, "absolute_spl", "PENDING_PHYSICAL_REFERENCE");
         line(b, "sensor_vibration", "OBSERVED_UNPROMOTED");
         line(b, "hardware_diagnosis", "NOT_CLAIMED");
         line(b, "installation_proof",
                 "package metadata + installed APK SHA-256 + source/CI provenance when embedded");
 
         return b.toString();
+    }
+
+    private static void appendAudioInputDevices(
+            StringBuilder b, AudioManager audio) {
+        if (audio == null) {
+            line(b, "state", "UNAVAILABLE_SERVICE");
+            return;
+        }
+        AudioDeviceInfo[] devices = audio.getDevices(AudioManager.GET_DEVICES_INPUTS);
+        line(b, "count", Integer.toString(devices.length));
+        int i;
+        for (i = 0; i < devices.length; ++i) {
+            AudioDeviceInfo d = devices[i];
+            String prefix = "input." + i + ".";
+            line(b, prefix + "id", Integer.toString(d.getId()));
+            line(b, prefix + "type", Integer.toString(d.getType()));
+            CharSequence product = d.getProductName();
+            line(b, prefix + "product",
+                    product == null ? "UNAVAILABLE_NOT_REPORTED" : product.toString());
+            line(b, prefix + "sample_rates", joinInts(d.getSampleRates()));
+            line(b, prefix + "channel_counts", joinInts(d.getChannelCounts()));
+            line(b, prefix + "channel_masks", joinInts(d.getChannelMasks()));
+            line(b, prefix + "encodings", joinInts(d.getEncodings()));
+        }
+    }
+
+    private static void appendGraphicsCapabilities(
+            Context context, StringBuilder b, PackageManager pm) {
+        ActivityManager activity =
+                (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activity == null) {
+            line(b, "gles_required_version", "UNAVAILABLE_SERVICE");
+        } else {
+            ConfigurationInfo info = activity.getDeviceConfigurationInfo();
+            if (info == null) {
+                line(b, "gles_required_version", "UNAVAILABLE_NOT_REPORTED");
+            } else {
+                line(b, "gles_required_version",
+                        "0x" + Integer.toHexString(info.reqGlEsVersion));
+            }
+        }
+        line(b, "vulkan_feature",
+                pm.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL) ?
+                        "PRESENT" : "NOT_REPORTED");
+    }
+
+    private static String joinInts(int[] values) {
+        if (values == null || values.length == 0) return "UNAVAILABLE_NOT_REPORTED";
+        StringBuilder b = new StringBuilder();
+        int i;
+        for (i = 0; i < values.length; ++i) {
+            if (i != 0) b.append(',');
+            b.append(values[i]);
+        }
+        return b.toString();
+    }
+
+    private static String safeOrUnavailable(String value) {
+        return value == null || value.length() == 0 ?
+                "UNAVAILABLE_NOT_REPORTED" : value;
     }
 
     private static void appendAssetOrToken(
@@ -208,14 +277,14 @@ final class EvidenceBundleWriter {
             }
             if (b.length() == 0 || b.charAt(b.length() - 1) != '\n') b.append('\n');
         } catch (Exception e) {
-            line(b, "ci_provenance", "TOKEN_VAZIO");
+            line(b, "ci_provenance", "UNAVAILABLE_LOCAL_OR_NONCANONICAL_BUILD");
         }
     }
 
     private static void appendFileEvidence(StringBuilder b, String key, File file)
             throws Exception {
         if (file == null || !file.isFile()) {
-            line(b, key + ".state", "TOKEN_VAZIO");
+            line(b, key + ".state", "NOT_CREATED_IN_SESSION");
             return;
         }
         line(b, key + ".state", "PRESENT");
@@ -225,13 +294,13 @@ final class EvidenceBundleWriter {
     }
 
     private static String sha256File(File file) throws Exception {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        LowSha256 sha = new LowSha256();
         try (FileInputStream in = new FileInputStream(file)) {
             byte[] buffer = new byte[16384];
             int n;
-            while ((n = in.read(buffer)) > 0) md.update(buffer, 0, n);
+            while ((n = in.read(buffer)) > 0) sha.update(buffer, 0, n);
         }
-        return hex(md.digest());
+        return hex(sha.finish());
     }
 
     private static String hex(byte[] digest) {
@@ -255,16 +324,16 @@ final class EvidenceBundleWriter {
     }
 
     private static String sanitize(String value) {
-        if (value == null || value.length() == 0) return "TOKEN_VAZIO";
+        if (value == null || value.length() == 0) return "UNAVAILABLE_NOT_REPORTED";
         return value.replace('\n', ' ').replace('\r', ' ');
     }
 
     private static String safe(String value) {
-        return value == null || value.length() == 0 ? "TOKEN_VAZIO" : value;
+        return value == null || value.length() == 0 ? "UNAVAILABLE_NOT_REPORTED" : value;
     }
 
     private static String join(String[] values) {
-        if (values == null || values.length == 0) return "TOKEN_VAZIO";
+        if (values == null || values.length == 0) return "UNAVAILABLE_NOT_REPORTED";
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < values.length; ++i) {
             if (i != 0) b.append(',');
@@ -274,6 +343,18 @@ final class EvidenceBundleWriter {
     }
 
     private static String f6(double value) {
-        return String.format(Locale.US, "%.6f", value);
+        boolean negative = value < 0.0;
+        double positive = negative ? -value : value;
+        long scaled = (long)(positive * 1000000.0 + 0.5);
+        long whole = scaled / 1000000L;
+        long fraction = scaled - whole * 1000000L;
+        String frac = Long.toString(fraction);
+        StringBuilder b = new StringBuilder(24);
+        if (negative) b.append('-');
+        b.append(whole).append('.');
+        int pad;
+        for (pad = frac.length(); pad < 6; ++pad) b.append('0');
+        b.append(frac);
+        return b.toString();
     }
 }
