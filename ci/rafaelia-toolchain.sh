@@ -109,11 +109,12 @@ setup_gradle() {
 report() {
   printf 'RAFAELIA_TOOLCHAIN_CONTRACT=V1\n'
   printf 'NODE_APP_RUNTIME=0\n'
-  printf 'NODE_JS_ACTIONS_ALLOWED=actions/upload-artifact@v4_ONLY\n'
+  printf 'NODE_JS_ACTIONS_ALLOWED=NONE\n'
   printf 'CHECKOUT=AUTHORIAL_GIT_SHELL\n'
   printf 'JAVA17=RUNNER_IMAGE_VERIFIED\n'
   printf 'ANDROID_SDK=RUNNER_IMAGE_PLUS_PINNED_PACKAGES\n'
   printf 'GRADLE=PINNED_BINARY_SHA256\n'
+  printf 'GH_CLI=RUNNER_PLATFORM_EDGE\n'
 }
 
 case "$cmd" in
