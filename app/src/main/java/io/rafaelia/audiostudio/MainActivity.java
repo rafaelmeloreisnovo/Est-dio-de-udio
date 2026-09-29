@@ -409,8 +409,9 @@ public final class MainActivity extends Activity {
                             "\ninput=" + result.inputSource +
                             " | lag=" + result.bestLag + " samples" +
                             " | latency=" + result.latencyMicros() + " us" +
-                            "\ncaptured=" + result.capturedFrames + " frames" +
-                            " | correlation=" + result.correlation +
+                            "\npolarity=" + (result.correlation < 0L ? "INVERTED" : "NORMAL") +
+                            " | captured=" + result.capturedFrames + " frames" +
+                            "\ncorrelation=" + result.correlation +
                             "\nABS_SPL=TOKEN_VAZIO — requer referência acústica física." +
                             "\nCFR: " + result.cfrFile.getAbsolutePath());
                 });
