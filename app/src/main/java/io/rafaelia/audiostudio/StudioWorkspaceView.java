@@ -290,7 +290,8 @@ final class StudioWorkspaceView extends View {
         float width = right - left;
         float half = (bottom - top) * 0.46f;
         for (i = 0; i < waveBins; ++i) {
-            float x = left + width * i / (float)Math.max(1, waveBins - 1);
+            int denominator = waveBins > 1 ? waveBins - 1 : 1;
+            float x = left + width * i / (float)denominator;
             float y1 = mid - (waveMax[i] / 32768f) * half;
             float y2 = mid - (waveMin[i] / 32768f) * half;
             canvas.drawLine(x, y1, x, y2, thin);
@@ -312,10 +313,12 @@ final class StudioWorkspaceView extends View {
         paint.setARGB(255, 45, 50, 58);
         canvas.drawRect(left, top, right, top + dp(18), paint);
         paint.setARGB(255, 104, 185, 151);
-        canvas.drawRect(left, top, left + width * Math.min(100, peak) / 100f,
+        int peakBounded = peak < 0 ? 0 : (peak > 100 ? 100 : peak);
+        int rmsBounded = rms < 0 ? 0 : (rms > 100 ? 100 : rms);
+        canvas.drawRect(left, top, left + width * peakBounded / 100f,
                 top + dp(7), paint);
         paint.setARGB(255, 103, 145, 203);
-        canvas.drawRect(left, top + dp(11), left + width * Math.min(100, rms) / 100f,
+        canvas.drawRect(left, top + dp(11), left + width * rmsBounded / 100f,
                 top + dp(18), paint);
     }
 
@@ -326,7 +329,7 @@ final class StudioWorkspaceView extends View {
         float slot = (right - left) / spectrum.length;
         paint.setARGB(255, 112, 172, 210);
         for (i = 0; i < spectrum.length; ++i) {
-            float ratio = (float)Math.sqrt((double)spectrum[i] / (double)max);
+            float ratio = (float)((double)spectrum[i] / (double)max);
             float height = (bottom - top) * ratio;
             canvas.drawRect(left + i * slot + dp(2), bottom - height,
                     left + (i + 1) * slot - dp(2), bottom, paint);
@@ -338,18 +341,12 @@ final class StudioWorkspaceView extends View {
         canvas.drawRect(left, top, right, bottom, thin);
         float mid = (top + bottom) * 0.5f;
         canvas.drawLine(left, mid, right, mid, thin);
-        thin.setARGB(255, 186, 150, 96);
-        float px = left;
-        float py = mid;
         int i;
-        for (i = 1; i <= 48; ++i) {
-            float x = left + (right - left) * i / 48f;
-            float y = mid + (float)Math.sin(i * 0.47) * (bottom - top) * 0.12f
-                    + (float)Math.sin(i * 0.13) * (bottom - top) * 0.08f;
-            canvas.drawLine(px, py, x, y, thin);
-            px = x;
-            py = y;
+        for (i = 1; i < 8; ++i) {
+            float x = left + (right - left) * i / 8f;
+            canvas.drawLine(x, top, x, bottom, thin);
         }
+        drawText(canvas, "measured curve: TOKEN_VAZIO", left + dp(8), mid - dp(8), 10);
     }
 
     private void drawPills(Canvas canvas, float y, String[] labels) {
