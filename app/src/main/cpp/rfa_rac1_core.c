@@ -59,7 +59,8 @@ static int rfa_rac1_get_varint(
 
 int rfa_rac1_bound_bytes(int frames, int channels) {
     if (frames < 0 || channels <= 0 || channels > RFA_RAC1_MAX_CHANNELS) return 0;
-    if (frames > 715827882 / channels) return 0;
+    if (channels == 1 && frames > 715827882) return 0;
+    if (channels == 2 && frames > 357913941) return 0;
     return frames * channels * 3;
 }
 
