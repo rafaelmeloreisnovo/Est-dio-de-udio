@@ -285,3 +285,45 @@ RF_CONTROL = NOT_IMPLEMENTED
 MAGNETOMETER_PHYSICAL = NOT_RUN
 WAV_EXPORT_PHYSICAL = NOT_RUN
 ```
+
+
+## Delta 4.7 — SYS / binary origin / real signing / zero-JS pipeline
+
+The adaptive console now includes:
+
+```text
+REC | EDIT | CAL | SPEC | ROOM | VOICE | MASTER | EXPORT | SYS
+```
+
+`SYS` exposes the minimal permission state, sensor availability, component-origin boundary and signing state.
+
+Canonical CI now requires:
+
+```text
+NODE_APP_RUNTIME = 0
+NPM/YARN/PNPM = 0
+EXTERNAL_JS_ACTIONS = NONE
+GH_CLI = PLATFORM_EDGE
+```
+
+A successful main build creates:
+
+- APK SHA-256;
+- per-APK-entry SHA-256 manifest;
+- binary-origin receipt;
+- traceable GitHub prerelease through the runner-provided `gh` CLI.
+
+A separate `Rafaelia Signed Release` workflow is fail-closed and requires a real user-controlled keystore plus the expected public certificate SHA-256. It never substitutes a debug key for an absent authorial key.
+
+Installed evidence now measures the certificate that actually signed the installed APK and compares it with the expected fingerprint when configured.
+
+See:
+
+- `docs/AUTHORIAL_BINARY_ORIGIN_V1.md`
+- `docs/SENSOR_PERMISSION_MATRIX_V2.md`
+- `docs/SIGNED_RELEASE_V1.md`
+
+```text
+REAL_SIGNING_SECRETS = TOKEN_VAZIO until configured in GitHub
+SIGNED_RELEASE_PHYSICAL = NOT_RUN
+```
