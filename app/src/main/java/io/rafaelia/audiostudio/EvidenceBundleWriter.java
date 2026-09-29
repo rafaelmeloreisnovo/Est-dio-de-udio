@@ -25,7 +25,6 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
 import java.util.Locale;
 
@@ -225,13 +224,13 @@ final class EvidenceBundleWriter {
     }
 
     private static String sha256File(File file) throws Exception {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        LowSha256 sha = new LowSha256();
         try (FileInputStream in = new FileInputStream(file)) {
             byte[] buffer = new byte[16384];
             int n;
-            while ((n = in.read(buffer)) > 0) md.update(buffer, 0, n);
+            while ((n = in.read(buffer)) > 0) sha.update(buffer, 0, n);
         }
-        return hex(md.digest());
+        return hex(sha.finish());
     }
 
     private static String hex(byte[] digest) {
