@@ -46,3 +46,6 @@ rfa_measure_core:rfa_exp_sweep_render_q15
 rfa_measure_core:rfa_exp_sweep_reset_q31
 rfa_measure_core:rfa_relative_transfer_search
 rfa_measure_core:rfa_sync_sequence_q15
+rfa_rac1_core:rfa_rac1_bound_bytes
+rfa_rac1_core:rfa_rac1_encode_i16
+rfa_rac1_core:rfa_rac1_decode_i16
