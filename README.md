@@ -87,6 +87,70 @@ fixed-point    fixed-point
 
 O APK inteiro não é freestanding: microfone, tela, armazenamento e codec dependem da plataforma Android. O core é a unidade portátil e auditável.
 
+
+## Delta 4 — Audio Manifold / ZRF-CFR
+
+Branch de implementação: `feature/audio-manifold-zrf-cfr-v1`.
+
+### Micromódulos freestanding
+
+- `rfa_wave_core`: banco de até 16 senoides Q15 por acumulador de fase, sem `libm`;
+- `rfa_matrix_core`: matriz Q15 caller-owned até 16×16;
+- `rfa_block_core`: ring buffer caller-owned e perfis 128/512/4096;
+- `rfa_container_core`: cabeçalhos ZRF/CFR, chunks tipados e checksum bounded.
+
+Todos entram no mesmo gate `-nostdinc -ffreestanding -fno-builtin` dos núcleos existentes.
+
+### Studio surface
+
+A interface ganhou uma superfície profissional navegável:
+
+```text
+REC | EDIT | CAL | SPEC | ROOM | VOICE | MASTER | EXPORT
+```
+
+O workspace recebe waveform vivo limitado, telemetria da captura e espectro/master já produzidos pelo pipeline. Curvas de calibração/room não são simuladas: permanecem `TOKEN_VAZIO` até medição.
+
+### ZRF / CFR
+
+- o PCM bruto continua preservado;
+- antes do mastering, a origem processada também recebe um sidecar `ZRF1`;
+- ZRF v1 já contém cabeçalho + chunk PCM real;
+- WAVE/MATR/CAL/IR/SPEC/PHON/ROOM/RCPT estão registrados como tipos de chunk;
+- CFR possui codec de cabeçalho/chunk, mas captura de calibração permanece `PENDING`.
+
+Ver `docs/ZRF_CFR_FORMAT_V1.md`.
+
+### Evidência
+
+```text
+DELTA4_SOURCE = IMPLEMENTED
+DELTA4_HOST_SMOKE = PENDING_CI
+DELTA4_ARMV7_ZERO_UNDEFINED = PENDING_CI
+DELTA4_AARCH64_ZERO_UNDEFINED = PENDING_CI
+DELTA4_APK_BUILD = PENDING_CI
+DELTA4_PHYSICAL_ANDROID = NOT_RUN
+CFR_CALIBRATION_CAPTURE = PENDING
+ABSOLUTE_SPL = TOKEN_VAZIO
+claim_allowed = false
+```
+
+### Research boundary
+
+Poincaré/7D/14-axis, fonética, neurociência e hipóteses quânticas podem entrar como representações/experimentos com schema próprio. Nenhuma dessas camadas é promovida a mecanismo físico pelo simples fato de existir código ou matriz.
+
+Arquitetura: `docs/AUDIO_MANIFOLD_CONTRACT_V1.md`.
+
+### Licenciamento
+
+Novos módulos usam:
+
+```text
+SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+```
+
+Pesquisa/avaliação não comercial é permitida nos termos de `LICENSE_RESEARCH_COMMERCIAL.md`; uso comercial requer acordo escrito separado.
+
 ## F_next
 
 1. executar CI do Delta 3;
