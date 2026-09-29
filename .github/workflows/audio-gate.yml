@@ -23,6 +23,9 @@ jobs:
       RFA_SOURCE_SHA: ${{ inputs.source_sha }}
       RFA_CI_RUN_ID: ${{ github.run_id }}
       RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+      RFA_SIGNING_MODE: DEBUG_NONAUTHORIAL
+      RFA_SIGNER_ID: UNAVAILABLE_DEBUG_BUILD
+      RFA_EXPECTED_CERT_SHA256: TOKEN_VAZIO
 
     steps:
       - name: Authorial checkout — git shell only
@@ -221,54 +224,7 @@ jobs:
 
       - name: Generate component-origin and permission assets
         shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p app/src/main/assets "$RUNNER_TEMP/rafaelia-origin"
-
-          find app/src/main/java -type f -name '*.java' -print0 |
-            sort -z |
-            xargs -0 sha256sum > "$RUNNER_TEMP/rafaelia-origin/java.sha256"
-          find app/src/main/cpp -type f \( -name '*.c' -o -name '*.h' \) -print0 |
-            sort -z |
-            xargs -0 sha256sum > "$RUNNER_TEMP/rafaelia-origin/c.sha256"
-
-          JAVA_TREE_SHA="$(sha256sum "$RUNNER_TEMP/rafaelia-origin/java.sha256" | awk '{print $1}')"
-          C_TREE_SHA="$(sha256sum "$RUNNER_TEMP/rafaelia-origin/c.sha256" | awk '{print $1}')"
-          GRADLE_BIN="$(command -v gradle)"
-          JAVA_BIN="$(command -v java)"
-          CLANG_BIN="$ANDROID_SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
-
-          cat > app/src/main/assets/component_origin_v1.txt <<EOF
-          schema=rafaelia.component-origin/v1
-          project_package=io.rafaelia.audiostudio
-          project_java_tree_sha256=$JAVA_TREE_SHA
-          project_c_tree_sha256=$C_TREE_SHA
-          project_source_class=PROJECT_AUTHORED
-          dex_class=GENERATED_FROM_PROJECT_JAVA_WITH_ANDROID_PLATFORM_REFERENCES
-          native_so_class=PROJECT_CORE_PLUS_ANDROID_NDK_LINK_EDGE
-          android_manifest_class=PROJECT_SOURCE_COMPILED_BY_EXTERNAL_ANDROID_TOOLCHAIN
-          resources_class=PROJECT_SOURCE_GENERATED_BY_EXTERNAL_ANDROID_TOOLCHAIN
-          android_platform=EXTERNAL_PLATFORM
-          android_gradle_plugin=EXTERNAL_TOOLCHAIN:8.9.2
-          gradle=EXTERNAL_TOOLCHAIN:8.11.1
-          java_binary=$JAVA_BIN
-          gradle_binary=$GRADLE_BIN
-          clang_binary=$CLANG_BIN
-          authorship_rule=ONLY_PROJECT_SOURCE_AND_PROJECT_FORMATS_ARE_MARKED_PROJECT_AUTHORED
-          EOF
-
-          cat > app/src/main/assets/permission_contract_v1.txt <<EOF
-          schema=rafaelia.permission-contract/v1
-          RECORD_AUDIO=ASK_ON_EXPLICIT_AUDIO_ACTION
-          ACCESS_NETWORK_STATE=NORMAL_PASSIVE_METADATA_ONLY
-          ACTIVITY_RECOGNITION=ASK_ONLY_FROM_SYS_OPTIONAL_SENSOR_ACTION
-          ACCELEROMETER=NO_RUNTIME_PERMISSION_REQUIRED
-          MAGNETOMETER=NO_RUNTIME_PERMISSION_REQUIRED
-          LIGHT=NO_RUNTIME_PERMISSION_REQUIRED
-          PROXIMITY=NO_RUNTIME_PERMISSION_REQUIRED
-          HIGH_SAMPLING_RATE_SENSORS=NOT_REQUESTED_CURRENT_PROFILE
-          RF_TRANSMIT_CONTROL=NOT_IMPLEMENTED
-          EOF
+        run: bash ci/rafaelia-origin-assets.sh
 
       - name: Embed CI provenance asset
         run: |
