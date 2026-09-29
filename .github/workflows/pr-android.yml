@@ -173,6 +173,15 @@ jobs:
           artifact_upload=PENDING_AT_EMBED
           EOF
 
+      - name: Low Java SHA-256 known-answer test
+        run: |
+          rm -rf /tmp/rfa_sha_test
+          mkdir -p /tmp/rfa_sha_test
+          javac -d /tmp/rfa_sha_test \
+            app/src/main/java/io/rafaelia/audiostudio/LowSha256.java \
+            native/tests/LowSha256Smoke.java
+          java -cp /tmp/rfa_sha_test io.rafaelia.audiostudio.LowSha256Smoke
+
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
