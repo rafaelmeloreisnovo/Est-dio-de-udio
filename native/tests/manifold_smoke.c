@@ -28,6 +28,11 @@ int main(void) {
     rfa_container_desc desc;
     rfa_container_desc decoded;
     rfa_u8 header_bytes[RFA_CONTAINER_HEADER_BYTES];
+    rfa_u8 chunk_bytes[RFA_CONTAINER_CHUNK_HEADER_BYTES];
+    rfa_u32 chunk_type;
+    rfa_u32 chunk_flags;
+    rfa_u32 chunk_payload;
+    rfa_u32 chunk_items;
     int i;
 
     rfa_wave_bank_reset(&bank);
@@ -75,9 +80,18 @@ int main(void) {
     if (decoded.channels != 2 || decoded.matrix_dim != 14) return 43;
     if (decoded.sample_rate != 48000U || decoded.block_samples != 512U) return 44;
 
+    if (rfa_container_write_chunk_header(chunk_bytes,
+            RFA_CONTAINER_CHUNK_HEADER_BYTES, RFA_CHUNK_PCM,
+            0U, 2048U, 1024U) != RFA_CONTAINER_CHUNK_HEADER_BYTES) return 45;
+    if (!rfa_container_read_chunk_header(chunk_bytes,
+            RFA_CONTAINER_CHUNK_HEADER_BYTES, &chunk_type, &chunk_flags,
+            &chunk_payload, &chunk_items)) return 46;
+    if (chunk_type != RFA_CHUNK_PCM || chunk_flags != 0U ||
+        chunk_payload != 2048U || chunk_items != 1024U) return 47;
+
     header_bytes[8] ^= 1U;
     if (rfa_container_read_header(header_bytes,
-            RFA_CONTAINER_HEADER_BYTES, &decoded)) return 45;
+            RFA_CONTAINER_HEADER_BYTES, &decoded)) return 48;
 
     return 0;
 }
