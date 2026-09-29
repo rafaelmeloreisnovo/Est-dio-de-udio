@@ -7,7 +7,7 @@
  */
 
 #include "rfa_measure_core.h"
-#include "rfa_wave_core.h"
+#include "rfa_sine_q15.h"
 
 static rfa_i16 rfa_measure_clip_i16(rfa_i64 value) {
     if (value > 32767) return (rfa_i16)32767;
@@ -37,7 +37,7 @@ int rfa_exp_sweep_render_q15(rfa_exp_sweep_q31 *state,
     if (frames <= 0 || channels <= 0 || channels > 2) return 0;
 
     while (produced < frames && state->frames_left > 0) {
-        rfa_i16 sine = rfa_wave_sine_q15(state->phase);
+        rfa_i16 sine = rfa_sine_lookup_q15(state->phase);
         rfa_i64 scaled = ((rfa_i64)sine * (rfa_i64)state->gain_q15) >> 15;
         int channel;
         rfa_u64 next_step;
