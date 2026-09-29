@@ -231,6 +231,9 @@ jobs:
           host_manifold_smoke=PASS
           freestanding_source_gate=PASS
           low_dependency_gate=PASS
+          authorial_toolchain_bootstrap=PASS
+          node_app_runtime=0
+          external_js_actions=actions/upload-artifact@v4_ONLY
           armv7_zero_undefined=PASS
           armv7_abi_manifest=PASS
           aarch64_zero_undefined=PASS
