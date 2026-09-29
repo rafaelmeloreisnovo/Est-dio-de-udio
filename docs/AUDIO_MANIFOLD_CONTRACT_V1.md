@@ -148,7 +148,7 @@ CAL_ABSOLUTE_SPL -> requires a physical acoustic reference
 Without a physical reference:
 
 ```text
-ABS_SPL = TOKEN_VAZIO
+ABS_SPL = PENDING_PHYSICAL_REFERENCE
 ```
 
 ### 12.1 Relative physical capture
