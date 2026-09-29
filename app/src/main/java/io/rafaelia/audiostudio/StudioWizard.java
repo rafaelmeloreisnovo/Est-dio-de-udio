@@ -37,7 +37,7 @@ final class StudioWizard {
 
     private static void stepCapabilities(Activity a, Runnable finish) {
         AudioManager am = (AudioManager) a.getSystemService(Context.AUDIO_SERVICE);
-        String sampleRate = am == null ? "TOKEN_VAZIO"
+        String sampleRate = am == null ? "UNAVAILABLE_SERVICE"
                 : am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
         String frames = am == null ? "TOKEN_VAZIO"
                 : am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
