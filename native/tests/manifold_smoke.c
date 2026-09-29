@@ -165,13 +165,13 @@ int main(void) {
     }
 
     rfa_exp_sweep_reset_q31(&sweep, 89478485U, 2149631132U, 16384, 64);
-    if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 61;
+    if (rfa_exp_sweep_render_q15(&sweep, sweep_data, 64, 1) != 64) return 65;
     for (i = 0; i < 72; ++i) delayed_data[i] = 0;
     for (i = 0; i < 64; ++i) delayed_data[i + 5] = sweep_data[i];
     if (!rfa_relative_transfer_search(
-            sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 62;
-    if (transfer.best_lag != 5) return 63;
-    if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 64;
+            sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 66;
+    if (transfer.best_lag != 5) return 67;
+    if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 68;
 
     return 0;
 }
