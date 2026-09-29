@@ -1,0 +1,31 @@
+# START HERE — Rafaelia Audio Studio
+
+## 1. What this is
+
+Rafaelia Audio Studio is an Android audio workstation and measurement research platform with a narrow Android edge and authorial fixed-point freestanding C cores.
+
+## 2. Choose your route
+
+| I want to… | Read |
+|---|---|
+| use the app | `USER_GUIDE.md` |
+| understand features | `CAPABILITY_MATRIX.md` |
+| integrate/develop | `DEVELOPER_GUIDE.md` |
+| understand architecture | `AUDIO_MANIFOLD_CONTRACT_V1.md` |
+| validate an installation | `INSTALLATION_VALIDATION.md` |
+| test hardware | `HARDWARE_TEST_PROTOCOL.md` |
+| understand μ∆ vibration | `MICRO_DELTA_VIBRATION_V1.md` |
+| audit claims/evidence | `VERIFICATION_AND_EVIDENCE.md` |
+| publish/share the product | `PUBLICATION_INDEX.md` |
+| prepare a release | `RELEASE_READINESS.md` |
+| understand terminology | `GLOSSARY.md` |
+
+## 3. Current epistemic rule
+
+```text
+implementation is not execution
+execution is not evidence
+evidence is not every possible claim
+```
+
+The evidence button inside the app creates an installation/hardware/development bundle, including installed APK SHA-256 and a bounded accelerometer μ∆ observation.
