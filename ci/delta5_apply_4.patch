@@ -1,0 +1,292 @@
+diff --git a/docs/CAPABILITY_MATRIX.md b/docs/CAPABILITY_MATRIX.md
+index e7149de..16a4313 100644
+--- a/docs/CAPABILITY_MATRIX.md
++++ b/docs/CAPABILITY_MATRIX.md
+@@ -7,9 +7,11 @@
+ | ZRF session container | implemented | build-gated | available | bounded |
+ | CFR relative capture | implemented | build-gated | requires run | physical result NOT_RUN until CFR exists |
+ | absolute SPL | schema only | N/A | reference required | PENDING_PHYSICAL_REFERENCE |
+-| IR/deconvolution | partial primitives | pending integration | NOT_RUN | PENDING |
+-| RT metrics | UI/contract route | not complete | NOT_RUN | PENDING |
+-| room correction | FIR primitive + route | not complete | NOT_RUN | PENDING |
++| relative 16-band sweep profile | implemented fixed-point core | local gate PASS; remote delta CI pending | requires CFR run | bounded relative path |
++| relative EDT/T20/T30 estimator | implemented fixed-point core | local gate PASS; remote delta CI pending | requires sufficient measured decay | non-standard relative estimate |
++| IR/deconvolution | FIR/measurement primitives | not integrated as inverse-sweep IR | NOT_RUN | PENDING |
++| standards-conformant RT metrics | relative estimator exists | standard vectors/protocol pending | NOT_RUN | NOT_CLAIMED |
++| room correction | FIR primitive + route | automatic fitting/application not complete | NOT_RUN | PENDING |
+ | voice acoustic features | implemented reference | gated | input-dependent | bounded |
+ | pitch-preserving autotune | not complete | NOT_RUN | NOT_RUN | PENDING |
+ | accelerometer μ∆ vibration | implemented platform probe | build-gated | generated on device | OBSERVED_UNPROMOTED |
+@@ -40,11 +42,11 @@ Update this matrix whenever a receipt materially promotes or demotes a state.
+ 
+ | Node.js application runtime | absent | CI-gated | N/A | 0 |
+ | npm/yarn/pnpm dependency graph | absent | CI-gated | N/A | 0 |
+-| authorial CI orchestration | implemented | pending execution | N/A | IMPLEMENTED_UNTESTED |
++| authorial CI orchestration | implemented | main run 36545296255 PASS at baseline 1a1b00bb93b0 | N/A | PASS_BASELINE |
+ | checkout/setup Java/setup Android/setup Gradle JS Actions | removed from canonical gate | pending execution | N/A | SOURCE_REMOVED |
+-| external JavaScript Actions | none in canonical workflow | pending CI | N/A | 0 |
+-| GitHub CLI release transport | implemented platform edge | pending CI | N/A | PLATFORM_EDGE |
++| external JavaScript Actions | none in canonical workflow | baseline main gate PASS | N/A | 0 |
++| GitHub CLI release transport | implemented platform edge | baseline main gate PASS | N/A | PLATFORM_EDGE |
+ | installed APK signing certificate evidence | implemented | build-gated | device-dependent | bounded |
+ | real authorial signed release | workflow implemented | requires real secrets/vars | NOT_RUN | TOKEN_VAZIO_UNTIL_CONFIGURED |
+-| component-origin manifest | implemented | pending CI | embedded + post-build | bounded |
+-| SYS permissions/origin/signature workspace | implemented | pending CI | physical NOT_RUN | bounded source |
++| component-origin manifest | implemented | baseline main gate PASS | embedded + post-build | bounded |
++| SYS permissions/origin/signature workspace | implemented | baseline main gate PASS | physical NOT_RUN | bounded source |
+diff --git a/docs/CFR_RELATIVE_ANALYSIS_V1.md b/docs/CFR_RELATIVE_ANALYSIS_V1.md
+new file mode 100644
+index 0000000..4f7928a
+--- /dev/null
++++ b/docs/CFR_RELATIVE_ANALYSIS_V1.md
+@@ -0,0 +1,79 @@
++# CFR Relative Analysis V1
++
++Copyright (c) 2026 Rafael Melo Reis  
++SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
++
++**State:** `IMPLEMENTED_LOCAL_TESTED / REMOTE_CI_PENDING`
++
++## Purpose
++
++This layer derives bounded, reproducible information from an already aligned CFR capture without converting relative measurements into absolute acoustic claims.
++
++```text
++sync alignment
++-> exponential sweep window
++-> 16 equal-time/log-frequency energy windows
++-> relative power ratio Q20
++-> post-sweep tail
++-> backward-integrated relative decay
++-> EDT/T20/T30 candidates when dynamic range permits
++```
++
++The original reference PCM and microphone response remain preserved in the same CFR. Derived data is additive; it does not replace the source capture.
++
++## 16-band relative sweep profile
++
++`rfa_sweep_band_profile_q20` divides the exponential sweep into 16 equal-time windows. Because the sweep frequency grows exponentially, the windows are approximately logarithmic in frequency, but they are **not** a calibrated FFT/STFT filter bank.
++
++For each band `k`:
++
++```text
++E_ref[k]  = sum(reference^2)
++E_resp[k] = sum(response^2)
++R_q20[k]  = E_resp[k] / E_ref[k]
++```
++
++`R_q20` is a **power ratio** with 20 fractional bits. A UI may display `10*log10(R)`, but this is a relative speaker-room-microphone-ADC path only.
++
++## Relative decay profile
++
++`rfa_decay_profile_q30` estimates the tail noise energy, performs a backward energy integration and searches threshold crossings at -5, -10, -25 and -35 dB relative to the corrected initial integrated energy.
++
++When sufficient dynamic range exists:
++
++```text
++EDT candidate = 6 * time(0 -> -10 dB)
++T20 candidate = 3 * time(-5 -> -25 dB)
++T30 candidate = 2 * time(-5 -> -35 dB)
++```
++
++These are relative estimators. They are not promoted to ISO 3382 conformance without controlled acquisition, geometry, noise criteria, repeatability and the required standard-specific evidence.
++
++## CFR chunks
++
++A V1 analyzed relative CFR writes:
++
++```text
++WAVE
++CAL
++PCM reference
++PCM response
++SPEC relative 16-band profile
++ROOM relative decay profile
++```
++
++`SPEC` and `ROOM` are derived artifacts linked to the preserved PCM source inside the same container.
++
++## Claim boundary
++
++```text
++RELATIVE_SWEEP_PROFILE = IMPLEMENTED
++RELATIVE_DECAY_ESTIMATOR = IMPLEMENTED
++ABSOLUTE_SPL = PENDING_PHYSICAL_REFERENCE
++CALIBRATED_FFT_STFT = NOT_CLAIMED
++IR_DECONVOLUTION = NOT_CLAIMED
++ISO3382_CONFORMANCE = NOT_CLAIMED
++AUTOMATIC_ROOM_CORRECTION = PENDING
++```
++
++`SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM`.
+diff --git a/docs/RELEASE_READINESS.md b/docs/RELEASE_READINESS.md
+index de78741..1126548 100644
+--- a/docs/RELEASE_READINESS.md
++++ b/docs/RELEASE_READINESS.md
+@@ -20,10 +20,15 @@
+ 
+ ## Required before acoustic calibration claims
+ 
+-Relative:
+-- repeated CFR captures;
++Relative software gate:
+ - known source/response alignment;
+-- transfer derivation validated.
++- 16-band relative sweep profile validated by deterministic host vectors;
++- relative decay estimator validated by deterministic host vectors.
++
++Relative physical evidence:
++- repeated CFR captures on the target device/room;
++- raw reference/response preserved;
++- repeatability and noise/dynamic-range recorded.
+ 
+ Absolute:
+ - traceable or otherwise documented acoustic reference;
+@@ -33,3 +38,8 @@ Absolute:
+ ## No-go
+ 
+ Release notes must not convert `PENDING`, `NOT_RUN` or `TOKEN_VAZIO` into marketing claims.
++
++
++## Baseline evidence before Delta 5
++
++`main@1a1b00bb93b0988224d8b24085a82029d1228c45` passed GitHub run `36545296255`, including host smokes, freestanding gate, ARMv7/AArch64 gates, APK assembly, binary-origin receipt and live prerelease publication. Delta 5 must obtain its own CI result before promotion.
+diff --git a/docs/START_HERE.md b/docs/START_HERE.md
+index 0b3efdc..bf5689d 100644
+--- a/docs/START_HERE.md
++++ b/docs/START_HERE.md
+@@ -12,6 +12,7 @@ Rafaelia Audio Studio is an Android audio workstation and measurement research p
+ | understand features | `CAPABILITY_MATRIX.md` |
+ | integrate/develop | `DEVELOPER_GUIDE.md` |
+ | understand architecture | `AUDIO_MANIFOLD_CONTRACT_V1.md` |
++| inspect relative CFR analysis | `CFR_RELATIVE_ANALYSIS_V1.md` |
+ | validate an installation | `INSTALLATION_VALIDATION.md` |
+ | test hardware | `HARDWARE_TEST_PROTOCOL.md` |
+ | understand μ∆ vibration | `MICRO_DELTA_VIBRATION_V1.md` |
+diff --git a/docs/ZRF_CFR_FORMAT_V1.md b/docs/ZRF_CFR_FORMAT_V1.md
+index bb95f8b..d8dec63 100644
+--- a/docs/ZRF_CFR_FORMAT_V1.md
++++ b/docs/ZRF_CFR_FORMAT_V1.md
+@@ -3,7 +3,7 @@
+ Copyright (c) 2026 Rafael Melo Reis
+ SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+ 
+-**State:** `PROJECT_LOCAL_FORMAT_V1 / IMPLEMENTED_UNTESTED`
++**State:** `PROJECT_LOCAL_FORMAT_V1 / IMPLEMENTED / DELTA5_REMOTE_CI_PENDING`
+ 
+ ZRF and CFR are project-local container identifiers. They are not external standards.
+ 
+@@ -118,13 +118,15 @@ hash != authorship
+ 
+ ## 9. CFR relative calibration profile v1
+ 
+-A physical relative-capture session writes four chunks in this order:
++An analyzed relative-capture session writes six chunks in this order:
+ 
+ ```text
+ WAVE flags=0
+ CAL  flags=RELATIVE
+ PCM  flags=REFERENCE
+ PCM  flags=RESPONSE
++SPEC flags=RELATIVE
++ROOM flags=RELATIVE
+ ```
+ 
+ ### WAVE payload — 32 bytes
+@@ -201,3 +203,43 @@ CODEBOOK != CONTENT
+ HASH != AUTHORSHIP
+ RAC1_ROUNDTRIP != SUPERIOR_COMPRESSION
+ ```
++
++
++## 10. SPEC relative sweep profile — 344 bytes
++
++```text
++u32 version = 1
++u32 kind = 1              # equal-time windows over exponential sweep
++u32 band_count = 16
++u32 valid_bands
++u32 analyzed_frames
++u32 power_ratio_fraction_bits = 20
++repeat 16 times:
++  u64 reference_energy
++  u64 response_energy
++  u32 power_ratio_q20
++```
++
++This is a relative energy profile. Equal time on an exponential sweep approximates logarithmic frequency windows; it is not a calibrated FFT/STFT or deconvolved impulse response.
++
++## 11. ROOM relative decay profile — 72 bytes
++
++```text
++u32 version = 1
++u32 kind = 1              # backward-integrated relative decay
++u32 analyzed_frames
++u32 noise_tail_frames
++u64 raw_energy
++u64 noise_energy_per_sample
++u64 corrected_initial_energy
++i32 t5_frames
++i32 t10_frames
++i32 t25_frames
++i32 t35_frames
++i32 edt60_frames
++i32 t20_rt60_frames
++i32 t30_rt60_frames
++u32 flags                   # EDT=1, T20=2, T30=4
++```
++
++A negative threshold/estimate means insufficient dynamic range. These values remain relative and do not assert ISO 3382 conformance.
+diff --git a/docs/receipts/DELTA5_RELATIVE_TRANSFER_DECAY_2026-10-01.md b/docs/receipts/DELTA5_RELATIVE_TRANSFER_DECAY_2026-10-01.md
+new file mode 100644
+index 0000000..8bd416b
+--- /dev/null
++++ b/docs/receipts/DELTA5_RELATIVE_TRANSFER_DECAY_2026-10-01.md
+@@ -0,0 +1,47 @@
++# Delta 5 — Relative transfer + decay closure — 2026-10-01
++
++## Authority
++
++```text
++repository = rafaelmeloreisnovo/Est-dio-de-udio
++baseline_main = 1a1b00bb93b0988224d8b24085a82029d1228c45
++baseline_main_ci_run = 36545296255
++baseline_main_ci = PASS
++source = uploaded Est-dio-de-udio-main.zip + GitHub main
++```
++
++## Delta
++
++- 16-band relative energy profile over the aligned exponential sweep;
++- backward-integrated relative decay with tail-noise estimate;
++- explicit EDT/T20/T30 candidate flags when dynamic range permits;
++- `SPEC` and `ROOM` CFR chunks while retaining both PCM source streams;
++- UI plots the measured relative profile instead of a placeholder;
++- evidence bundle records the relative analysis and its claim boundary;
++- relative calibration failure path resets derived state fail-closed;
++- JNI relative-transfer result initialized before failure paths.
++
++## Local gates
++
++```text
++host_dsp_smoke = PASS
++host_meter_smoke = PASS
++host_manifold_smoke = PASS
++low_sha256_kat = PASS
++freestanding_source_gate = PASS
++remote_pr_ci = PENDING
++android_apk_build_for_delta5 = PENDING_REMOTE_CI
++```
++
++## Claims deliberately not promoted
++
++```text
++physical_android_capture = NOT_RUN_IN_THIS_EXECUTION
++absolute_spl = PENDING_PHYSICAL_REFERENCE
++iso3382 = NOT_CLAIMED
++ir_deconvolution = NOT_CLAIMED
++room_correction = PENDING
++real_authorial_signed_release = TOKEN_VAZIO_UNTIL_SECRETS_CONFIGURED
++```
++
++`IMPLEMENTED_LOCAL_TESTED != REMOTE_CI_PASS` until GitHub verifies this delta.
