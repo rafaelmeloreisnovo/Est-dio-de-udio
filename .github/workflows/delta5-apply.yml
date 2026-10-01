@@ -1,0 +1,75 @@
+name: Delta 5 Patch Applier
+
+on:
+  push:
+    branches:
+      - feature/delta5-relative-transfer-decay-v1
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'ci: activate Delta 5 patch applier'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authorial checkout
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
+
+      - name: Validate and apply custody patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          for patch in ci/delta5_apply_1.patch ci/delta5_apply_2.patch ci/delta5_apply_3.patch ci/delta5_apply_4.patch; do
+            test -s "$patch"
+            git apply --check "$patch"
+            git apply "$patch"
+          done
+          git diff --check
+
+      - name: Re-run deterministic host gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_CFLAGS='-std=c11 -O2 -Wall -Wextra -Werror -pedantic -ffreestanding -fno-builtin -nostdinc -Iapp/src/main/cpp'
+          clang $CORE_CFLAGS native/tests/dsp_smoke.c app/src/main/cpp/dsp_core.c -o /tmp/dsp_smoke
+          /tmp/dsp_smoke
+          clang $CORE_CFLAGS native/tests/meter_smoke.c app/src/main/cpp/meter_core.c -o /tmp/meter_smoke
+          /tmp/meter_smoke
+          clang $CORE_CFLAGS native/tests/manifold_smoke.c \
+            app/src/main/cpp/rfa_wave_core.c \
+            app/src/main/cpp/rfa_matrix_core.c \
+            app/src/main/cpp/rfa_block_core.c \
+            app/src/main/cpp/rfa_container_core.c \
+            app/src/main/cpp/rfa_fir_core.c \
+            app/src/main/cpp/rfa_time_core.c \
+            app/src/main/cpp/rfa_lms_core.c \
+            app/src/main/cpp/rfa_biquad_core.c \
+            app/src/main/cpp/rfa_voice_core.c \
+            app/src/main/cpp/rfa_measure_core.c \
+            app/src/main/cpp/rfa_rac1_core.c \
+            -o /tmp/manifold_smoke
+          /tmp/manifold_smoke
+          mkdir -p /tmp/rfa_sha
+          javac -d /tmp/rfa_sha app/src/main/java/io/rafaelia/audiostudio/LowSha256.java native/tests/LowSha256Smoke.java
+          java -cp /tmp/rfa_sha io.rafaelia.audiostudio.LowSha256Smoke
+
+      - name: Commit applied Delta 5
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "rafaelia-delta5-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: Delta 5 relative transfer and decay analysis"
+          git push origin HEAD:feature/delta5-relative-transfer-decay-v1
