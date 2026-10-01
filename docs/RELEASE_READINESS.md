@@ -20,10 +20,15 @@
 
 ## Required before acoustic calibration claims
 
-Relative:
-- repeated CFR captures;
+Relative software gate:
 - known source/response alignment;
-- transfer derivation validated.
+- 16-band relative sweep profile validated by deterministic host vectors;
+- relative decay estimator validated by deterministic host vectors.
+
+Relative physical evidence:
+- repeated CFR captures on the target device/room;
+- raw reference/response preserved;
+- repeatability and noise/dynamic-range recorded.
 
 Absolute:
 - traceable or otherwise documented acoustic reference;
@@ -33,3 +38,8 @@ Absolute:
 ## No-go
 
 Release notes must not convert `PENDING`, `NOT_RUN` or `TOKEN_VAZIO` into marketing claims.
+
+
+## Baseline evidence before Delta 5
+
+`main@1a1b00bb93b0988224d8b24085a82029d1228c45` passed GitHub run `36545296255`, including host smokes, freestanding gate, ARMv7/AArch64 gates, APK assembly, binary-origin receipt and live prerelease publication. Delta 5 must obtain its own CI result before promotion.

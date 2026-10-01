@@ -67,6 +67,7 @@ public final class MainActivity extends Activity {
     private File lastMasteredPcm;
     private File lastZrf;
     private File lastCfr;
+    private RelativeCalibrationEngine.Result lastCalibrationResult;
     private int lastMasteredRate = 48000;
     private int lastMasteredChannels = 1;
     private Uri lastOutput;
@@ -415,7 +416,8 @@ public final class MainActivity extends Activity {
                                 magnetometer,
                                 lastZrf,
                                 lastCfr,
-                                lastMasteredPcm);
+                                lastMasteredPcm,
+                                lastCalibrationResult);
                         lastEvidenceUri = result.uri;
                         runOnUiThread(() -> status.setText(
                                 "PROVAS GERADAS — " + result.displayName +
@@ -507,31 +509,43 @@ public final class MainActivity extends Activity {
                 RelativeCalibrationEngine.Result result =
                         RelativeCalibrationEngine.run(this, cfr);
                 lastCfr = result.cfrFile;
+                lastCalibrationResult = result;
 
                 runOnUiThread(() -> {
+                    long rtMs = result.preferredRt60Millis();
+                    String roomState = "ROOM=" + result.decayMethod() +
+                            (rtMs >= 0L ? " | RT60_REL~" + rtMs + " ms" :
+                                    " | RT60_REL=TOKEN_VAZIO_DYNAMIC_RANGE");
                     if (studioWorkspaceView != null) {
                         studioWorkspaceView.setCalibrationState(
-                                "CAL=RELATIVE_CAPTURED | input=" + result.inputSource +
+                                "CAL=RELATIVE_ANALYZED | input=" + result.inputSource +
                                 " | lag=" + result.bestLag + " samples");
+                        studioWorkspaceView.setCalibrationAnalysis(
+                                result.powerRatiosQ20(), result.validTransferBands(), roomState);
                         studioWorkspaceView.setContainerState(
-                                "CFR=RECORDED_RELATIVE | ABS_SPL=PENDING_PHYSICAL_REFERENCE");
+                                "CFR=RECORDED+SPEC16+ROOM_RELATIVE | ABS_SPL=PENDING_PHYSICAL_REFERENCE");
                     }
                     status.setText(
-                            "CFR RELATIVO GRAVADO" +
+                            "CFR RELATIVO ANALISADO" +
                             "\ninput=" + result.inputSource +
                             " | lag=" + result.bestLag + " samples" +
                             " | latency=" + result.latencyMicros() + " us" +
                             "\npolarity=" + (result.correlation < 0L ? "INVERTED" : "NORMAL") +
                             " | captured=" + result.capturedFrames + " frames" +
-                            "\ncorrelation=" + result.correlation +
+                            " | bands=" + result.validTransferBands() + "/16" +
+                            "\n" + roomState +
+                            " | ISO3382=NOT_CLAIMED" +
                             "\nABS_SPL=PENDING_PHYSICAL_REFERENCE — referência acústica física necessária." +
                             "\nCFR: " + result.cfrFile.getAbsolutePath());
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
+                    lastCalibrationResult = null;
                     if (studioWorkspaceView != null) {
                         studioWorkspaceView.setCalibrationState(
                                 "CAL=FAIL | ABS_SPL=TOKEN_VAZIO");
+                        studioWorkspaceView.setCalibrationAnalysis(
+                                null, 0, "ROOM=NOT_RUN_AFTER_CAL_FAIL");
                     }
                     status.setText("Falha na calibração relativa: " + e.getMessage());
                 });

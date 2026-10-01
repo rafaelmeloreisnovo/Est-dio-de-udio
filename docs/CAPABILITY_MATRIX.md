@@ -7,9 +7,11 @@
 | ZRF session container | implemented | build-gated | available | bounded |
 | CFR relative capture | implemented | build-gated | requires run | physical result NOT_RUN until CFR exists |
 | absolute SPL | schema only | N/A | reference required | PENDING_PHYSICAL_REFERENCE |
-| IR/deconvolution | partial primitives | pending integration | NOT_RUN | PENDING |
-| RT metrics | UI/contract route | not complete | NOT_RUN | PENDING |
-| room correction | FIR primitive + route | not complete | NOT_RUN | PENDING |
+| relative 16-band sweep profile | implemented fixed-point core | local gate PASS; remote delta CI pending | requires CFR run | bounded relative path |
+| relative EDT/T20/T30 estimator | implemented fixed-point core | local gate PASS; remote delta CI pending | requires sufficient measured decay | non-standard relative estimate |
+| IR/deconvolution | FIR/measurement primitives | not integrated as inverse-sweep IR | NOT_RUN | PENDING |
+| standards-conformant RT metrics | relative estimator exists | standard vectors/protocol pending | NOT_RUN | NOT_CLAIMED |
+| room correction | FIR primitive + route | automatic fitting/application not complete | NOT_RUN | PENDING |
 | voice acoustic features | implemented reference | gated | input-dependent | bounded |
 | pitch-preserving autotune | not complete | NOT_RUN | NOT_RUN | PENDING |
 | accelerometer μ∆ vibration | implemented platform probe | build-gated | generated on device | OBSERVED_UNPROMOTED |
@@ -40,11 +42,11 @@ Update this matrix whenever a receipt materially promotes or demotes a state.
 
 | Node.js application runtime | absent | CI-gated | N/A | 0 |
 | npm/yarn/pnpm dependency graph | absent | CI-gated | N/A | 0 |
-| authorial CI orchestration | implemented | pending execution | N/A | IMPLEMENTED_UNTESTED |
+| authorial CI orchestration | implemented | main run 36545296255 PASS at baseline 1a1b00bb93b0 | N/A | PASS_BASELINE |
 | checkout/setup Java/setup Android/setup Gradle JS Actions | removed from canonical gate | pending execution | N/A | SOURCE_REMOVED |
-| external JavaScript Actions | none in canonical workflow | pending CI | N/A | 0 |
-| GitHub CLI release transport | implemented platform edge | pending CI | N/A | PLATFORM_EDGE |
+| external JavaScript Actions | none in canonical workflow | baseline main gate PASS | N/A | 0 |
+| GitHub CLI release transport | implemented platform edge | baseline main gate PASS | N/A | PLATFORM_EDGE |
 | installed APK signing certificate evidence | implemented | build-gated | device-dependent | bounded |
 | real authorial signed release | workflow implemented | requires real secrets/vars | NOT_RUN | TOKEN_VAZIO_UNTIL_CONFIGURED |
-| component-origin manifest | implemented | pending CI | embedded + post-build | bounded |
-| SYS permissions/origin/signature workspace | implemented | pending CI | physical NOT_RUN | bounded source |
+| component-origin manifest | implemented | baseline main gate PASS | embedded + post-build | bounded |
+| SYS permissions/origin/signature workspace | implemented | baseline main gate PASS | physical NOT_RUN | bounded source |

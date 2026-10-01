@@ -29,6 +29,7 @@ final class RelativeCalibrationEngine {
     static final int PRE_FRAMES = 4096;
     static final int POST_FRAMES = 8192;
     static final int MAX_LAG = 16384;
+    static final int DECAY_NOISE_TAIL_FRAMES = 2048;
 
     static final long SWEEP_START_STEP_Q32 = 1_789_570L;   // 20 Hz @ 48 kHz
     static final long SWEEP_RATIO_Q31 = 2_147_638_177L;    // ~20 Hz -> 20 kHz / 2 s
@@ -45,6 +46,8 @@ final class RelativeCalibrationEngine {
         final long referenceEnergy;
         final long responseEnergy;
         final String inputSource;
+        final long[] sweepProfile;
+        final long[] decayProfile;
 
         Result(
                 File cfrFile,
@@ -53,7 +56,9 @@ final class RelativeCalibrationEngine {
                 long correlation,
                 long referenceEnergy,
                 long responseEnergy,
-                String inputSource) {
+                String inputSource,
+                long[] sweepProfile,
+                long[] decayProfile) {
             this.cfrFile = cfrFile;
             this.capturedFrames = capturedFrames;
             this.bestLag = bestLag;
@@ -61,10 +66,54 @@ final class RelativeCalibrationEngine {
             this.referenceEnergy = referenceEnergy;
             this.responseEnergy = responseEnergy;
             this.inputSource = inputSource;
+            this.sweepProfile = sweepProfile;
+            this.decayProfile = decayProfile;
         }
 
         long latencyMicros() {
             return ((long) bestLag * 1_000_000L) / SAMPLE_RATE;
+        }
+
+        int validTransferBands() {
+            if (sweepProfile == null ||
+                    sweepProfile.length < NativeDsp.SWEEP_PROFILE_OUTPUT_LONGS) return 0;
+            return (int) sweepProfile[NativeDsp.SWEEP_PROFILE_BANDS * 3];
+        }
+
+        long[] powerRatiosQ20() {
+            long[] ratios = new long[NativeDsp.SWEEP_PROFILE_BANDS];
+            if (sweepProfile == null) return ratios;
+            int base = NativeDsp.SWEEP_PROFILE_BANDS * 2;
+            for (int i = 0; i < ratios.length; ++i) {
+                if (base + i < sweepProfile.length) ratios[i] = sweepProfile[base + i];
+            }
+            return ratios;
+        }
+
+        long decayFlags() {
+            return decayProfile != null && decayProfile.length >= 13 ? decayProfile[12] : 0L;
+        }
+
+        int preferredRt60Frames() {
+            if (decayProfile == null || decayProfile.length < 13) return -1;
+            long flags = decayFlags();
+            if ((flags & NativeDsp.DECAY_FLAG_T30) != 0L) return (int) decayProfile[11];
+            if ((flags & NativeDsp.DECAY_FLAG_T20) != 0L) return (int) decayProfile[10];
+            if ((flags & NativeDsp.DECAY_FLAG_EDT) != 0L) return (int) decayProfile[9];
+            return -1;
+        }
+
+        long preferredRt60Millis() {
+            int frames = preferredRt60Frames();
+            return frames < 0 ? -1L : ((long) frames * 1000L) / SAMPLE_RATE;
+        }
+
+        String decayMethod() {
+            long flags = decayFlags();
+            if ((flags & NativeDsp.DECAY_FLAG_T30) != 0L) return "T30_RELATIVE";
+            if ((flags & NativeDsp.DECAY_FLAG_T20) != 0L) return "T20_RELATIVE";
+            if ((flags & NativeDsp.DECAY_FLAG_EDT) != 0L) return "EDT_RELATIVE";
+            return "NOT_ENOUGH_DYNAMIC_RANGE";
         }
     }
 
@@ -183,6 +232,36 @@ final class RelativeCalibrationEngine {
             throw new IOException("relative transfer could not locate sync");
         }
 
+        int bestLag = (int) transfer[3];
+        int referenceSweepOffset = SYNC_FRAMES + GUARD_FRAMES;
+        int responseSweepOffset = bestLag + SYNC_FRAMES + GUARD_FRAMES;
+        long[] sweepProfile = new long[NativeDsp.SWEEP_PROFILE_OUTPUT_LONGS];
+        int sweepProfileOk = NativeDsp.nativeSweepBandProfile(
+                excitation, excitation.length, referenceSweepOffset,
+                response, captured, responseSweepOffset,
+                SWEEP_FRAMES, sweepProfile);
+        if (sweepProfileOk == 0) {
+            throw new IOException("relative sweep profile failed after sync alignment");
+        }
+
+        long[] decayProfile = new long[NativeDsp.DECAY_PROFILE_OUTPUT_LONGS];
+        int responseTailOffset = responseSweepOffset + SWEEP_FRAMES;
+        int responseTailFrames = captured - responseTailOffset;
+        if (responseTailFrames <= 0) {
+            throw new IOException("relative decay tail unavailable");
+        }
+        int decayOk = NativeDsp.nativeDecayProfile(
+                response, responseTailOffset, responseTailFrames,
+                DECAY_NOISE_TAIL_FRAMES, decayProfile);
+        if (decayOk == 0) {
+            // The capture remains valid even when the tail has insufficient
+            // dynamic range. Keep an explicit empty decay profile in the CFR.
+            for (int i = 0; i < decayProfile.length; ++i) decayProfile[i] = 0L;
+            decayProfile[3] = responseTailFrames;
+            decayProfile[4] = Math.min(DECAY_NOISE_TAIL_FRAMES, responseTailFrames);
+            for (int i = 5; i <= 11; ++i) decayProfile[i] = -1L;
+        }
+
         CalibrationContainerWriter.writeRelativeCfr(
                 cfrTarget,
                 excitation,
@@ -197,16 +276,20 @@ final class RelativeCalibrationEngine {
                 PRE_FRAMES,
                 POST_FRAMES,
                 MAX_LAG,
-                transfer);
+                transfer,
+                sweepProfile,
+                decayProfile);
 
         return new Result(
                 cfrTarget,
                 captured,
-                (int) transfer[3],
+                bestLag,
                 transfer[0],
                 transfer[1],
                 transfer[2],
-                input.sourceName);
+                input.sourceName,
+                sweepProfile,
+                decayProfile);
     }
 
     private static final class InputHandle {

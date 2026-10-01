@@ -3,7 +3,7 @@
 Copyright (c) 2026 Rafael Melo Reis
 SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
 
-**State:** `PROJECT_LOCAL_FORMAT_V1 / IMPLEMENTED_UNTESTED`
+**State:** `PROJECT_LOCAL_FORMAT_V1 / IMPLEMENTED / DELTA5_REMOTE_CI_PENDING`
 
 ZRF and CFR are project-local container identifiers. They are not external standards.
 
@@ -118,13 +118,15 @@ hash != authorship
 
 ## 9. CFR relative calibration profile v1
 
-A physical relative-capture session writes four chunks in this order:
+An analyzed relative-capture session writes six chunks in this order:
 
 ```text
 WAVE flags=0
 CAL  flags=RELATIVE
 PCM  flags=REFERENCE
 PCM  flags=RESPONSE
+SPEC flags=RELATIVE
+ROOM flags=RELATIVE
 ```
 
 ### WAVE payload — 32 bytes
@@ -201,3 +203,43 @@ CODEBOOK != CONTENT
 HASH != AUTHORSHIP
 RAC1_ROUNDTRIP != SUPERIOR_COMPRESSION
 ```
+
+
+## 10. SPEC relative sweep profile — 344 bytes
+
+```text
+u32 version = 1
+u32 kind = 1              # equal-time windows over exponential sweep
+u32 band_count = 16
+u32 valid_bands
+u32 analyzed_frames
+u32 power_ratio_fraction_bits = 20
+repeat 16 times:
+  u64 reference_energy
+  u64 response_energy
+  u32 power_ratio_q20
+```
+
+This is a relative energy profile. Equal time on an exponential sweep approximates logarithmic frequency windows; it is not a calibrated FFT/STFT or deconvolved impulse response.
+
+## 11. ROOM relative decay profile — 72 bytes
+
+```text
+u32 version = 1
+u32 kind = 1              # backward-integrated relative decay
+u32 analyzed_frames
+u32 noise_tail_frames
+u64 raw_energy
+u64 noise_energy_per_sample
+u64 corrected_initial_energy
+i32 t5_frames
+i32 t10_frames
+i32 t25_frames
+i32 t35_frames
+i32 edt60_frames
+i32 t20_rt60_frames
+i32 t30_rt60_frames
+u32 flags                   # EDT=1, T20=2, T30=4
+```
+
+A negative threshold/estimate means insufficient dynamic range. These values remain relative and do not assert ISO 3382 conformance.

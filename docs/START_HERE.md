@@ -12,6 +12,7 @@ Rafaelia Audio Studio is an Android audio workstation and measurement research p
 | understand features | `CAPABILITY_MATRIX.md` |
 | integrate/develop | `DEVELOPER_GUIDE.md` |
 | understand architecture | `AUDIO_MANIFOLD_CONTRACT_V1.md` |
+| inspect relative CFR analysis | `CFR_RELATIVE_ANALYSIS_V1.md` |
 | validate an installation | `INSTALLATION_VALIDATION.md` |
 | test hardware | `HARDWARE_TEST_PROTOCOL.md` |
 | understand μ∆ vibration | `MICRO_DELTA_VIBRATION_V1.md` |

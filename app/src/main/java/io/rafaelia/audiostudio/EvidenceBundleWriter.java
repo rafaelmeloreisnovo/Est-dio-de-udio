@@ -50,7 +50,8 @@ final class EvidenceBundleWriter {
             MicroDeltaMagnetometerProbe.Result magnetometer,
             File lastZrf,
             File lastCfr,
-            File lastMasteredPcm) throws Exception {
+            File lastMasteredPcm,
+            RelativeCalibrationEngine.Result lastCalibration) throws Exception {
         String displayName = "rafaelia_evidence_" +
                 System.currentTimeMillis() + ".txt";
 
@@ -70,7 +71,8 @@ final class EvidenceBundleWriter {
         try (OutputStream out = context.getContentResolver().openOutputStream(uri, "w")) {
             if (out == null) throw new IllegalStateException("evidence stream unavailable");
             String text = buildText(
-                    context, vibration, magnetometer, lastZrf, lastCfr, lastMasteredPcm);
+                    context, vibration, magnetometer, lastZrf, lastCfr,
+                    lastMasteredPcm, lastCalibration);
             out.write(text.getBytes(StandardCharsets.UTF_8));
             out.flush();
             success = true;
@@ -89,7 +91,8 @@ final class EvidenceBundleWriter {
             MicroDeltaMagnetometerProbe.Result magnetometer,
             File lastZrf,
             File lastCfr,
-            File lastMasteredPcm) throws Exception {
+            File lastMasteredPcm,
+            RelativeCalibrationEngine.Result lastCalibration) throws Exception {
         StringBuilder b = new StringBuilder(16384);
         PackageManager pm = context.getPackageManager();
         PackageInfo pi = pm.getPackageInfo(context.getPackageName(), 0);
@@ -260,10 +263,29 @@ final class EvidenceBundleWriter {
         appendFileEvidence(b, "last_cfr", lastCfr);
         appendFileEvidence(b, "last_mastered_pcm", lastMasteredPcm);
 
+        section(b, "relative_calibration_analysis");
+        if (lastCalibration == null) {
+            line(b, "state", "NOT_RUN");
+        } else {
+            line(b, "state", "OBSERVED_RELATIVE_UNCALIBRATED");
+            line(b, "input_source", safe(lastCalibration.inputSource));
+            line(b, "best_lag_samples", Integer.toString(lastCalibration.bestLag));
+            line(b, "latency_us", Long.toString(lastCalibration.latencyMicros()));
+            line(b, "valid_sweep_bands", Integer.toString(lastCalibration.validTransferBands()));
+            line(b, "decay_method", lastCalibration.decayMethod());
+            long rtMs = lastCalibration.preferredRt60Millis();
+            line(b, "rt60_relative_ms", rtMs >= 0L ? Long.toString(rtMs) :
+                    "TOKEN_VAZIO_DYNAMIC_RANGE");
+            line(b, "interpretation",
+                    "RELATIVE_PATH_ONLY; ABS_SPL_NOT_ESTABLISHED; ISO3382_NOT_CLAIMED; IR_DECONVOLUTION_NOT_CLAIMED");
+        }
+
         section(b, "capability_claims");
         line(b, "freestanding_core",
                 "BUILT_IN; runtime proof depends on embedded CI provenance");
         line(b, "cfr_relative_capture", "AVAILABLE_IN_APP");
+        line(b, "cfr_relative_sweep_profile", "AVAILABLE_IN_APP_16_BANDS");
+        line(b, "relative_decay_metrics", "AVAILABLE_IN_APP_NONSTANDARD_RELATIVE");
         line(b, "absolute_spl", "PENDING_PHYSICAL_REFERENCE");
         line(b, "sensor_vibration", "OBSERVED_UNPROMOTED");
         line(b, "sensor_magnetic", "OBSERVED_UNPROMOTED");

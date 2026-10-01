@@ -124,7 +124,7 @@ O workspace recebe waveform vivo limitado, telemetria da captura e espectro/mast
 - antes do mastering, a origem processada também recebe um sidecar `ZRF1`;
 - ZRF v1 já contém cabeçalho + chunk PCM real;
 - WAVE/MATR/CAL/IR/SPEC/PHON/ROOM/RCPT estão registrados como tipos de chunk;
-- CFR possui codec de cabeçalho/chunk, mas captura de calibração permanece `PENDING`;
+- CFR possui captura relativa e, no Delta 5, deriva `SPEC` em 16 bandas + `ROOM` com decaimento relativo, preservando os PCM originais;
 - FIR/LMS/time-map/biquad são kernels de referência e ainda não estão todos ligados ao workflow visual.
 
 Ver `docs/ZRF_CFR_FORMAT_V1.md`.
@@ -133,12 +133,14 @@ Ver `docs/ZRF_CFR_FORMAT_V1.md`.
 
 ```text
 DELTA4_SOURCE = IMPLEMENTED
-DELTA4_HOST_SMOKE = PENDING_CI
-DELTA4_ARMV7_ZERO_UNDEFINED = PENDING_CI
-DELTA4_AARCH64_ZERO_UNDEFINED = PENDING_CI
-DELTA4_APK_BUILD = PENDING_CI
+BASELINE_MAIN_SHA = 1a1b00bb93b0988224d8b24085a82029d1228c45
+BASELINE_MAIN_CI_RUN = 36545296255
+DELTA4_HOST_SMOKE = PASS
+DELTA4_ARMV7_ZERO_UNDEFINED = PASS
+DELTA4_AARCH64_ZERO_UNDEFINED = PASS
+DELTA4_APK_BUILD = PASS
 DELTA4_PHYSICAL_ANDROID = NOT_RUN
-CFR_CALIBRATION_CAPTURE = PENDING
+CFR_CALIBRATION_CAPTURE = IMPLEMENTED_REQUIRES_PHYSICAL_RUN
 ABSOLUTE_SPL = PENDING_PHYSICAL_REFERENCE
 claim_allowed = false
 ```
@@ -161,13 +163,13 @@ Pesquisa/avaliação não comercial é permitida nos termos de `LICENSE_RESEARCH
 
 ## F_next
 
-1. executar CI do Delta 3;
-2. corrigir qualquer regressão de compilação/símbolo;
-3. promover apenas gates comprovados para PASS;
-4. instalar APK no Android 10 armeabi-v7a;
-5. captura física + Ogg/Opus round-trip;
-6. vetores BS.1770/EBU;
-7. inspeção de clipping/true-peak.
+1. executar CI do Delta 5 e promover somente o que passar;
+2. instalar o APK no Android 10 armeabi-v7a;
+3. repetir CFR físico e registrar variabilidade/noise floor;
+4. captura física + Ogg/Opus round-trip;
+5. vetores externos BS.1770/EBU e, separadamente, protocolo ISO 3382 quando aplicável;
+6. inspeção física de clipping/true-peak;
+7. configurar assinatura autoral real somente com certificado/segredos verificados.
 
 
 ## Delta 4.2 — CFR relative physical capture
@@ -180,6 +182,7 @@ Implemented on `feature/cfr-relative-calibration-v1`:
 - `UNPROCESSED` input with `MIC` fallback;
 - conservative excitation gain and output volume cap;
 - CFR recording with `WAVE + CAL + PCM(reference) + PCM(response)`;
+- Delta 5 adds `SPEC` (16-band relative sweep energy) and `ROOM` (relative decay thresholds/estimators) without deleting the raw streams;
 - CAL workspace action wired to the measurement path.
 
 Current state:
@@ -189,8 +192,10 @@ CFR_RELATIVE_SOURCE = IMPLEMENTED
 CFR_RELATIVE_CI = PASS
 CFR_RELATIVE_PHYSICAL_ANDROID = NOT_RUN
 ABSOLUTE_SPL = PENDING_PHYSICAL_REFERENCE
-FREQUENCY_TRANSFER_DECONVOLUTION = PENDING
-RT60 = PENDING
+RELATIVE_SWEEP_PROFILE_16 = IMPLEMENTED_LOCAL_TESTED
+RELATIVE_DECAY_EDT_T20_T30 = IMPLEMENTED_LOCAL_TESTED
+FREQUENCY_TRANSFER_DECONVOLUTION = NOT_CLAIMED
+ISO3382_RT = NOT_CLAIMED
 ROOM_CORRECTION = PENDING
 ```
 

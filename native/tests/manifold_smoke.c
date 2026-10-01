@@ -66,6 +66,11 @@ int main(void) {
     rfa_i16 sync_b[32];
     rfa_i16 sync_inverted[40];
     rfa_relative_transfer inverted_transfer;
+    rfa_i16 band_reference[160];
+    rfa_i16 band_response[160];
+    rfa_sweep_band_profile band_profile;
+    rfa_i16 decay_data[4096];
+    rfa_decay_profile decay_profile;
     rfa_i16 rac_input[16] = {
         0,0, 100,-100, 200,-200, 300,-300,
         301,-299, 302,-298, 1000,-1000, 0,0
@@ -188,6 +193,38 @@ int main(void) {
             sweep_data, 64, delayed_data, 72, 0, 8, &transfer)) return 69;
     if (transfer.best_lag != 5) return 70;
     if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 71;
+
+    for (i = 0; i < 160; ++i) {
+        band_reference[i] = (i & 1) == 0 ? 1000 : -1000;
+        band_response[i] = (i & 1) == 0 ? 500 : -500;
+    }
+    if (!rfa_sweep_band_profile_q20(
+            band_reference, 160, 0, band_response, 160, 0, 160,
+            &band_profile)) return 72;
+    if (band_profile.valid_bands != 16 || band_profile.analyzed_frames != 160) return 73;
+    for (i = 0; i < 16; ++i) {
+        if (band_profile.reference_energy[i] != 10000000ULL) return 74;
+        if (band_profile.response_energy[i] != 2500000ULL) return 75;
+        if (band_profile.power_ratio_q20[i] != 262144U) return 76;
+    }
+
+    for (i = 0; i < 4096; ++i) {
+        if (i >= 3584) {
+            decay_data[i] = 0;
+        } else {
+            decay_data[i] = (rfa_i16)(16000 >> (i >> 9));
+        }
+    }
+    if (!rfa_decay_profile_q30(decay_data, 4096, 512, &decay_profile)) return 77;
+    if ((decay_profile.flags & RFA_DECAY_FLAG_T20) == 0U) return 78;
+    if ((decay_profile.flags & RFA_DECAY_FLAG_T30) == 0U) return 79;
+    if ((decay_profile.flags & RFA_DECAY_FLAG_EDT) == 0U) return 85;
+    if (!(decay_profile.t5_frames < decay_profile.t10_frames &&
+          decay_profile.t10_frames < decay_profile.t25_frames &&
+          decay_profile.t25_frames < decay_profile.t35_frames)) return 86;
+    if (decay_profile.edt60_frames <= 0 ||
+        decay_profile.t20_rt60_frames <= 0 ||
+        decay_profile.t30_rt60_frames <= 0) return 87;
 
     if (rfa_rac1_bound_bytes(8, 2) != 48) return 80;
     rac_bytes = rfa_rac1_encode_i16(rac_input, 8, 2, rac_encoded, 48);
