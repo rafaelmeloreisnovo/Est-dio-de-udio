@@ -1,0 +1,363 @@
+diff --git a/app/src/main/java/io/rafaelia/audiostudio/CalibrationContainerWriter.java b/app/src/main/java/io/rafaelia/audiostudio/CalibrationContainerWriter.java
+index fb36c05..a136c11 100644
+--- a/app/src/main/java/io/rafaelia/audiostudio/CalibrationContainerWriter.java
++++ b/app/src/main/java/io/rafaelia/audiostudio/CalibrationContainerWriter.java
+@@ -29,8 +29,11 @@ final class CalibrationContainerWriter {
+             int preFrames,
+             int postFrames,
+             int maxLag,
+-            long[] transfer) throws IOException {
+-        if (target == null || reference == null || response == null || transfer == null) {
++            long[] transfer,
++            long[] sweepProfile,
++            long[] decayProfile) throws IOException {
++        if (target == null || reference == null || response == null || transfer == null ||
++                sweepProfile == null || decayProfile == null) {
+             throw new IOException("CFR argument missing");
+         }
+         if (referenceFrames < 0 || referenceFrames > reference.length) {
+@@ -42,16 +45,26 @@ final class CalibrationContainerWriter {
+         if (transfer.length < 5) {
+             throw new IOException("relative-transfer result incomplete");
+         }
++        if (sweepProfile.length < NativeDsp.SWEEP_PROFILE_OUTPUT_LONGS) {
++            throw new IOException("sweep profile incomplete");
++        }
++        if (decayProfile.length < NativeDsp.DECAY_PROFILE_OUTPUT_LONGS) {
++            throw new IOException("decay profile incomplete");
++        }
+ 
+         final int waveBytes = 32;
+         final int calBytes = 48;
++        final int specBytes = 344;
++        final int roomBytes = 72;
+         long refBytes = (long) referenceFrames * 2L;
+         long respBytes = (long) responseFrames * 2L;
+         long payloadBytes =
+                 16L + waveBytes +
+                 16L + calBytes +
+                 16L + refBytes +
+-                16L + respBytes;
++                16L + respBytes +
++                16L + specBytes +
++                16L + roomBytes;
+ 
+         if (payloadBytes > 0xffffffffL) {
+             throw new IOException("CFR v1 exceeds bounded 32-bit payload");
+@@ -64,7 +77,7 @@ final class CalibrationContainerWriter {
+                 sampleRate,
+                 1,
+                 NativeDsp.CFR_FLAG_RELATIVE,
+-                4,
++                6,
+                 payloadBytes,
+                 512);
+         byte[] waveHeader = NativeDsp.nativeChunkHeader(
+@@ -77,9 +90,16 @@ final class CalibrationContainerWriter {
+         byte[] respHeader = NativeDsp.nativeChunkHeader(
+                 NativeDsp.CHUNK_PCM, NativeDsp.CHUNK_FLAG_RESPONSE,
+                 respBytes, responseFrames);
++        byte[] specHeader = NativeDsp.nativeChunkHeader(
++                NativeDsp.CHUNK_SPEC, NativeDsp.CFR_FLAG_RELATIVE,
++                specBytes, NativeDsp.SWEEP_PROFILE_BANDS);
++        byte[] roomHeader = NativeDsp.nativeChunkHeader(
++                NativeDsp.CHUNK_ROOM, NativeDsp.CFR_FLAG_RELATIVE,
++                roomBytes, 1L);
+ 
+         if (header == null || waveHeader == null || calHeader == null ||
+-                refHeader == null || respHeader == null) {
++                refHeader == null || respHeader == null ||
++                specHeader == null || roomHeader == null) {
+             throw new IOException("native CFR framing rejected descriptor");
+         }
+ 
+@@ -112,6 +132,32 @@ final class CalibrationContainerWriter {
+ 
+             out.write(respHeader);
+             writePcm16Le(out, response, responseFrames);
++
++            out.write(specHeader);
++            writeU32(out, 1L);
++            writeU32(out, 1L); // equal-time windows over exponential sweep
++            writeU32(out, NativeDsp.SWEEP_PROFILE_BANDS);
++            writeU32(out, sweepProfile[48]);
++            writeU32(out, sweepProfile[49]);
++            writeU32(out, 20L); // power_ratio_q20 fractional bits
++            for (int i = 0; i < NativeDsp.SWEEP_PROFILE_BANDS; ++i) {
++                writeU64(out, sweepProfile[i]);
++                writeU64(out, sweepProfile[NativeDsp.SWEEP_PROFILE_BANDS + i]);
++                writeU32(out, sweepProfile[NativeDsp.SWEEP_PROFILE_BANDS * 2 + i]);
++            }
++
++            out.write(roomHeader);
++            writeU32(out, 1L);
++            writeU32(out, 1L); // backward-integrated relative decay
++            writeU32(out, decayProfile[3]);
++            writeU32(out, decayProfile[4]);
++            writeU64(out, decayProfile[0]);
++            writeU64(out, decayProfile[1]);
++            writeU64(out, decayProfile[2]);
++            for (int i = 5; i <= 11; ++i) {
++                writeI32(out, (int) decayProfile[i]);
++            }
++            writeU32(out, decayProfile[12]);
+             out.flush();
+         }
+ 
+diff --git a/app/src/main/java/io/rafaelia/audiostudio/NativeDsp.java b/app/src/main/java/io/rafaelia/audiostudio/NativeDsp.java
+index 2d20345..337f7b7 100644
+--- a/app/src/main/java/io/rafaelia/audiostudio/NativeDsp.java
++++ b/app/src/main/java/io/rafaelia/audiostudio/NativeDsp.java
+@@ -21,6 +21,16 @@ final class NativeDsp {
+     static final long CHUNK_FLAG_REFERENCE = 1L;
+     static final long CHUNK_FLAG_RESPONSE = 2L;
+     static final int CFR_FLAG_RELATIVE = 1;
++    static final long CHUNK_SPEC = 0x43455053L;
++    static final long CHUNK_ROOM = 0x4d4f4f52L;
++
++    static final int SWEEP_PROFILE_BANDS = 16;
++    static final int SWEEP_PROFILE_OUTPUT_LONGS = SWEEP_PROFILE_BANDS * 3 + 2;
++    static final int DECAY_PROFILE_OUTPUT_LONGS = 13;
++
++    static final long DECAY_FLAG_EDT = 1L;
++    static final long DECAY_FLAG_T20 = 2L;
++    static final long DECAY_FLAG_T30 = 4L;
+ 
+     static final long TARGET_EBU_R128_Q36 = 403_812_580L;    // -23 LUFS
+     static final long TARGET_NARRATION_Q36 = 1_276_967_499L; // -18 LUFS custom
+@@ -67,6 +77,15 @@ final class NativeDsp {
+             short[] reference, int referenceCount,
+             short[] response, int responseCount,
+             int minLag, int maxLag, long[] output);
++
++    static native int nativeSweepBandProfile(
++            short[] reference, int referenceCount, int referenceOffset,
++            short[] response, int responseCount, int responseOffset,
++            int sweepFrames, long[] output);
++
++    static native int nativeDecayProfile(
++            short[] samples, int offset, int count,
++            int noiseTailFrames, long[] output);
+ }
+ 
+ 
+diff --git a/app/src/main/java/io/rafaelia/audiostudio/RelativeCalibrationEngine.java b/app/src/main/java/io/rafaelia/audiostudio/RelativeCalibrationEngine.java
+index 9bf6b88..ffc4e82 100644
+--- a/app/src/main/java/io/rafaelia/audiostudio/RelativeCalibrationEngine.java
++++ b/app/src/main/java/io/rafaelia/audiostudio/RelativeCalibrationEngine.java
+@@ -29,6 +29,7 @@ final class RelativeCalibrationEngine {
+     static final int PRE_FRAMES = 4096;
+     static final int POST_FRAMES = 8192;
+     static final int MAX_LAG = 16384;
++    static final int DECAY_NOISE_TAIL_FRAMES = 2048;
+ 
+     static final long SWEEP_START_STEP_Q32 = 1_789_570L;   // 20 Hz @ 48 kHz
+     static final long SWEEP_RATIO_Q31 = 2_147_638_177L;    // ~20 Hz -> 20 kHz / 2 s
+@@ -45,6 +46,8 @@ final class RelativeCalibrationEngine {
+         final long referenceEnergy;
+         final long responseEnergy;
+         final String inputSource;
++        final long[] sweepProfile;
++        final long[] decayProfile;
+ 
+         Result(
+                 File cfrFile,
+@@ -53,7 +56,9 @@ final class RelativeCalibrationEngine {
+                 long correlation,
+                 long referenceEnergy,
+                 long responseEnergy,
+-                String inputSource) {
++                String inputSource,
++                long[] sweepProfile,
++                long[] decayProfile) {
+             this.cfrFile = cfrFile;
+             this.capturedFrames = capturedFrames;
+             this.bestLag = bestLag;
+@@ -61,11 +66,55 @@ final class RelativeCalibrationEngine {
+             this.referenceEnergy = referenceEnergy;
+             this.responseEnergy = responseEnergy;
+             this.inputSource = inputSource;
++            this.sweepProfile = sweepProfile;
++            this.decayProfile = decayProfile;
+         }
+ 
+         long latencyMicros() {
+             return ((long) bestLag * 1_000_000L) / SAMPLE_RATE;
+         }
++
++        int validTransferBands() {
++            if (sweepProfile == null ||
++                    sweepProfile.length < NativeDsp.SWEEP_PROFILE_OUTPUT_LONGS) return 0;
++            return (int) sweepProfile[NativeDsp.SWEEP_PROFILE_BANDS * 3];
++        }
++
++        long[] powerRatiosQ20() {
++            long[] ratios = new long[NativeDsp.SWEEP_PROFILE_BANDS];
++            if (sweepProfile == null) return ratios;
++            int base = NativeDsp.SWEEP_PROFILE_BANDS * 2;
++            for (int i = 0; i < ratios.length; ++i) {
++                if (base + i < sweepProfile.length) ratios[i] = sweepProfile[base + i];
++            }
++            return ratios;
++        }
++
++        long decayFlags() {
++            return decayProfile != null && decayProfile.length >= 13 ? decayProfile[12] : 0L;
++        }
++
++        int preferredRt60Frames() {
++            if (decayProfile == null || decayProfile.length < 13) return -1;
++            long flags = decayFlags();
++            if ((flags & NativeDsp.DECAY_FLAG_T30) != 0L) return (int) decayProfile[11];
++            if ((flags & NativeDsp.DECAY_FLAG_T20) != 0L) return (int) decayProfile[10];
++            if ((flags & NativeDsp.DECAY_FLAG_EDT) != 0L) return (int) decayProfile[9];
++            return -1;
++        }
++
++        long preferredRt60Millis() {
++            int frames = preferredRt60Frames();
++            return frames < 0 ? -1L : ((long) frames * 1000L) / SAMPLE_RATE;
++        }
++
++        String decayMethod() {
++            long flags = decayFlags();
++            if ((flags & NativeDsp.DECAY_FLAG_T30) != 0L) return "T30_RELATIVE";
++            if ((flags & NativeDsp.DECAY_FLAG_T20) != 0L) return "T20_RELATIVE";
++            if ((flags & NativeDsp.DECAY_FLAG_EDT) != 0L) return "EDT_RELATIVE";
++            return "NOT_ENOUGH_DYNAMIC_RANGE";
++        }
+     }
+ 
+     static Result run(Context context, File cfrTarget) throws Exception {
+@@ -183,6 +232,36 @@ final class RelativeCalibrationEngine {
+             throw new IOException("relative transfer could not locate sync");
+         }
+ 
++        int bestLag = (int) transfer[3];
++        int referenceSweepOffset = SYNC_FRAMES + GUARD_FRAMES;
++        int responseSweepOffset = bestLag + SYNC_FRAMES + GUARD_FRAMES;
++        long[] sweepProfile = new long[NativeDsp.SWEEP_PROFILE_OUTPUT_LONGS];
++        int sweepProfileOk = NativeDsp.nativeSweepBandProfile(
++                excitation, excitation.length, referenceSweepOffset,
++                response, captured, responseSweepOffset,
++                SWEEP_FRAMES, sweepProfile);
++        if (sweepProfileOk == 0) {
++            throw new IOException("relative sweep profile failed after sync alignment");
++        }
++
++        long[] decayProfile = new long[NativeDsp.DECAY_PROFILE_OUTPUT_LONGS];
++        int responseTailOffset = responseSweepOffset + SWEEP_FRAMES;
++        int responseTailFrames = captured - responseTailOffset;
++        if (responseTailFrames <= 0) {
++            throw new IOException("relative decay tail unavailable");
++        }
++        int decayOk = NativeDsp.nativeDecayProfile(
++                response, responseTailOffset, responseTailFrames,
++                DECAY_NOISE_TAIL_FRAMES, decayProfile);
++        if (decayOk == 0) {
++            // The capture remains valid even when the tail has insufficient
++            // dynamic range. Keep an explicit empty decay profile in the CFR.
++            for (int i = 0; i < decayProfile.length; ++i) decayProfile[i] = 0L;
++            decayProfile[3] = responseTailFrames;
++            decayProfile[4] = Math.min(DECAY_NOISE_TAIL_FRAMES, responseTailFrames);
++            for (int i = 5; i <= 11; ++i) decayProfile[i] = -1L;
++        }
++
+         CalibrationContainerWriter.writeRelativeCfr(
+                 cfrTarget,
+                 excitation,
+@@ -197,16 +276,20 @@ final class RelativeCalibrationEngine {
+                 PRE_FRAMES,
+                 POST_FRAMES,
+                 MAX_LAG,
+-                transfer);
++                transfer,
++                sweepProfile,
++                decayProfile);
+ 
+         return new Result(
+                 cfrTarget,
+                 captured,
+-                (int) transfer[3],
++                bestLag,
+                 transfer[0],
+                 transfer[1],
+                 transfer[2],
+-                input.sourceName);
++                input.sourceName,
++                sweepProfile,
++                decayProfile);
+     }
+ 
+     private static final class InputHandle {
+diff --git a/native/abi/public_symbols_v1.txt b/native/abi/public_symbols_v1.txt
+index fdafb4b..72806b4 100644
+--- a/native/abi/public_symbols_v1.txt
++++ b/native/abi/public_symbols_v1.txt
+@@ -42,9 +42,11 @@ rfa_biquad_core:rfa_biquad_bank_process_q30
+ rfa_biquad_core:rfa_biquad_bank_reset_q30
+ rfa_biquad_core:rfa_biquad_bank_set_q30
+ rfa_voice_core:rfa_voice_analyze_mono
++rfa_measure_core:rfa_decay_profile_q30
+ rfa_measure_core:rfa_exp_sweep_render_q15
+ rfa_measure_core:rfa_exp_sweep_reset_q31
+ rfa_measure_core:rfa_relative_transfer_search
++rfa_measure_core:rfa_sweep_band_profile_q20
+ rfa_measure_core:rfa_sync_sequence_q15
+ rfa_rac1_core:rfa_rac1_bound_bytes
+ rfa_rac1_core:rfa_rac1_encode_i16
+diff --git a/native/tests/manifold_smoke.c b/native/tests/manifold_smoke.c
+index 2251952..ae914da 100644
+--- a/native/tests/manifold_smoke.c
++++ b/native/tests/manifold_smoke.c
+@@ -66,6 +66,11 @@ int main(void) {
+     rfa_i16 sync_b[32];
+     rfa_i16 sync_inverted[40];
+     rfa_relative_transfer inverted_transfer;
++    rfa_i16 band_reference[160];
++    rfa_i16 band_response[160];
++    rfa_sweep_band_profile band_profile;
++    rfa_i16 decay_data[4096];
++    rfa_decay_profile decay_profile;
+     rfa_i16 rac_input[16] = {
+         0,0, 100,-100, 200,-200, 300,-300,
+         301,-299, 302,-298, 1000,-1000, 0,0
+@@ -189,6 +194,38 @@ int main(void) {
+     if (transfer.best_lag != 5) return 70;
+     if (transfer.reference_energy == 0ULL || transfer.response_energy == 0ULL) return 71;
+ 
++    for (i = 0; i < 160; ++i) {
++        band_reference[i] = (i & 1) == 0 ? 1000 : -1000;
++        band_response[i] = (i & 1) == 0 ? 500 : -500;
++    }
++    if (!rfa_sweep_band_profile_q20(
++            band_reference, 160, 0, band_response, 160, 0, 160,
++            &band_profile)) return 72;
++    if (band_profile.valid_bands != 16 || band_profile.analyzed_frames != 160) return 73;
++    for (i = 0; i < 16; ++i) {
++        if (band_profile.reference_energy[i] != 10000000ULL) return 74;
++        if (band_profile.response_energy[i] != 2500000ULL) return 75;
++        if (band_profile.power_ratio_q20[i] != 262144U) return 76;
++    }
++
++    for (i = 0; i < 4096; ++i) {
++        if (i >= 3584) {
++            decay_data[i] = 0;
++        } else {
++            decay_data[i] = (rfa_i16)(16000 >> (i >> 9));
++        }
++    }
++    if (!rfa_decay_profile_q30(decay_data, 4096, 512, &decay_profile)) return 77;
++    if ((decay_profile.flags & RFA_DECAY_FLAG_T20) == 0U) return 78;
++    if ((decay_profile.flags & RFA_DECAY_FLAG_T30) == 0U) return 79;
++    if ((decay_profile.flags & RFA_DECAY_FLAG_EDT) == 0U) return 85;
++    if (!(decay_profile.t5_frames < decay_profile.t10_frames &&
++          decay_profile.t10_frames < decay_profile.t25_frames &&
++          decay_profile.t25_frames < decay_profile.t35_frames)) return 86;
++    if (decay_profile.edt60_frames <= 0 ||
++        decay_profile.t20_rt60_frames <= 0 ||
++        decay_profile.t30_rt60_frames <= 0) return 87;
++
+     if (rfa_rac1_bound_bytes(8, 2) != 48) return 80;
+     rac_bytes = rfa_rac1_encode_i16(rac_input, 8, 2, rac_encoded, 48);
+     if (rac_bytes <= 0 || rac_bytes > 48) return 81;
