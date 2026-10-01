@@ -290,7 +290,7 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeRelativeTransfer(
     jsize respLength;
     jshort *refData;
     jshort *respData;
-    rfa_relative_transfer result;
+    rfa_relative_transfer result = {0LL, 0ULL, 0ULL, 0, 0};
     jlong values[5];
     int ok;
     (void)clazz;
@@ -327,5 +327,99 @@ Java_io_rafaelia_audiostudio_NativeDsp_nativeRelativeTransfer(
     values[3] = (jlong)result.best_lag;
     values[4] = (jlong)result.analyzed;
     (*env)->SetLongArrayRegion(env, output, 0, 5, values);
+    return ok ? 1 : 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeSweepBandProfile(
+        JNIEnv *env, jclass clazz,
+        jshortArray reference, jint referenceCount, jint referenceOffset,
+        jshortArray response, jint responseCount, jint responseOffset,
+        jint sweepFrames, jlongArray output) {
+    jsize refLength;
+    jsize respLength;
+    jshort *refData;
+    jshort *respData;
+    rfa_sweep_band_profile profile;
+    jlong values[RFA_SWEEP_PROFILE_BANDS * 3 + 2];
+    int ok;
+    int i;
+    (void)clazz;
+
+    if (reference == (jshortArray)0 || response == (jshortArray)0 ||
+        output == (jlongArray)0) return 0;
+    if ((*env)->GetArrayLength(env, output) < RFA_SWEEP_PROFILE_BANDS * 3 + 2) return 0;
+
+    refLength = (*env)->GetArrayLength(env, reference);
+    respLength = (*env)->GetArrayLength(env, response);
+    if (referenceCount < 0 || referenceCount > refLength ||
+        responseCount < 0 || responseCount > respLength) return 0;
+
+    refData = (*env)->GetShortArrayElements(env, reference, (jboolean *)0);
+    if (refData == (jshort *)0) return 0;
+    respData = (*env)->GetShortArrayElements(env, response, (jboolean *)0);
+    if (respData == (jshort *)0) {
+        (*env)->ReleaseShortArrayElements(env, reference, refData, JNI_ABORT);
+        return 0;
+    }
+
+    ok = rfa_sweep_band_profile_q20(
+            (const rfa_i16 *)refData, (int)referenceCount, (int)referenceOffset,
+            (const rfa_i16 *)respData, (int)responseCount, (int)responseOffset,
+            (int)sweepFrames, &profile);
+
+    (*env)->ReleaseShortArrayElements(env, reference, refData, JNI_ABORT);
+    (*env)->ReleaseShortArrayElements(env, response, respData, JNI_ABORT);
+
+    for (i = 0; i < RFA_SWEEP_PROFILE_BANDS; ++i) {
+        values[i] = (jlong)profile.reference_energy[i];
+        values[RFA_SWEEP_PROFILE_BANDS + i] = (jlong)profile.response_energy[i];
+        values[RFA_SWEEP_PROFILE_BANDS * 2 + i] =
+                (jlong)(rfa_u64)profile.power_ratio_q20[i];
+    }
+    values[RFA_SWEEP_PROFILE_BANDS * 3] = (jlong)profile.valid_bands;
+    values[RFA_SWEEP_PROFILE_BANDS * 3 + 1] = (jlong)profile.analyzed_frames;
+    (*env)->SetLongArrayRegion(
+            env, output, 0, RFA_SWEEP_PROFILE_BANDS * 3 + 2, values);
+    return ok ? 1 : 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_io_rafaelia_audiostudio_NativeDsp_nativeDecayProfile(
+        JNIEnv *env, jclass clazz, jshortArray samples, jint offset, jint count,
+        jint noiseTailFrames, jlongArray output) {
+    jsize length;
+    jshort *data;
+    rfa_decay_profile profile;
+    jlong values[13];
+    int ok;
+    (void)clazz;
+
+    if (samples == (jshortArray)0 || output == (jlongArray)0) return 0;
+    if ((*env)->GetArrayLength(env, output) < 13) return 0;
+    length = (*env)->GetArrayLength(env, samples);
+    if (offset < 0 || count < 0 || offset > length || count > length - offset) return 0;
+
+    data = (*env)->GetShortArrayElements(env, samples, (jboolean *)0);
+    if (data == (jshort *)0) return 0;
+    ok = rfa_decay_profile_q30(
+            (const rfa_i16 *)data + offset, (int)count,
+            (int)noiseTailFrames, &profile);
+    (*env)->ReleaseShortArrayElements(env, samples, data, JNI_ABORT);
+
+    values[0] = (jlong)profile.raw_energy;
+    values[1] = (jlong)profile.noise_energy_per_sample;
+    values[2] = (jlong)profile.corrected_initial_energy;
+    values[3] = (jlong)profile.analyzed_frames;
+    values[4] = (jlong)profile.noise_tail_frames;
+    values[5] = (jlong)profile.t5_frames;
+    values[6] = (jlong)profile.t10_frames;
+    values[7] = (jlong)profile.t25_frames;
+    values[8] = (jlong)profile.t35_frames;
+    values[9] = (jlong)profile.edt60_frames;
+    values[10] = (jlong)profile.t20_rt60_frames;
+    values[11] = (jlong)profile.t30_rt60_frames;
+    values[12] = (jlong)(rfa_u64)profile.flags;
+    (*env)->SetLongArrayRegion(env, output, 0, 13, values);
     return ok ? 1 : 0;
 }

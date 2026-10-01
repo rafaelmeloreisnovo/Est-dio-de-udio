@@ -21,6 +21,16 @@ final class NativeDsp {
     static final long CHUNK_FLAG_REFERENCE = 1L;
     static final long CHUNK_FLAG_RESPONSE = 2L;
     static final int CFR_FLAG_RELATIVE = 1;
+    static final long CHUNK_SPEC = 0x43455053L;
+    static final long CHUNK_ROOM = 0x4d4f4f52L;
+
+    static final int SWEEP_PROFILE_BANDS = 16;
+    static final int SWEEP_PROFILE_OUTPUT_LONGS = SWEEP_PROFILE_BANDS * 3 + 2;
+    static final int DECAY_PROFILE_OUTPUT_LONGS = 13;
+
+    static final long DECAY_FLAG_EDT = 1L;
+    static final long DECAY_FLAG_T20 = 2L;
+    static final long DECAY_FLAG_T30 = 4L;
 
     static final long TARGET_EBU_R128_Q36 = 403_812_580L;    // -23 LUFS
     static final long TARGET_NARRATION_Q36 = 1_276_967_499L; // -18 LUFS custom
@@ -67,6 +77,15 @@ final class NativeDsp {
             short[] reference, int referenceCount,
             short[] response, int responseCount,
             int minLag, int maxLag, long[] output);
+
+    static native int nativeSweepBandProfile(
+            short[] reference, int referenceCount, int referenceOffset,
+            short[] response, int responseCount, int responseOffset,
+            int sweepFrames, long[] output);
+
+    static native int nativeDecayProfile(
+            short[] samples, int offset, int count,
+            int noiseTailFrames, long[] output);
 }
 
 

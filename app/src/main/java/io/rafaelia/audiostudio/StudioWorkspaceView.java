@@ -59,6 +59,7 @@ final class StudioWorkspaceView extends View {
     private final short[] waveMin = new short[128];
     private final short[] waveMax = new short[128];
     private final long[] spectrum = new long[16];
+    private final long[] calibrationPowerRatioQ20 = new long[16];
 
     private int screen;
     private int waveBins;
@@ -71,6 +72,8 @@ final class StudioWorkspaceView extends View {
     private String inputSource = "INPUT_IDLE";
     private String masterState = "MASTER=PENDING";
     private String calibrationState = "CAL=RELATIVE_ONLY";
+    private int calibrationValidBands;
+    private String roomAnalysisState = "ROOM=NOT_RUN";
     private String containerState = "ZRF/CFR=IMPLEMENTED_UNTESTED";
     private String systemState = "SENSORS=OBSERVE | PERMISSIONS=MINIMAL";
     private String originState = "ORIGIN=PROJECT+PLATFORM+TOOLCHAIN";
@@ -144,6 +147,18 @@ final class StudioWorkspaceView extends View {
 
     void setCalibrationState(String state) {
         calibrationState = state == null ? "CAL=UNAVAILABLE" : state;
+        invalidate();
+    }
+
+    void setCalibrationAnalysis(long[] powerRatiosQ20, int validBands, String roomState) {
+        for (int i = 0; i < calibrationPowerRatioQ20.length; ++i) {
+            calibrationPowerRatioQ20[i] =
+                    powerRatiosQ20 != null && i < powerRatiosQ20.length ?
+                            powerRatiosQ20[i] : 0L;
+        }
+        calibrationValidBands = validBands < 0 ? 0 :
+                Math.min(validBands, calibrationPowerRatioQ20.length);
+        roomAnalysisState = roomState == null ? "ROOM=UNAVAILABLE" : roomState;
         invalidate();
     }
 
@@ -459,7 +474,8 @@ final class StudioWorkspaceView extends View {
     private void drawRoom(Canvas canvas, float w, float h) {
         float top = dp(120);
         drawText(canvas, "IR -> ETC/EDC -> EDT/T20/T30 -> constrained correction", dp(12), top, 12);
-        drawMiniResponse(canvas, dp(12), top + dp(24), w - dp(12), top + dp(176));
+        drawText(canvas, roomAnalysisState, dp(12), top + dp(22), 10);
+        drawMiniResponse(canvas, dp(12), top + dp(36), w - dp(12), top + dp(176));
         drawPills(canvas, top + dp(202), new String[]{
                 "CAPTURE IR", "CONVOLVE", "RT", "TARGET", "CORRECT", "BYPASS"
         });
@@ -603,10 +619,39 @@ final class StudioWorkspaceView extends View {
             float x = left + (right - left) * i / 8f;
             canvas.drawLine(x, top, x, bottom, thin);
         }
-        String curveState = calibrationState != null && calibrationState.contains("CAPTURED") ?
-                "raw CFR captured | transfer derivation PENDING" :
-                "measured curve: NOT_RUN";
-        drawText(canvas, curveState, left + dp(8), mid - dp(8), 10);
+        if (calibrationValidBands > 0) {
+            float slot = (right - left) / (calibrationPowerRatioQ20.length - 1);
+            paint.setARGB(255, 112, 172, 210);
+            float lastX = left;
+            float lastY = mid;
+            boolean haveLast = false;
+            for (i = 0; i < calibrationPowerRatioQ20.length; ++i) {
+                long raw = calibrationPowerRatioQ20[i];
+                if (raw <= 0L) {
+                    haveLast = false;
+                    continue;
+                }
+                double powerRatio = (double) raw / 1048576.0;
+                double db = 10.0 * Math.log10(powerRatio);
+                if (db > 24.0) db = 24.0;
+                if (db < -24.0) db = -24.0;
+                float x = left + slot * i;
+                float y = mid - (float) db * (bottom - top) / 48.0f;
+                if (haveLast) canvas.drawLine(lastX, lastY, x, y, paint);
+                canvas.drawCircle(x, y, dp(2), paint);
+                lastX = x;
+                lastY = y;
+                haveLast = true;
+            }
+            drawText(canvas, "relative 16-band sweep profile | 0 dB=center | uncalibrated",
+                    left + dp(8), top + dp(16), 10);
+        } else {
+            String curveState = calibrationState != null &&
+                    calibrationState.contains("CAPTURED") ?
+                    "raw CFR captured | profile unavailable" :
+                    "measured curve: NOT_RUN";
+            drawText(canvas, curveState, left + dp(8), mid - dp(8), 10);
+        }
     }
 
     private void drawPills(Canvas canvas, float y, String[] labels) {

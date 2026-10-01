@@ -29,8 +29,11 @@ final class CalibrationContainerWriter {
             int preFrames,
             int postFrames,
             int maxLag,
-            long[] transfer) throws IOException {
-        if (target == null || reference == null || response == null || transfer == null) {
+            long[] transfer,
+            long[] sweepProfile,
+            long[] decayProfile) throws IOException {
+        if (target == null || reference == null || response == null || transfer == null ||
+                sweepProfile == null || decayProfile == null) {
             throw new IOException("CFR argument missing");
         }
         if (referenceFrames < 0 || referenceFrames > reference.length) {
@@ -42,16 +45,26 @@ final class CalibrationContainerWriter {
         if (transfer.length < 5) {
             throw new IOException("relative-transfer result incomplete");
         }
+        if (sweepProfile.length < NativeDsp.SWEEP_PROFILE_OUTPUT_LONGS) {
+            throw new IOException("sweep profile incomplete");
+        }
+        if (decayProfile.length < NativeDsp.DECAY_PROFILE_OUTPUT_LONGS) {
+            throw new IOException("decay profile incomplete");
+        }
 
         final int waveBytes = 32;
         final int calBytes = 48;
+        final int specBytes = 344;
+        final int roomBytes = 72;
         long refBytes = (long) referenceFrames * 2L;
         long respBytes = (long) responseFrames * 2L;
         long payloadBytes =
                 16L + waveBytes +
                 16L + calBytes +
                 16L + refBytes +
-                16L + respBytes;
+                16L + respBytes +
+                16L + specBytes +
+                16L + roomBytes;
 
         if (payloadBytes > 0xffffffffL) {
             throw new IOException("CFR v1 exceeds bounded 32-bit payload");
@@ -64,7 +77,7 @@ final class CalibrationContainerWriter {
                 sampleRate,
                 1,
                 NativeDsp.CFR_FLAG_RELATIVE,
-                4,
+                6,
                 payloadBytes,
                 512);
         byte[] waveHeader = NativeDsp.nativeChunkHeader(
@@ -77,9 +90,16 @@ final class CalibrationContainerWriter {
         byte[] respHeader = NativeDsp.nativeChunkHeader(
                 NativeDsp.CHUNK_PCM, NativeDsp.CHUNK_FLAG_RESPONSE,
                 respBytes, responseFrames);
+        byte[] specHeader = NativeDsp.nativeChunkHeader(
+                NativeDsp.CHUNK_SPEC, NativeDsp.CFR_FLAG_RELATIVE,
+                specBytes, NativeDsp.SWEEP_PROFILE_BANDS);
+        byte[] roomHeader = NativeDsp.nativeChunkHeader(
+                NativeDsp.CHUNK_ROOM, NativeDsp.CFR_FLAG_RELATIVE,
+                roomBytes, 1L);
 
         if (header == null || waveHeader == null || calHeader == null ||
-                refHeader == null || respHeader == null) {
+                refHeader == null || respHeader == null ||
+                specHeader == null || roomHeader == null) {
             throw new IOException("native CFR framing rejected descriptor");
         }
 
@@ -112,6 +132,32 @@ final class CalibrationContainerWriter {
 
             out.write(respHeader);
             writePcm16Le(out, response, responseFrames);
+
+            out.write(specHeader);
+            writeU32(out, 1L);
+            writeU32(out, 1L); // equal-time windows over exponential sweep
+            writeU32(out, NativeDsp.SWEEP_PROFILE_BANDS);
+            writeU32(out, sweepProfile[48]);
+            writeU32(out, sweepProfile[49]);
+            writeU32(out, 20L); // power_ratio_q20 fractional bits
+            for (int i = 0; i < NativeDsp.SWEEP_PROFILE_BANDS; ++i) {
+                writeU64(out, sweepProfile[i]);
+                writeU64(out, sweepProfile[NativeDsp.SWEEP_PROFILE_BANDS + i]);
+                writeU32(out, sweepProfile[NativeDsp.SWEEP_PROFILE_BANDS * 2 + i]);
+            }
+
+            out.write(roomHeader);
+            writeU32(out, 1L);
+            writeU32(out, 1L); // backward-integrated relative decay
+            writeU32(out, decayProfile[3]);
+            writeU32(out, decayProfile[4]);
+            writeU64(out, decayProfile[0]);
+            writeU64(out, decayProfile[1]);
+            writeU64(out, decayProfile[2]);
+            for (int i = 5; i <= 11; ++i) {
+                writeI32(out, (int) decayProfile[i]);
+            }
+            writeU32(out, decayProfile[12]);
             out.flush();
         }
 
