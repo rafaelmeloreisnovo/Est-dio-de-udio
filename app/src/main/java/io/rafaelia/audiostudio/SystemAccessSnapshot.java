@@ -23,18 +23,23 @@ final class SystemAccessSnapshot {
         String mic = granted(context, Manifest.permission.RECORD_AUDIO) ?
                 "MIC=GRANTED" : "MIC=ASK_ON_USE";
         String sensorEvidence = "SENSOR_MUDELTA=EXPLICIT_PROOF_ACTION";
+        String sensorAccess =
+                "SENSOR_ACCESS=NO_RUNTIME_PERMISSION_REQUIRED_ACCEL_MAG_CURRENT_PROFILE";
+        String sensorRate =
+                "SENSOR_RATE=PLATFORM_BOUNDED_NO_HIGH_RATE_PERMISSION";
 
         String accel = sensor(sm, Sensor.TYPE_ACCELEROMETER) ?
-                "ACCEL=PRESENT" : "ACCEL=TOKEN_VAZIO";
+                "ACCEL=PRESENT" : "ACCEL=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
         String mag = sensor(sm, Sensor.TYPE_MAGNETIC_FIELD) ?
-                "MAG=PRESENT" : "MAG=TOKEN_VAZIO";
+                "MAG=PRESENT" : "MAG=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
         String light = sensor(sm, Sensor.TYPE_LIGHT) ?
-                "LIGHT=PRESENT" : "LIGHT=TOKEN_VAZIO";
+                "LIGHT=PRESENT" : "LIGHT=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
         String prox = sensor(sm, Sensor.TYPE_PROXIMITY) ?
-                "PROX=PRESENT" : "PROX=TOKEN_VAZIO";
+                "PROX=PRESENT" : "PROX=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
 
-        return mic + " | " + sensorEvidence + " | " + accel + " | " +
-                mag + " | " + light + " | " + prox;
+        return mic + " | " + sensorAccess + " | " + sensorRate + " | " +
+                sensorEvidence + " | " + accel + " | " + mag + " | " +
+                light + " | " + prox;
     }
 
     static String signatureState() {
