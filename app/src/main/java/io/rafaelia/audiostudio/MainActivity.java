@@ -39,7 +39,6 @@ import java.util.Locale;
 public final class MainActivity extends Activity {
     private static final int REQ_AUDIO = 100;
     private static final int REQ_PICK = 101;
-    private static final int REQ_ACTIVITY = 102;
 
     private static final String[] PROFILES = {
             "WhatsApp / voz — -16 LUFS workflow",
@@ -341,19 +340,11 @@ public final class MainActivity extends Activity {
     }
 
     private void requestOptionalSensorAccess() {
-        if (android.os.Build.VERSION.SDK_INT >= 29 &&
-                checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-                        != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                    new String[]{Manifest.permission.ACTIVITY_RECOGNITION},
-                    REQ_ACTIVITY);
-            return;
-        }
-
         refreshSystemPanel();
         status.setText(
-                "Sensores locais: permissões mínimas reconciliadas. " +
-                "Acelerômetro/magnetômetro/luz/proximidade não recebem permissões inventadas.");
+                "Sensores locais: nenhuma permissão Android adicional é necessária para " +
+                "acelerômetro/magnetômetro/luz/proximidade no perfil atual. " +
+                "A observação μ∆ ocorre somente após a ação explícita ★ VALIDAR + ZIPRAF.");
     }
 
     private int currentWpm() {
@@ -405,7 +396,8 @@ public final class MainActivity extends Activity {
 
         evidenceRunning = true;
         status.setText(
-                "★ ASSURANCE — coletando material, execução, métricas, relações e gaps…");
+                "★ ASSURANCE — ação explícita: coletando μ∆ local de acelerômetro/" +
+                "magnetômetro por janela limitada, além de material, métricas e gaps…");
 
         MicroDeltaVibrationProbe.run(this, 2200L, vibration -> {
             MicroDeltaMagnetometerProbe.run(this, 2200L, magnetometer -> {
@@ -904,16 +896,6 @@ public final class MainActivity extends Activity {
         } else if (requestCode == REQ_AUDIO) {
             pendingCalibration = false;
             status.setText("Permissão de microfone negada.");
-        } else if (requestCode == REQ_ACTIVITY) {
-            refreshSystemPanel();
-            if (grantResults.length > 0 &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                status.setText(
-                        "ACTIVITY_RECOGNITION concedida para sensores de movimento compatíveis.");
-            } else {
-                status.setText(
-                        "ACTIVITY_RECOGNITION negada; sensores que não exigem essa permissão continuam disponíveis.");
-            }
         }
     }
 
