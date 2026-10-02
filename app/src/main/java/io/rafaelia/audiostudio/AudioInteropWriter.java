@@ -141,6 +141,9 @@ final class AudioInteropWriter {
     static long writeCaf16(
             File pcm, OutputStream out, int sampleRate, int channels) throws IOException {
         long dataBytes = validatePcm16(pcm, out, sampleRate, channels);
+        if (dataBytes > Long.MAX_VALUE - 4L) {
+            throw new IOException("CAF data size overflow");
+        }
         int bytesPerFrame = channels * 2;
 
         writeAscii(out, "caff");
@@ -183,22 +186,36 @@ final class AudioInteropWriter {
         if (source == null || !source.isFile()) throw new IOException("source missing");
         if (out == null) throw new IOException("output stream missing");
         byte[] buffer = new byte[16384];
+        byte[] converted = swap16 ? new byte[16384] : null;
         long total = 0L;
+        int pending = -1;
         try (FileInputStream in = new FileInputStream(source)) {
             int n;
             while ((n = in.read(buffer)) > 0) {
-                if (swap16) {
-                    if ((n & 1) != 0) throw new IOException("PCM16 chunk alignment failure");
-                    for (int i = 0; i < n; i += 2) {
-                        byte lo = buffer[i];
-                        buffer[i] = buffer[i + 1];
-                        buffer[i + 1] = lo;
-                    }
-                }
-                out.write(buffer, 0, n);
                 total += n;
+                if (!swap16) {
+                    out.write(buffer, 0, n);
+                    continue;
+                }
+
+                int i = 0;
+                int j = 0;
+                if (pending >= 0) {
+                    converted[j++] = buffer[0];
+                    converted[j++] = (byte) pending;
+                    pending = -1;
+                    i = 1;
+                }
+                while (i + 1 < n) {
+                    converted[j++] = buffer[i + 1];
+                    converted[j++] = buffer[i];
+                    i += 2;
+                }
+                if (i < n) pending = buffer[i] & 0xff;
+                if (j > 0) out.write(converted, 0, j);
             }
         }
+        if (pending >= 0) throw new IOException("PCM16 source ended on partial sample");
         out.flush();
         return total;
     }
