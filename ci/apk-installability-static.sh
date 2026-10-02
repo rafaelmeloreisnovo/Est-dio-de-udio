@@ -62,3 +62,8 @@ echo 'APK_ABIS=armeabi-v7a,arm64-v8a'
 printf 'APK_CERT=%s\n' "${cert_line:-AVAILABLE_IN_REPORT}"
 echo 'INSTALLABLE_STATIC=PASS'
 echo 'INSTALLED_PHYSICAL=NOT_RUN'
+
+# 6) Prove the physical-receipt exact-byte contract with a mocked transport.
+# This does not claim a device execution; it only prevents a wrong APK or
+# wrong installed base.apk from being promoted to INSTALLED_PHYSICAL=PASS.
+bash ci/test-android-device-install-receipt.sh
