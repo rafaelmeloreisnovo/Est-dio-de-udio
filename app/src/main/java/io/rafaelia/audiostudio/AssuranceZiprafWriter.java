@@ -106,10 +106,15 @@ final class AssuranceZiprafWriter {
                         AssurancePipelineModel.isFinite(magnetometer.peakDeltaUt));
         final boolean metricContractResolved = vibrationContract && magneticContract;
 
-        int materializedCount = 2; // installed APK + raw evidence
-        if (!zrfSha.startsWith("TOKEN_VAZIO")) ++materializedCount;
-        if (!cfrSha.startsWith("TOKEN_VAZIO")) ++materializedCount;
-        if (!pcmSha.startsWith("TOKEN_VAZIO")) ++materializedCount;
+        // Backward-compatible aggregate plus explicit custody semantics.
+        // Only APK identity and raw evidence bytes are embedded/bound by this ZIPRAF.
+        // ZRF/CFR/PCM are referenced by SHA-256 unless their bytes are added in a future schema.
+        final int embeddedCount = 2; // installed APK identity + embedded raw evidence bytes
+        int referencedArtifactCount = 0;
+        if (!zrfSha.startsWith("TOKEN_VAZIO")) ++referencedArtifactCount;
+        if (!cfrSha.startsWith("TOKEN_VAZIO")) ++referencedArtifactCount;
+        if (!pcmSha.startsWith("TOKEN_VAZIO")) ++referencedArtifactCount;
+        final int materializedCount = embeddedCount + referencedArtifactCount; // legacy aggregate
 
         int gapCount = 3; // physical SPL reference + independent reproduction + external audit
         if (!authorialSigningResolved) ++gapCount;
@@ -130,12 +135,14 @@ final class AssuranceZiprafWriter {
 
         put(entries, "00_manifest.json", manifestJson(
                 generatedEpochMs, rawEvidence.displayName, rawEvidenceSha,
-                apkSha, materializedCount, relationCount, gapCount, starState));
+                apkSha, materializedCount, embeddedCount, referencedArtifactCount,
+                relationCount, gapCount, starState));
         put(entries, "10_material.json", materialJson(
                 apkSha, zrfSha, cfrSha, pcmSha));
         put(entries, "20_materialized.json", materializedJson(
                 apkSha, rawEvidence.displayName, rawEvidenceSha,
-                zrfSha, cfrSha, pcmSha, materializedCount));
+                zrfSha, cfrSha, pcmSha, materializedCount,
+                embeddedCount, referencedArtifactCount));
         put(entries, "30_metrics.json", metricsJson(
                 vibration, magnetometer, lastCalibration));
         put(entries, "40_relations.json", relationsJson(
@@ -150,8 +157,8 @@ final class AssuranceZiprafWriter {
                 magneticSourceState, magnetometer == null ? 0 : magnetometer.samples,
                 lastCalibration));
         put(entries, "70_receipt.txt", receiptText(
-                generatedEpochMs, materializedCount, relationCount, gapCount,
-                starState, authorialSigningResolved));
+                generatedEpochMs, materializedCount, embeddedCount, referencedArtifactCount,
+                relationCount, gapCount, starState, authorialSigningResolved));
         entries.put("80_raw/evidence.txt", rawEvidenceBytes);
 
         StringBuilder sums = new StringBuilder(4096);
@@ -205,6 +212,8 @@ final class AssuranceZiprafWriter {
             String rawEvidenceSha,
             String apkSha,
             int materializedCount,
+            int embeddedCount,
+            int referencedArtifactCount,
             int relationCount,
             int gapCount,
             String starState) {
@@ -221,6 +230,9 @@ final class AssuranceZiprafWriter {
                 "  \"raw_evidence_sha256\":\"" + rawEvidenceSha + "\",\n" +
                 "  \"installed_apk_sha256\":\"" + apkSha + "\",\n" +
                 "  \"materialized_count\":" + materializedCount + ",\n" +
+                "  \"embedded_count\":" + embeddedCount + ",\n" +
+                "  \"referenced_artifact_count\":" + referencedArtifactCount + ",\n" +
+                "  \"custody_semantics\":\"embedded bytes != referenced-by-hash artifacts\",\n" +
                 "  \"relation_count\":" + relationCount + ",\n" +
                 "  \"gap_count\":" + gapCount + ",\n" +
                 "  \"external_standard_audit\":\"NOT_AUDITED\",\n" +
@@ -246,9 +258,11 @@ final class AssuranceZiprafWriter {
             String apkSha,
             String rawName, String rawSha,
             String zrfSha, String cfrSha, String pcmSha,
-            int count) {
+            int count, int embeddedCount, int referencedArtifactCount) {
         return "{\n" +
                 "  \"double_dagger_materialized_n\":" + count + ",\n" +
+                "  \"embedded_count\":" + embeddedCount + ",\n" +
+                "  \"referenced_artifact_count\":" + referencedArtifactCount + ",\n" +
                 "  \"installed_apk_sha256\":\"" + apkSha + "\",\n" +
                 "  \"raw_evidence\":{\"name\":\"" + json(rawName) +
                 "\",\"sha256\":\"" + rawSha + "\"},\n" +
@@ -404,6 +418,8 @@ final class AssuranceZiprafWriter {
     private static String receiptText(
             long epochMs,
             int materializedCount,
+            int embeddedCount,
+            int referencedArtifactCount,
             int relationCount,
             int gapCount,
             String starState,
@@ -413,6 +429,9 @@ final class AssuranceZiprafWriter {
                 "star_expression=" + AssurancePipelineModel.STAR_EXPRESSION + NL +
                 "dagger_material=BOUND_TO_INSTALLED_APK" + NL +
                 "double_dagger_materialized_n=" + materializedCount + NL +
+                "embedded_count=" + embeddedCount + NL +
+                "referenced_artifact_count=" + referencedArtifactCount + NL +
+                "custody_semantics=EMBEDDED_BYTES_SEPARATE_FROM_REFERENCED_SHA256" + NL +
                 "empty_gap_count=" + gapCount + NL +
                 "delta_behavior=RUNTIME_PROBE_OR_NOT_RUN" + NL +
                 "section_metric_contract=AVAILABILITY_THEN_EXPLICIT_UNITS_AND_REFERENCE_GATES" + NL +
