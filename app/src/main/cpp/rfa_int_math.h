@@ -30,6 +30,19 @@ static inline rfa_i64 rfa_div_i64_u64_shift(rfa_i64 numerator,
         magnitude = (rfa_u64)numerator;
     }
 
+    /*
+     * |numerator| cannot exceed 2^63. For denominators above 2^63 the
+     * quotient is necessarily zero; exactly 2^63 only INT64_MIN can reach
+     * magnitude 2^63. Handling this boundary early also keeps remainder
+     * shifts below the unsigned overflow/carry-loss edge in the loop below.
+     */
+    if (denominator >= (1ULL << 63)) {
+        if (denominator == (1ULL << 63) && magnitude == (1ULL << 63)) {
+            return negative ? -1LL : 1LL;
+        }
+        return 0LL;
+    }
+
     for (bit = 63; bit >= 0; --bit) {
         remainder = (remainder << 1) | ((magnitude >> bit) & 1ULL);
         if (remainder >= denominator) {
