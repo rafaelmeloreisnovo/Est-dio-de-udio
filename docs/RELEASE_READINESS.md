@@ -2,15 +2,17 @@
 
 Release readiness is evaluated per evidence class. A green software gate does not promote provider policy, physical execution, calibration, signing authority or external audit.
 
+The exact receipt recorded below is an **immutable executed baseline**. A documentation-only merge may advance `main`; the newest exact CI receipt and issue #29 must be used for the next physical-install target rather than silently rewriting this historical evidence.
+
 ```text
 SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
 IMPLEMENTED_UNTESTED != PASS
 TOKEN_VAZIO != 0
 ```
 
-## Current software receipt
+## Executed software baseline
 
-Current authoritative software baseline for this document:
+Validated runtime-bearing baseline before this documentation-only reconciliation:
 
 - source: `main@469eb83b0d23286190c306b17c3fd378118dadd4`
 - canonical GitHub Actions run: `37014682335` / #39 = `SUCCESS`
@@ -29,7 +31,7 @@ Current authoritative software baseline for this document:
 
 ## Testable debug APK — software gate
 
-The current canonical receipt supports the executed software scope below:
+The baseline canonical receipt supports the executed software scope below:
 
 - exact detached checkout of the declared source SHA;
 - Java compile + native build for both Android ABIs;
@@ -47,9 +49,9 @@ The current canonical receipt supports the executed software scope below:
 
 This does **not** imply a physical-device PASS or independent reproduction.
 
-## Required before claiming current-head physical capability
+## Required before claiming exact-head physical capability
 
-All must bind to the exact APK hash above, or to a later exact receipt that supersedes it:
+The physical target must bind to the newest exact CI receipt tracked by issue #29. For any chosen target receipt:
 
 - target Android version and hardware identity recorded;
 - installed APK SHA-256 verified against the expected CI artifact;
@@ -66,8 +68,8 @@ All must bind to the exact APK hash above, or to a later exact receipt that supe
 Until those are satisfied:
 
 ```text
-CURRENT_HEAD_DEVICE_RUN=NOT_RUN
-CURRENT_HEAD_PHYSICAL_ZIPRAF=TOKEN_VAZIO
+EXACT_HEAD_DEVICE_RUN=NOT_RUN
+EXACT_HEAD_PHYSICAL_ZIPRAF=TOKEN_VAZIO
 ```
 
 ## Required before authorial signed release
@@ -80,7 +82,7 @@ CURRENT_HEAD_PHYSICAL_ZIPRAF=TOKEN_VAZIO
 - signed APK digest and signing receipt must be retained;
 - delivery must target the exact gated source SHA.
 
-Current state:
+Current unresolved authority state:
 
 ```text
 PROVIDER_ENFORCEMENT=TOKEN_VAZIO_UNRESOLVED
@@ -147,6 +149,7 @@ Release notes and receipts must not convert any of the following into a stronger
 - same-environment reproducibility into independent reproduction;
 - static installability into installed physical execution;
 - pre-link freestanding core status into a claim that the final Android `.so` is bare-metal/freestanding;
-- a hash into authenticity, scientific validity or calibration.
+- a hash into authenticity, scientific validity or calibration;
+- an older executed receipt into a floating statement about a later branch head.
 
-The obsolete `main@1a1b00... / run 36545296255` baseline is historical only and is no longer the current readiness anchor.
+The obsolete `main@1a1b00... / run 36545296255` baseline is historical only and is no longer the readiness anchor. The `469eb83... / #39` receipt above remains an immutable executed baseline until a newer receipt is explicitly appended/promoted.
