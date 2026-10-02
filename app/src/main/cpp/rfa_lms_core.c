@@ -7,33 +7,12 @@
  */
 
 #include "rfa_lms_core.h"
+#include "rfa_int_math.h"
 
 static rfa_i16 rfa_lms_clip_i16(rfa_i64 value) {
     if (value > 32767) return (rfa_i16)32767;
     if (value < -32768) return (rfa_i16)-32768;
     return (rfa_i16)value;
-}
-
-static rfa_i64 rfa_nlms_div_i64_u64(rfa_i64 numerator, rfa_u64 denominator) {
-    rfa_u64 value;
-    rfa_u64 quotient = 0ULL;
-    rfa_u64 remainder = 0ULL;
-    int negative;
-    int bit;
-
-    if (denominator == 0ULL || numerator == 0LL) return 0LL;
-    negative = numerator < 0LL;
-    value = negative ? (rfa_u64)(-numerator) : (rfa_u64)numerator;
-
-    for (bit = 63; bit >= 0; --bit) {
-        remainder = (remainder << 1) | ((value >> bit) & 1ULL);
-        if (remainder >= denominator) {
-            remainder -= denominator;
-            quotient |= 1ULL << bit;
-        }
-    }
-
-    return negative ? -(rfa_i64)quotient : (rfa_i64)quotient;
 }
 
 int rfa_lms_bind_q15(rfa_lms_q15 *state, rfa_i16 *weights_q15,
@@ -181,7 +160,7 @@ rfa_i16 rfa_nlms_cancel_sample_q15(rfa_nlms_q15 *state,
             rfa_i64 numerator = (rfa_i64)state->mu_q15 *
                                 (rfa_i64)error *
                                 (rfa_i64)state->history_q15[index];
-            rfa_i64 delta = rfa_nlms_div_i64_u64(numerator, energy_q30);
+            rfa_i64 delta = rfa_div_i64_u64_shift(numerator, energy_q30);
             rfa_i64 updated = (rfa_i64)state->weights_q15[tap] + delta;
             state->weights_q15[tap] = rfa_lms_clip_i16(updated);
             --index;
