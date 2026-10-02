@@ -1,45 +1,164 @@
 # Release Readiness
 
+## Current exact software baseline
+
+```text
+SOURCE_SHA=def87c720b14ab30ff39371637530d172223da6c
+CI_RUN_ID=37013439446
+CI_RUN_NUMBER=37
+CI_CONCLUSION=SUCCESS
+APK_SHA256=09703c7564980f9aa1374a689a10fc3408ffd321488ecaab56726de416eb19ee
+APK_PACKAGE_ID=io.rafaelia.audiostudio
+APK_MIN_SDK=29
+APK_TARGET_SDK=35
+APK_ABIS=armeabi-v7a,arm64-v8a
+INSTALLABLE_STATIC=PASS
+INSTALLED_PHYSICAL=NOT_RUN
+SIGNING_MODE=DEBUG_NONAUTHORIAL
+EXPECTED_CERT_SHA256=TOKEN_VAZIO
+EXTERNAL_STANDARD_AUDIT=NOT_AUDITED
+CLAIM_ALLOWED=false
+```
+
+This baseline supersedes older baseline references for **current software state only**. Older physical receipts remain valid historical evidence for their own exact SHA; they are not current-head evidence.
+
 ## Required for a testable APK release
 
-- host DSP/meter/manifold smokes PASS;
-- freestanding source gate PASS;
+- exact source SHA checkout PASS;
+- quality/assurance consistency gates PASS;
+- host DSP/meter/manifold smokes PASS where wired;
+- pre-Android freestanding source/runtime gate PASS;
 - ARMv7 zero-undefined + ABI PASS;
 - AArch64 zero-undefined PASS;
-- assembleDebug/release PASS;
+- writable persistent native symbol count remains zero in the gated freestanding scope;
+- local shadow diagnostics remain enforced;
+- final Android ELF boundary explicitly classified rather than mislabeled as true freestanding;
+- debug/release assembly PASS for the requested route;
+- static APK integrity/signature/zipalign/installability PASS;
 - artifact digest recorded;
-- documentation capability matrix reconciled.
+- capability matrix reconciled to the exact source/run.
+
+## Native boundary rule
+
+The current gate distinguishes two scopes:
+
+```text
+PRE_ANDROID_LINK_CORE_OBJECTS = freestanding gate scope
+FINAL_ANDROID_SO = Android platform-linked edge
+```
+
+For the current baseline the final `.so` files declare Android platform libraries and therefore are not claimed as true freestanding. This does not regress the separately gated freestanding core-object scope.
 
 ## Required before claiming physical capability
 
-- target Android version/device recorded;
-- installation evidence bundle generated;
+- exact target Android version/device recorded;
+- APK installed is byte-identical to the intended CI APK SHA-256;
+- installed package/source SHA/CI run/signing certificate recorded;
 - relevant hardware action executed;
 - raw artifact preserved;
-- receipt records environment and outcome.
+- receipt records environment and outcome;
+- new ZIPRAF generated from that exact execution;
+- internal ZIPRAF SHA256SUMS verified;
+- raw evidence embedded in ZIPRAF is byte-identical to separately exported raw evidence.
+
+Current exact-head physical state:
+
+```text
+INSTALLED_PHYSICAL=NOT_RUN
+CURRENT_HEAD_PHYSICAL_ZIPRAF=TOKEN_VAZIO
+```
+
+Tracked by issue #29.
 
 ## Required before acoustic calibration claims
 
-Relative software gate:
+### Relative software gate
+
 - known source/response alignment;
 - 16-band relative sweep profile validated by deterministic host vectors;
 - relative decay estimator validated by deterministic host vectors.
 
-Relative physical evidence:
-- repeated CFR captures on the target device/room;
-- raw reference/response preserved;
-- repeatability and noise/dynamic-range recorded.
+### Relative physical evidence
 
-Absolute:
+- repeated CFR captures on the same exact software/device/room configuration;
+- raw reference/response preserved;
+- sample rate, orientation, thermal/battery context and capture conditions recorded;
+- repeatability plus noise/dynamic-range recorded;
+- N, median, mean, dispersion and min/max reported before promotion.
+
+### Absolute
+
 - traceable or otherwise documented acoustic reference;
-- calibration method and uncertainty;
+- calibration method;
+- measurement uncertainty;
 - physical repeatability.
+
+Until then:
+
+```text
+absolute_spl=PENDING_PHYSICAL_REFERENCE
+```
+
+## Required before authenticity / authorial signing claims
+
+- `AUTHORIAL_ANDROID_APKSIGNER` route executed;
+- signing identity configured from real protected provider state;
+- expected certificate SHA-256 concrete, not `TOKEN_VAZIO`;
+- produced APK certificate observed;
+- expected and observed certificate digests match;
+- signed APK digest recorded and bound to exact source/run.
+
+Current state:
+
+```text
+SIGNING_MODE=DEBUG_NONAUTHORIAL
+AUTHORIAL_SIGNING=TOKEN_VAZIO
+```
+
+## Required before reproducibility claims
+
+- same exact source SHA built in a second controlled environment;
+- toolchain/environment receipt captured independently;
+- produced artifact digests compared;
+- any mismatch classified before promotion.
+
+Current state:
+
+```text
+REPRODUCIBLE_BUILD_2ND_ENV=TOKEN_VAZIO
+INDEPENDENT_REPRODUCTION=TOKEN_VAZIO
+```
+
+## Provider promotion enforcement
+
+Project CI gates do not by themselves prove provider-side branch/ruleset enforcement.
+
+Required provider receipt:
+
+- `main` protected or equivalent ruleset active;
+- exact-head canonical workflow required before merge;
+- force-push/deletion policy read back;
+- promotion route documented.
+
+Until that readback exists, do not translate `CI=PASS` into `PROVIDER_ENFORCEMENT=PASS`.
 
 ## No-go
 
-Release notes must not convert `PENDING`, `NOT_RUN` or `TOKEN_VAZIO` into marketing claims.
+Release notes, UI copy, README text and ZIPRAF claims must not convert any of these into marketing or scientific claims:
 
+```text
+PENDING
+NOT_RUN
+IMPLEMENTED_UNTESTED
+TOKEN_VAZIO
+NOT_AUDITED
+OBSERVED_UNPROMOTED
+```
 
-## Baseline evidence before Delta 5
+The governing invariant remains:
 
-`main@1a1b00bb93b0988224d8b24085a82029d1228c45` passed GitHub run `36545296255`, including host smokes, freestanding gate, ARMv7/AArch64 gates, APK assembly, binary-origin receipt and live prerelease publication. Delta 5 must obtain its own CI result before promotion.
+```text
+SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
+TOKEN_VAZIO != 0
+IMPLEMENTED_UNTESTED != PASS
+```
