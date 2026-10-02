@@ -276,14 +276,28 @@ public final class MainActivity extends Activity {
         first.addView(stopPlayback, weight());
         panel.addView(first);
 
-        LinearLayout export = row();
-        Button rawExport = button("Export RAW PCM");
+        panel.addView(sectionLabel("PCM EXPORT FORMATS"));
+
+        LinearLayout exportPrimary = row();
+        Button rawExport = button("RAW");
         rawExport.setOnClickListener(v -> exportMasterRaw());
-        Button wavExport = button("Export WAV PCM16");
+        Button wavExport = button("WAV");
         wavExport.setOnClickListener(v -> exportMasterWav());
-        export.addView(rawExport, weight());
-        export.addView(wavExport, weight());
-        panel.addView(export);
+        Button aiffExport = button("AIFF");
+        aiffExport.setOnClickListener(v -> exportMasterAiff());
+        exportPrimary.addView(rawExport, weight());
+        exportPrimary.addView(wavExport, weight());
+        exportPrimary.addView(aiffExport, weight());
+        panel.addView(exportPrimary);
+
+        LinearLayout exportSecondary = row();
+        Button auExport = button("AU / SND");
+        auExport.setOnClickListener(v -> exportMasterAu());
+        Button cafExport = button("CAF / LPCM");
+        cafExport.setOnClickListener(v -> exportMasterCaf());
+        exportSecondary.addView(auExport, weight());
+        exportSecondary.addView(cafExport, weight());
+        panel.addView(exportSecondary);
 
         LinearLayout share = row();
         Button shareAudio = button("Share processed audio");
@@ -777,34 +791,46 @@ public final class MainActivity extends Activity {
     }
 
     private void exportMasterRaw() {
-        exportMasterInterop(false);
+        exportMasterInterop(AudioInteropWriter.Format.RAW_PCM);
     }
 
     private void exportMasterWav() {
-        exportMasterInterop(true);
+        exportMasterInterop(AudioInteropWriter.Format.WAV_PCM16);
     }
 
-    private void exportMasterInterop(boolean wav) {
+    private void exportMasterAiff() {
+        exportMasterInterop(AudioInteropWriter.Format.AIFF_PCM16);
+    }
+
+    private void exportMasterAu() {
+        exportMasterInterop(AudioInteropWriter.Format.AU_PCM16);
+    }
+
+    private void exportMasterCaf() {
+        exportMasterInterop(AudioInteropWriter.Format.CAF_PCM16);
+    }
+
+    private void exportMasterInterop(AudioInteropWriter.Format format) {
         if (lastMasteredPcm == null || !lastMasteredPcm.isFile()) {
             status.setText("No master PCM is available to export yet.");
             return;
         }
 
+        boolean raw = format == AudioInteropWriter.Format.RAW_PCM;
         String stamp = new SimpleDateFormat(
                 "yyyyMMdd_HHmmss", Locale.US).format(new Date());
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME,
-                "Rafaelia_Master_" + stamp + (wav ? ".wav" : ".pcm"));
-        values.put(MediaStore.MediaColumns.MIME_TYPE,
-                wav ? "audio/wav" : "application/octet-stream");
+                "Rafaelia_Master_" + stamp + format.extension);
+        values.put(MediaStore.MediaColumns.MIME_TYPE, format.mimeType);
         values.put(MediaStore.MediaColumns.RELATIVE_PATH,
-                wav ? Environment.DIRECTORY_MUSIC + "/RafaeliaAudio" :
-                        Environment.DIRECTORY_DOWNLOADS + "/RafaeliaAudio/Raw");
+                raw ? Environment.DIRECTORY_DOWNLOADS + "/RafaeliaAudio/Raw" :
+                        Environment.DIRECTORY_MUSIC + "/RafaeliaAudio");
         values.put(MediaStore.MediaColumns.IS_PENDING, 1);
 
-        Uri collection = wav ?
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI :
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+        Uri collection = raw ?
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI :
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         Uri uri = getContentResolver().insert(collection, values);
         if (uri == null) {
             status.setText("Export destination could not be created.");
@@ -815,24 +841,24 @@ public final class MainActivity extends Activity {
             try (java.io.OutputStream out =
                          getContentResolver().openOutputStream(uri, "w")) {
                 if (out == null) throw new IllegalStateException("Output stream unavailable");
-                long bytes = wav ?
-                        AudioInteropWriter.writeWav16(
-                                lastMasteredPcm, out,
-                                lastMasteredRate, lastMasteredChannels) :
-                        AudioInteropWriter.writeRaw(lastMasteredPcm, out);
+                long bytes = AudioInteropWriter.write(
+                        format,
+                        lastMasteredPcm,
+                        out,
+                        lastMasteredRate,
+                        lastMasteredChannels);
 
                 ContentValues done = new ContentValues();
                 done.put(MediaStore.MediaColumns.IS_PENDING, 0);
                 getContentResolver().update(uri, done, null, null);
                 runOnUiThread(() -> status.setText(
-                        (wav ? "WAV PCM16" : "RAW PCM") +
-                        " exported · " + bytes + " bytes"));
+                        format.label + " exported · " + bytes + " bytes"));
             } catch (Exception e) {
                 getContentResolver().delete(uri, null, null);
                 runOnUiThread(() ->
-                        status.setText("Export failed · " + e.getMessage()));
+                        status.setText(format.label + " export failed · " + e.getMessage()));
             }
-        }, wav ? "rafaelia-wav-export" : "rafaelia-raw-export").start();
+        }, "rafaelia-" + format.name().toLowerCase(Locale.US) + "-export").start();
     }
 
     private void shareLast() {

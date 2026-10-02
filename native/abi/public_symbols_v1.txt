@@ -55,3 +55,6 @@ rfa_measure_core:rfa_sync_sequence_q15
 rfa_rac1_core:rfa_rac1_bound_bytes
 rfa_rac1_core:rfa_rac1_encode_i16
 rfa_rac1_core:rfa_rac1_decode_i16
+rfa_audio_format_core:rfa_audio_format_header_size
+rfa_audio_format_core:rfa_audio_format_write_header
+rfa_audio_format_core:rfa_pcm16_swap_pairs
