@@ -4,9 +4,31 @@
  * project-owned task names and ordering used by CI and local development.
  */
 
+def assuranceSmokeOut = layout.buildDirectory.dir("rafaelia-assurance-smoke")
+
+tasks.register("rafaeliaAssuranceModelSmoke") {
+    group = "rafaelia verification"
+    description = "Run pure-Java fail-closed qualification vectors for the ZIPRAF assurance model."
+    doLast {
+        def outDir = assuranceSmokeOut.get().asFile
+        delete(outDir)
+        outDir.mkdirs()
+        exec {
+            commandLine "javac", "-d", outDir.absolutePath,
+                    "src/main/java/io/rafaelia/audiostudio/AssurancePipelineModel.java",
+                    rootProject.file("native/tests/AssurancePipelineSmoke.java").absolutePath
+        }
+        exec {
+            commandLine "java", "-cp", outDir.absolutePath,
+                    "io.rafaelia.audiostudio.AssurancePipelineSmoke"
+        }
+    }
+}
+
 tasks.register("rafaeliaJavaGate") {
     group = "rafaelia verification"
     description = "Compile the Android Java edge early and fail before full APK work."
+    dependsOn("rafaeliaAssuranceModelSmoke")
     dependsOn("compileDebugJavaWithJavac")
 }
 
@@ -32,5 +54,7 @@ tasks.register("rafaeliaBuildContract") {
         println("R8=OFF")
         println("RESOURCE_SHRINK=OFF")
         println("ABIS=armeabi-v7a,arm64-v8a")
+        println("ASSURANCE_ZIPRAF=FAIL_CLOSED_MODEL_V1")
+        println("EXTERNAL_STANDARD_AUDIT=NOT_AUDITED")
     }
 }
