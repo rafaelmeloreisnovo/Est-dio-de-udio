@@ -71,7 +71,7 @@ static rfa_u64 rfa_double_bits_from_u32(rfa_u32 value) {
     rfa_u64 biased = (rfa_u64)(exponent + 1023u);
     rfa_u64 base = ((rfa_u64)1u) << exponent;
     rfa_u64 remainder = (rfa_u64)value - base;
-    rfa_u64 fraction = (remainder << 52) >> exponent;
+    rfa_u64 fraction = remainder << (52u - exponent);
     return (biased << 52) | (fraction & 0x000fffffffffffffull);
 }
 
