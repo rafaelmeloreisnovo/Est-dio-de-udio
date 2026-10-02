@@ -92,36 +92,6 @@ jobs:
           echo "DELIVERY_MODE=$delivery"
           echo "EXTERNAL_STANDARD_AUDIT=NOT_AUDITED"
 
-  provider_bootstrap:
-    name: 05 · provider / bootstrap
-    if: ${{ needs.plan.outputs.delivery == 'provider-bootstrap' }}
-    needs: plan
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
-      RFA_PROVIDER_ADMIN_TOKEN: ${{ secrets.PAT_ENVIRONMENTS || secrets.PAT_ENV || secrets.PAT_ACTIONS }}
-      RFA_PAT_ENV: ${{ secrets.PAT_ENV }}
-      RFA_PAT_ENVIRONMENTS: ${{ secrets.PAT_ENVIRONMENTS }}
-      RFA_PAT_ACTIONS: ${{ secrets.PAT_ACTIONS }}
-      RFA_PAT_AGENTS: ${{ secrets.PAT_AGENTS }}
-      RFA_PAT_DEPENDABOT: ${{ secrets.PAT_DEPENDABOT }}
-      RFA_PAT_CODESPACE: ${{ secrets.PAT_CODESPACE }}
-    steps:
-      - name: Exact checkout for provider bootstrap
-        shell: bash
-        run: |
-          set -euo pipefail
-          git init .
-          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
-          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
-          git checkout --detach FETCH_HEAD
-          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
-      - name: Apply non-delete provider governance
-        shell: bash
-        run: bash ci/provider-bootstrap.sh
-
   gate:
     name: gate / build
     if: ${{ needs.plan.outputs.delivery != 'provider-bootstrap' }}
@@ -207,6 +177,38 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: bash ci/rafaelia-pipeline.sh summary
+
+  provider_bootstrap:
+    name: 05 · provider / bootstrap
+    if: ${{ always() && (needs.plan.outputs.delivery == 'provider-bootstrap' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.gate.result == 'success')) }}
+    needs:
+      - plan
+      - gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      RFA_PROVIDER_ADMIN_TOKEN: ${{ secrets.PAT_ENVIRONMENTS || secrets.PAT_ENV || secrets.PAT_ACTIONS }}
+      RFA_PAT_ENV: ${{ secrets.PAT_ENV }}
+      RFA_PAT_ENVIRONMENTS: ${{ secrets.PAT_ENVIRONMENTS }}
+      RFA_PAT_ACTIONS: ${{ secrets.PAT_ACTIONS }}
+      RFA_PAT_AGENTS: ${{ secrets.PAT_AGENTS }}
+      RFA_PAT_DEPENDABOT: ${{ secrets.PAT_DEPENDABOT }}
+      RFA_PAT_CODESPACE: ${{ secrets.PAT_CODESPACE }}
+    steps:
+      - name: Exact checkout for provider bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+      - name: Apply non-delete provider governance
+        shell: bash
+        run: bash ci/provider-bootstrap.sh
 
   deliver_live:
     name: 90 · delivery / live-debug
