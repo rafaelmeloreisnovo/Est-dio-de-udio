@@ -12,7 +12,6 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
-import android.os.Build;
 
 final class SystemAccessSnapshot {
     private SystemAccessSnapshot() {}
@@ -23,13 +22,7 @@ final class SystemAccessSnapshot {
 
         String mic = granted(context, Manifest.permission.RECORD_AUDIO) ?
                 "MIC=GRANTED" : "MIC=ASK_ON_USE";
-        String motion;
-        if (Build.VERSION.SDK_INT >= 29) {
-            motion = granted(context, Manifest.permission.ACTIVITY_RECOGNITION) ?
-                    "MOTION=GRANTED" : "MOTION=OPTIONAL_REQUEST";
-        } else {
-            motion = "MOTION=PLATFORM_PRE29";
-        }
+        String sensorEvidence = "SENSOR_MUDELTA=EXPLICIT_PROOF_ACTION";
 
         String accel = sensor(sm, Sensor.TYPE_ACCELEROMETER) ?
                 "ACCEL=PRESENT" : "ACCEL=TOKEN_VAZIO";
@@ -40,7 +33,7 @@ final class SystemAccessSnapshot {
         String prox = sensor(sm, Sensor.TYPE_PROXIMITY) ?
                 "PROX=PRESENT" : "PROX=TOKEN_VAZIO";
 
-        return mic + " | " + motion + " | " + accel + " | " +
+        return mic + " | " + sensorEvidence + " | " + accel + " | " +
                 mag + " | " + light + " | " + prox;
     }
 

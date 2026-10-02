@@ -25,10 +25,21 @@ tasks.register("rafaeliaAssuranceModelSmoke") {
     }
 }
 
+tasks.register("rafaeliaSensorPermissionGate") {
+    group = "rafaelia verification"
+    description = "Fail closed on Android permission, step/activity and sensor-rate regressions."
+    doLast {
+        exec {
+            commandLine "bash", rootProject.file("ci/sensor-permission-gate.sh").absolutePath
+        }
+    }
+}
+
 tasks.register("rafaeliaJavaGate") {
     group = "rafaelia verification"
     description = "Compile the Android Java edge early and fail before full APK work."
     dependsOn("rafaeliaAssuranceModelSmoke")
+    dependsOn("rafaeliaSensorPermissionGate")
     dependsOn("compileDebugJavaWithJavac")
 }
 
@@ -55,6 +66,7 @@ tasks.register("rafaeliaBuildContract") {
         println("RESOURCE_SHRINK=OFF")
         println("ABIS=armeabi-v7a,arm64-v8a")
         println("ASSURANCE_ZIPRAF=FAIL_CLOSED_MODEL_V1")
+        println("SENSOR_PERMISSION_GATE=BOUND_TO_JAVA_GATE")
         println("EXTERNAL_STANDARD_AUDIT=NOT_AUDITED")
     }
 }
