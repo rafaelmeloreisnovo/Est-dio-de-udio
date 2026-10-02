@@ -81,17 +81,17 @@ grep -Fq 'SENSOR_RATE=PLATFORM_BOUNDED_NO_HIGH_RATE_PERMISSION' "$snapshot" || \
 grep -Fq 'SENSOR_MUDELTA=EXPLICIT_PROOF_ACTION' "$snapshot" || \
   fail 'SYSTEM_SENSOR_EVIDENCE_POLICY_MISSING'
 
-grep -Fq 'TOKEN_VAZIO_SENSOR_UNAVAILABLE_SERVICE_UNAVAILABLE' "$vibration" || \
+grep -Fq 'Result.unavailable("SERVICE_UNAVAILABLE")' "$vibration" || \
   fail 'VIBRATION_SERVICE_UNAVAILABLE_STATE_MISSING'
-grep -Fq 'TOKEN_VAZIO_SENSOR_UNAVAILABLE_NOT_PRESENT' "$vibration" || \
+grep -Fq 'Result.unavailable("NOT_PRESENT")' "$vibration" || \
   fail 'VIBRATION_NOT_PRESENT_STATE_MISSING'
-grep -Fq 'TOKEN_VAZIO_SENSOR_UNAVAILABLE_LISTENER_REGISTRATION_FAILED' "$vibration" || \
+grep -Fq 'Result.unavailable("LISTENER_REGISTRATION_FAILED")' "$vibration" || \
   fail 'VIBRATION_REGISTRATION_FAILURE_STATE_MISSING'
-grep -Fq 'TOKEN_VAZIO_SENSOR_UNAVAILABLE_SERVICE_UNAVAILABLE' "$magnetic" || \
+grep -Fq 'Result.unavailable("SERVICE_UNAVAILABLE")' "$magnetic" || \
   fail 'MAGNETIC_SERVICE_UNAVAILABLE_STATE_MISSING'
-grep -Fq 'TOKEN_VAZIO_SENSOR_UNAVAILABLE_NOT_PRESENT' "$magnetic" || \
+grep -Fq 'Result.unavailable("NOT_PRESENT")' "$magnetic" || \
   fail 'MAGNETIC_NOT_PRESENT_STATE_MISSING'
-grep -Fq 'TOKEN_VAZIO_SENSOR_UNAVAILABLE_LISTENER_REGISTRATION_FAILED' "$magnetic" || \
+grep -Fq 'Result.unavailable("LISTENER_REGISTRATION_FAILED")' "$magnetic" || \
   fail 'MAGNETIC_REGISTRATION_FAILURE_STATE_MISSING'
 
 grep -Fq '"activity_recognition_permission",' "$evidence" || \
