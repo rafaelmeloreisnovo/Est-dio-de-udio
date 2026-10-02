@@ -13,8 +13,22 @@ afail() {
 
 test -s "$writer" || afail "MISSING=$writer"
 
-grep -Fq 'int materializedCount = 2; // installed APK + raw evidence' "$writer" || \
-  afail 'MATERIALIZED_BASE_SCOPE_MISSING'
+grep -Fq 'final int embeddedArtifactCount = 1; // raw evidence bytes copied into ZIPRAF' "$writer" || \
+  afail 'EMBEDDED_ARTIFACT_BASE_SCOPE_MISSING'
+grep -Fq 'int referencedArtifactCount = 1; // installed APK hash; bytes remain outside ZIPRAF' "$writer" || \
+  afail 'REFERENCED_ARTIFACT_BASE_SCOPE_MISSING'
+grep -Fq 'final int materializedCount = embeddedArtifactCount + referencedArtifactCount;' "$writer" || \
+  afail 'MATERIALIZED_AGGREGATE_RELATION_MISSING'
+grep -Fq '\"embedded_artifact_count\":' "$writer" || \
+  afail 'EMBEDDED_ARTIFACT_COUNT_FIELD_MISSING'
+grep -Fq '\"referenced_artifact_count\":' "$writer" || \
+  afail 'REFERENCED_ARTIFACT_COUNT_FIELD_MISSING'
+grep -Fq '\"installed_apk_custody\":\"REFERENCED_NOT_EMBEDDED\"' "$writer" || \
+  afail 'INSTALLED_APK_CUSTODY_SCOPE_MISSING'
+grep -Fq '\"custody\":\"EMBEDDED\"' "$writer" || \
+  afail 'RAW_EVIDENCE_EMBEDDED_SCOPE_MISSING'
+grep -Fq 'custody_boundary=EMBEDDED_BYTES_SEPARATE_FROM_HASH_REFERENCES' "$writer" || \
+  afail 'CUSTODY_BOUNDARY_RECEIPT_MISSING'
 grep -Fq '\"installed_apk_sha256\":\"' "$writer" || \
   afail 'MATERIALIZED_APK_EXPLICIT_FIELD_MISSING'
 grep -Fq 'authorialSigningResolved' "$writer" || \
@@ -34,7 +48,9 @@ test "$base_gap_line" = 1 || afail "BASE_GAP_DECLARATION_COUNT=$base_gap_line"
 grep -Fq 'if (!authorialSigningResolved) ++gapCount;' "$writer" || \
   afail 'AUTHORIAL_SIGNING_NOT_COUNTED_AS_GAP'
 
-printf 'MATERIALIZED_BASE=INSTALLED_APK+RAW_EVIDENCE\n'
+printf 'MATERIALIZED_BASE=EMBEDDED_RAW_EVIDENCE+REFERENCED_INSTALLED_APK\n'
+printf 'MATERIALIZED_AGGREGATE=EMBEDDED+REFERENCED\n'
+printf 'ZIPRAF_EMBEDDED_REFERENCE_SPLIT=PASS_EXECUTED_SCOPE\n'
 printf 'MATERIALIZED_APK_FIELD=EXPLICIT\n'
 printf 'AUTHORIAL_SIGNING_GAP=EXPLICIT_FAIL_CLOSED\n'
 printf 'AUTHORIAL_CERT_MATCH_SOURCE=RAW_PHYSICAL_EVIDENCE\n'
