@@ -76,6 +76,11 @@ final class AssuranceZiprafWriter {
         final boolean sourceBound = AssurancePipelineModel.isConcreteIdentity(BuildConfig.SOURCE_SHA);
         final boolean ciBound = AssurancePipelineModel.isConcreteIdentity(BuildConfig.CI_RUN_ID);
         final boolean provenanceResolved = sourceBound && ciBound;
+        final boolean authorialSigningResolved =
+                "AUTHORIAL_ANDROID_APKSIGNER".equals(BuildConfig.SIGNING_MODE) &&
+                AssurancePipelineModel.isConcreteIdentity(BuildConfig.SIGNER_ID) &&
+                AssurancePipelineModel.isConcreteIdentity(BuildConfig.EXPECTED_CERT_SHA256) &&
+                hasEvidenceLine(rawEvidenceBytes, "signing_cert_matches_expected", "PASS");
 
         final String vibrationSourceState = vibration == null ? "NOT_RUN" : vibration.state;
         final String magneticSourceState = magnetometer == null ? "NOT_RUN" : magnetometer.state;
@@ -107,6 +112,7 @@ final class AssuranceZiprafWriter {
         if (!pcmSha.startsWith("TOKEN_VAZIO")) ++materializedCount;
 
         int gapCount = 3; // physical SPL reference + independent reproduction + external audit
+        if (!authorialSigningResolved) ++gapCount;
         if (!sourceBound) ++gapCount;
         if (!ciBound) ++gapCount;
         if (!vibrationContract || !magneticContract) ++gapCount;
@@ -128,7 +134,7 @@ final class AssuranceZiprafWriter {
         put(entries, "10_material.json", materialJson(
                 apkSha, zrfSha, cfrSha, pcmSha));
         put(entries, "20_materialized.json", materializedJson(
-                rawEvidence.displayName, rawEvidenceSha,
+                apkSha, rawEvidence.displayName, rawEvidenceSha,
                 zrfSha, cfrSha, pcmSha, materializedCount));
         put(entries, "30_metrics.json", metricsJson(
                 vibration, magnetometer, lastCalibration));
@@ -136,14 +142,16 @@ final class AssuranceZiprafWriter {
                 apkSha, rawEvidenceSha, zrfSha, cfrSha, pcmSha,
                 sourceBound, ciBound, vibrationSourceState, magneticSourceState));
         put(entries, "50_gaps.json", gapsJson(
-                sourceBound, ciBound, vibrationContract, magneticContract, gapCount));
+                sourceBound, ciBound, authorialSigningResolved,
+                vibrationContract, magneticContract, gapCount));
         put(entries, "60_claims.json", claimsJson(
-                apkSha, sourceBound, ciBound,
+                apkSha, sourceBound, ciBound, authorialSigningResolved,
                 vibrationSourceState, vibration == null ? 0 : vibration.samples,
                 magneticSourceState, magnetometer == null ? 0 : magnetometer.samples,
                 lastCalibration));
         put(entries, "70_receipt.txt", receiptText(
-                generatedEpochMs, materializedCount, relationCount, gapCount, starState));
+                generatedEpochMs, materializedCount, relationCount, gapCount,
+                starState, authorialSigningResolved));
         entries.put("80_raw/evidence.txt", rawEvidenceBytes);
 
         StringBuilder sums = new StringBuilder(4096);
@@ -235,11 +243,13 @@ final class AssuranceZiprafWriter {
     }
 
     private static String materializedJson(
+            String apkSha,
             String rawName, String rawSha,
             String zrfSha, String cfrSha, String pcmSha,
             int count) {
         return "{\n" +
                 "  \"double_dagger_materialized_n\":" + count + ",\n" +
+                "  \"installed_apk_sha256\":\"" + apkSha + "\",\n" +
                 "  \"raw_evidence\":{\"name\":\"" + json(rawName) +
                 "\",\"sha256\":\"" + rawSha + "\"},\n" +
                 "  \"zrf_sha256\":\"" + zrfSha + "\",\n" +
@@ -339,6 +349,7 @@ final class AssuranceZiprafWriter {
     private static String gapsJson(
             boolean sourceBound,
             boolean ciBound,
+            boolean authorialSigningResolved,
             boolean vibrationContract,
             boolean magneticContract,
             int gapCount) {
@@ -348,6 +359,8 @@ final class AssuranceZiprafWriter {
                 gap("absolute_spl_reference", "PENDING_PHYSICAL_REFERENCE", "provide traceable physical acoustic reference") + ",\n" +
                 gap("independent_reproduction", "TOKEN_VAZIO", "repeat on independently controlled installation/device") + ",\n" +
                 gap("external_standard_audit", "NOT_AUDITED", "scoped external audit evidence required before any conformity claim") +
+                (authorialSigningResolved ? "" : ",\n" +
+                        gap("authorial_signing", "TOKEN_VAZIO_AUTHORIAL_SIGNATURE", "build with AUTHORIAL_ANDROID_APKSIGNER and prove installed certificate matches expected SHA-256")) +
                 (sourceBound ? "" : ",\n" + gap("source_sha", "TOKEN_VAZIO", "build through source-bound CI")) +
                 (ciBound ? "" : ",\n" + gap("ci_run_id", "TOKEN_VAZIO", "build through CI with run provenance")) +
                 ((vibrationContract && magneticContract) ? "" : ",\n" +
@@ -360,6 +373,7 @@ final class AssuranceZiprafWriter {
             String apkSha,
             boolean sourceBound,
             boolean ciBound,
+            boolean authorialSigningResolved,
             String vibrationState,
             int vibrationSamples,
             String magneticState,
@@ -372,6 +386,8 @@ final class AssuranceZiprafWriter {
                         apkSha.length() == 64 ? "PROVABLE_SCOPED" : "TOKEN_VAZIO_EVIDENCE") + ",\n" +
                 claim("source_ci_binding",
                         (sourceBound && ciBound) ? "PROVABLE_SCOPED" : "TOKEN_VAZIO_PROVENANCE") + ",\n" +
+                claim("authorial_signing_identity",
+                        authorialSigningResolved ? "PROVABLE_SCOPED" : "TOKEN_VAZIO_AUTHORIAL_SIGNATURE") + ",\n" +
                 claim("vibration_behavior_observation",
                         sensorClaimState(vibrationState, vibrationSamples)) + ",\n" +
                 claim("magnetic_behavior_observation",
@@ -390,7 +406,8 @@ final class AssuranceZiprafWriter {
             int materializedCount,
             int relationCount,
             int gapCount,
-            String starState) {
+            String starState,
+            boolean authorialSigningResolved) {
         return "schema=" + AssurancePipelineModel.SCHEMA + NL +
                 "generated_epoch_ms=" + epochMs + NL +
                 "star_expression=" + AssurancePipelineModel.STAR_EXPRESSION + NL +
@@ -400,6 +417,8 @@ final class AssuranceZiprafWriter {
                 "delta_behavior=RUNTIME_PROBE_OR_NOT_RUN" + NL +
                 "section_metric_contract=AVAILABILITY_THEN_EXPLICIT_UNITS_AND_REFERENCE_GATES" + NL +
                 "paragraph_relations=" + relationCount + NL +
+                "authorial_signing_binding=" +
+                        (authorialSigningResolved ? "PASS" : "TOKEN_VAZIO_AUTHORIAL_SIGNATURE") + NL +
                 "star_numeric_score=TOKEN_VAZIO_NOT_DEFINED" + NL +
                 "star_state=" + starState + NL +
                 "external_standard_audit=NOT_AUDITED" + NL +
@@ -444,6 +463,24 @@ final class AssuranceZiprafWriter {
 
     private static String relationState(String hash) {
         return hash.startsWith("TOKEN_VAZIO") ? "TOKEN_VAZIO" : "BOUND_SHA256";
+    }
+
+    private static boolean hasEvidenceLine(byte[] bytes, String key, String expected) {
+        if (bytes == null || key == null || expected == null) return false;
+        String text = new String(bytes, StandardCharsets.UTF_8);
+        String needle = key + "=" + expected;
+        int from = 0;
+        while (from <= text.length()) {
+            int index = text.indexOf(needle, from);
+            if (index < 0) return false;
+            boolean left = index == 0 || text.charAt(index - 1) == '\n';
+            int end = index + needle.length();
+            boolean right = end == text.length() || text.charAt(end) == '\n' ||
+                    text.charAt(end) == '\r';
+            if (left && right) return true;
+            from = index + 1;
+        }
+        return false;
     }
 
     private static void put(TreeMap<String, byte[]> entries, String name, String text) {
