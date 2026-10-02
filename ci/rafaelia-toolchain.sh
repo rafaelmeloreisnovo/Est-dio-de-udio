@@ -44,7 +44,10 @@ setup_android() {
   [ -d "$root" ] || die "ANDROID_SDK_ROOT_NOT_FOUND"
 
   local sdkmanager=""
-  for candidate in     "$root/cmdline-tools/latest/bin/sdkmanager"     "$root/cmdline-tools/bin/sdkmanager"     "$root/tools/bin/sdkmanager"
+  for candidate in \
+    "$root/cmdline-tools/latest/bin/sdkmanager" \
+    "$root/cmdline-tools/bin/sdkmanager" \
+    "$root/tools/bin/sdkmanager"
   do
     if [ -x "$candidate" ]; then
       sdkmanager="$candidate"
@@ -72,10 +75,18 @@ setup_android() {
   fi
 
   yes | "$sdkmanager" --licenses >/dev/null || true
-  "$sdkmanager"     "platform-tools"     "platforms;android-35"     "build-tools;35.0.0"     "ndk;27.2.12479018"     "cmake;3.22.1"
+  "$sdkmanager" \
+    "platform-tools" \
+    "platforms;android-36" \
+    "build-tools;36.0.0" \
+    "ndk;27.2.12479018" \
+    "cmake;3.22.1"
 
   [ -d "$ANDROID_SDK_ROOT/ndk/27.2.12479018" ] || die "NDK_INSTALL_FAIL"
+  [ -d "$ANDROID_SDK_ROOT/platforms/android-36" ] || die "ANDROID36_PLATFORM_INSTALL_FAIL"
+  [ -x "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" ] || die "BUILD_TOOLS_36_INSTALL_FAIL"
   printf 'RAFAELIA_ANDROID_SDK=PASS\n'
+  printf 'RAFAELIA_TARGET_API_TOOLCHAIN=36\n'
 }
 
 setup_gradle() {
@@ -88,7 +99,9 @@ setup_gradle() {
   mkdir -p "$base"
 
   if [ ! -x "$home/bin/gradle" ]; then
-    curl --fail --location --silent --show-error       "https://services.gradle.org/distributions/gradle-$version-bin.zip"       --output "$zip"
+    curl --fail --location --silent --show-error \
+      "https://services.gradle.org/distributions/gradle-$version-bin.zip" \
+      --output "$zip"
     printf '%s  %s\n' "$sha256" "$zip" | sha256sum --check --strict
     rm -rf "$home"
     unzip -q "$zip" -d "$base"
@@ -113,6 +126,7 @@ report() {
   printf 'CHECKOUT=AUTHORIAL_GIT_SHELL\n'
   printf 'JAVA17=RUNNER_IMAGE_VERIFIED\n'
   printf 'ANDROID_SDK=RUNNER_IMAGE_PLUS_PINNED_PACKAGES\n'
+  printf 'ANDROID_TARGET_API=36\n'
   printf 'GRADLE=PINNED_BINARY_SHA256\n'
   printf 'GH_CLI=RUNNER_PLATFORM_EDGE\n'
 }

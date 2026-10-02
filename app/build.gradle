@@ -7,16 +7,27 @@ def envOrToken = { String name ->
     return value == null || value.trim().isEmpty() ? 'UNAVAILABLE_LOCAL_BUILD' : value.trim()
 }
 
+def envOrDefault = { String name, String fallback ->
+    def value = System.getenv(name)
+    return value == null || value.trim().isEmpty() ? fallback : value.trim()
+}
+
+def envIntOrDefault = { String name, int fallback ->
+    def value = System.getenv(name)
+    if (value == null || value.trim().isEmpty()) return fallback
+    return Integer.parseInt(value.trim())
+}
+
 android {
     namespace 'io.rafaelia.audiostudio'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId 'io.rafaelia.audiostudio'
         minSdk 29
-        targetSdk 35
-        versionCode 1
-        versionName '0.1.0-delta1'
+        targetSdk 36
+        versionCode envIntOrDefault('RFA_VERSION_CODE', 1)
+        versionName envOrDefault('RFA_VERSION_NAME', '0.1.0-local')
 
         buildConfigField 'String', 'SOURCE_SHA', '"'+envOrToken('RFA_SOURCE_SHA')+'"'
         buildConfigField 'String', 'CI_RUN_ID', '"'+envOrToken('RFA_CI_RUN_ID')+'"'
@@ -26,6 +37,8 @@ android {
         buildConfigField 'String', 'SIGNER_ID', '"'+envOrToken('RFA_SIGNER_ID')+'"'
         buildConfigField 'String', 'EXPECTED_CERT_SHA256', '"'+envOrToken('RFA_EXPECTED_CERT_SHA256')+'"'
         buildConfigField 'String', 'COMPONENT_ORIGIN_SCHEMA', '"rafaelia.component-origin/v1"'
+        buildConfigField 'int', 'RAFAELIA_VERSION_CODE', String.valueOf(envIntOrDefault('RFA_VERSION_CODE', 1))
+        buildConfigField 'String', 'RAFAELIA_VERSION_NAME', '"'+envOrDefault('RFA_VERSION_NAME', '0.1.0-local')+'"'
 
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a'
@@ -71,6 +84,5 @@ android {
         }
     }
 }
-
 
 apply from: rootProject.file("gradle/rafaelia-authorial.gradle")

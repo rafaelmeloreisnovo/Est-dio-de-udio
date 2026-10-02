@@ -22,7 +22,7 @@ die() {
 : "${RFA_EXPECTED_CERT_SHA256:?RAFAELIA_EXPECTED_CERT_SHA256_TOKEN_VAZIO}"
 : "${RFA_SIGNER_ID:?RAFAELIA_SIGNER_ID_TOKEN_VAZIO}"
 
-build_tools="${ANDROID_SDK_ROOT:?ANDROID_SDK_ROOT_TOKEN_VAZIO}/build-tools/35.0.0"
+build_tools="${ANDROID_SDK_ROOT:?ANDROID_SDK_ROOT_TOKEN_VAZIO}/build-tools/36.0.0"
 apksigner="$build_tools/apksigner"
 [ -x "$apksigner" ] || die "APKSIGNER_NOT_FOUND"
 
@@ -63,18 +63,18 @@ expected="$(
 [ "${#expected}" -eq 64 ] || die "EXPECTED_CERT_SHA256_INVALID"
 [ "$cert" = "$expected" ] || die "CERT_SHA256_MISMATCH"
 
-# The exact signed artifact must also satisfy the static installability contract
-# before publication. This is not a physical adb install claim.
 bash ci/apk-installability-static.sh "$signed_apk"
 
 apk_sha="$(sha256sum "$signed_apk" | awk '{print $1}')"
 unsigned_sha="$(sha256sum "$unsigned_apk" | awk '{print $1}')"
 
 cat > "$receipt" <<EOF
-schema=rafaelia.signed-release/v1
+schema=rafaelia.signed-release/v2
 source_sha=${RFA_SOURCE_SHA:-UNAVAILABLE}
 run_id=${RFA_CI_RUN_ID:-UNAVAILABLE}
 run_number=${RFA_CI_RUN_NUMBER:-UNAVAILABLE}
+version_code=${RFA_VERSION_CODE:-TOKEN_VAZIO}
+version_name=${RFA_VERSION_NAME:-TOKEN_VAZIO}
 signer_id=$RFA_SIGNER_ID
 android_key_alias=$RFA_ANDROID_KEY_ALIAS
 expected_certificate_sha256=$expected
@@ -82,7 +82,7 @@ observed_certificate_sha256=$cert
 certificate_match=PASS
 unsigned_apk_sha256=$unsigned_sha
 signed_apk_sha256=$apk_sha
-signature_tool=Android_build_tools_35.0.0_apksigner
+signature_tool=Android_build_tools_36.0.0_apksigner
 installable_static=PASS
 installed_physical=NOT_RUN
 private_key_material=SECRET_NOT_EXPORTED

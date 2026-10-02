@@ -17,7 +17,10 @@ on:
         options:
           - validate
           - live-debug
+          - provider-bootstrap
           - signed-release
+          - store-internal
+          - store-production
       source_sha:
         description: Optional exact 40-char source SHA; blank uses the selected ref SHA.
         required: false
@@ -76,7 +79,7 @@ jobs:
           fi
 
           case "$delivery" in
-            validate|live-debug|signed-release) ;;
+            validate|live-debug|provider-bootstrap|signed-release|store-internal|store-production) ;;
             *)
               echo "DELIVERY_MODE_INVALID=$delivery"
               exit 1
@@ -89,8 +92,39 @@ jobs:
           echo "DELIVERY_MODE=$delivery"
           echo "EXTERNAL_STANDARD_AUDIT=NOT_AUDITED"
 
+  provider_bootstrap:
+    name: 05 · provider / bootstrap
+    if: ${{ needs.plan.outputs.delivery == 'provider-bootstrap' }}
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      RFA_PROVIDER_ADMIN_TOKEN: ${{ secrets.PAT_ENVIRONMENTS || secrets.PAT_ENV || secrets.PAT_ACTIONS }}
+      RFA_PAT_ENV: ${{ secrets.PAT_ENV }}
+      RFA_PAT_ENVIRONMENTS: ${{ secrets.PAT_ENVIRONMENTS }}
+      RFA_PAT_ACTIONS: ${{ secrets.PAT_ACTIONS }}
+      RFA_PAT_AGENTS: ${{ secrets.PAT_AGENTS }}
+      RFA_PAT_DEPENDABOT: ${{ secrets.PAT_DEPENDABOT }}
+      RFA_PAT_CODESPACE: ${{ secrets.PAT_CODESPACE }}
+    steps:
+      - name: Exact checkout for provider bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+      - name: Apply non-delete provider governance
+        shell: bash
+        run: bash ci/provider-bootstrap.sh
+
   gate:
     name: gate / build
+    if: ${{ needs.plan.outputs.delivery != 'provider-bootstrap' }}
     needs: plan
     runs-on: ubuntu-latest
     permissions:
@@ -115,6 +149,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
           echo "RAFAELIA_CHECKOUT=PASS"
 
+      - name: 12 · deterministic Android revision
+        shell: bash
+        run: bash ci/rafaelia-version.sh
+
       - name: 20 · capacity bootstrap
         shell: bash
         run: bash ci/rafaelia-pipeline.sh bootstrap
@@ -126,6 +164,10 @@ jobs:
       - name: 40 · quality capability
         shell: bash
         run: bash ci/rafaelia-pipeline.sh quality
+
+      - name: 41 · distribution / update contract
+        shell: bash
+        run: bash ci/distribution-contract-gate.sh
 
       - name: 42 · explicit compile / Java + native ABIs
         shell: bash
@@ -193,6 +235,10 @@ jobs:
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
 
+      - name: Bind deterministic Android revision
+        shell: bash
+        run: bash ci/rafaelia-version.sh
+
       - name: Build capability bootstrap
         shell: bash
         run: bash ci/rafaelia-pipeline.sh bootstrap
@@ -224,8 +270,8 @@ jobs:
         run: bash ci/rafaelia-pipeline.sh publish-live
 
   deliver_signed:
-    name: 90 · delivery / signed-release
-    if: ${{ needs.plan.outputs.delivery == 'signed-release' }}
+    name: 90 · delivery / signed + store
+    if: ${{ needs.plan.outputs.delivery == 'signed-release' || needs.plan.outputs.delivery == 'store-internal' || needs.plan.outputs.delivery == 'store-production' }}
     needs:
       - plan
       - gate
@@ -236,6 +282,7 @@ jobs:
       RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
       RFA_CI_RUN_ID: ${{ github.run_id }}
       RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+      RFA_DELIVERY_MODE: ${{ needs.plan.outputs.delivery }}
       RFA_PROVIDER_REF: ${{ github.ref }}
       RFA_PROVIDER_REF_PROTECTED: ${{ github.ref_protected }}
       RFA_PROVIDER_REF_SHA: ${{ github.sha }}
@@ -248,6 +295,10 @@ jobs:
       RFA_ANDROID_KEY_PASSWORD: ${{ secrets.RAFAELIA_ANDROID_KEY_PASSWORD }}
       RFA_PAGES_REPO: ${{ vars.RAFAELIA_PAGES_REPO }}
       RFA_PAGES_PAT: ${{ secrets.RAFAELIA_PAGES_PAT }}
+      RFA_PAT_ACTIONS: ${{ secrets.PAT_ACTIONS }}
+      RFA_PLAY_SERVICE_ACCOUNT_B64: ${{ secrets.RAFAELIA_PLAY_SERVICE_ACCOUNT_B64 }}
+      RFA_PLAY_PACKAGE_NAME: ${{ vars.RAFAELIA_PLAY_PACKAGE_NAME }}
+      RFA_PLAY_PRODUCTION_APPROVED: ${{ vars.RAFAELIA_PLAY_PRODUCTION_APPROVED }}
     steps:
       - name: Provider enforcement gate
         shell: bash
@@ -263,12 +314,16 @@ jobs:
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
 
+      - name: Bind deterministic Android revision
+        shell: bash
+        run: bash ci/rafaelia-version.sh
+
       - name: Signing capability bootstrap
         shell: bash
         run: bash ci/rafaelia-pipeline.sh bootstrap
 
-      - name: Build, sign, verify and publish
+      - name: Build, sign, publish Pages and optional Play track
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash ci/rafaelia-pipeline.sh signed-release
+        run: bash ci/distribution-release.sh
