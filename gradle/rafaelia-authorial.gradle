@@ -28,8 +28,11 @@ tasks.register("rafaeliaAssuranceModelSmoke") {
 
 tasks.register("rafaeliaAudioInteropSmoke") {
     group = "rafaelia verification"
-    description = "Run provider-free byte-layout vectors for authorial PCM export containers."
+    description = "Gate freestanding C format headers and provider-free Java byte-layout vectors."
     doLast {
+        exec {
+            commandLine "bash", rootProject.file("ci/audio-format-core-gate.sh").absolutePath
+        }
         def outDir = audioInteropSmokeOut.get().asFile
         delete(outDir)
         outDir.mkdirs()
@@ -114,7 +117,7 @@ tasks.register("rafaeliaBuildContract") {
         println("ASSURANCE_ZIPRAF=FAIL_CLOSED_MODEL_V1")
         println("ASSURANCE_CONSISTENCY_GATE=BOUND_TO_JAVA_GATE")
         println("AUDIO_INTEROP_SMOKE=BOUND_TO_JAVA_GATE")
-        println("AUDIO_INTEROP_FORMATS=RAW_PCM16,WAV_PCM16,AIFF_PCM16,AU_PCM16,CAF_LPCM16")
+        println("AUDIO_INTEROP_FREESTANDING_CORE=RAW_PCM16,WAV_PCM16,AIFF_PCM16,AU_PCM16,CAF_LPCM16")
         println("AUDIO_INTEROP_EXTERNAL_CODEC_LIBRARY=NONE")
         println("SENSOR_PERMISSION_GATE=BOUND_TO_JAVA_GATE")
         println("FINAL_ELF_BOUNDARY_GATE=BOUND_TO_DEBUG_APK")
