@@ -18,6 +18,7 @@ final class AssurancePipelineModel {
             "★={†[material]}×{‡([materialized^n])+∅×∆×§×¶}";
 
     static final String NOT_AUDITED = "NOT_AUDITED";
+    static final String SENSOR_UNAVAILABLE = "TOKEN_VAZIO_SENSOR_UNAVAILABLE";
     static final String CLAIM_POLICY =
             "SOURCE!=ARTIFACT!=EXECUTION!=EVIDENCE!=CLAIM;" +
             "TOKEN_VAZIO!=0;IMPLEMENTED_UNTESTED!=PASS";
@@ -52,6 +53,39 @@ final class AssurancePipelineModel {
             return "OBSERVED_UNCALIBRATED";
         }
         return "OBSERVED_METRIC_SCOPED";
+    }
+
+    /**
+     * Sensor availability is orthogonal to metric validity.
+     * A device without the requested sensor did not fail a measurement contract;
+     * the metric is not applicable on that device and the source state is retained.
+     */
+    static String sensorMetricState(
+            String sourceState,
+            int samples,
+            boolean finite,
+            boolean unitDefined) {
+        if (isSensorUnavailable(sourceState)) return SENSOR_UNAVAILABLE;
+        if (sourceState == null || "NOT_RUN".equals(sourceState)) return "NOT_RUN";
+        if (samples <= 1) return "INSUFFICIENT_EVIDENCE";
+        if (!finite || !unitDefined) return "FAIL_METRIC_CONTRACT";
+        return "OBSERVED_METRIC_SCOPED";
+    }
+
+    static boolean isSensorUnavailable(String state) {
+        return state != null && state.startsWith(SENSOR_UNAVAILABLE);
+    }
+
+    static boolean isObservedSensorState(String state, int samples) {
+        return state != null &&
+                !isSensorUnavailable(state) &&
+                !"NOT_RUN".equals(state) &&
+                !"INSUFFICIENT_EVIDENCE".equals(state) &&
+                samples > 1;
+    }
+
+    static double finiteOrZero(double value) {
+        return isFinite(value) ? value : 0.0;
     }
 
     static boolean isFinite(double value) {
