@@ -8,6 +8,8 @@ The exact SHA/run/hash below is an **immutable executed baseline**, not a floati
 SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
 TOKEN_VAZIO != 0
 IMPLEMENTED_UNTESTED != PASS
+EMBEDDED_BYTES != REFERENCED_HASH
+REPRODUCIBLE_SAME_ENV != INDEPENDENT_REPRODUCTION
 ```
 
 ## Executed software baseline
@@ -87,7 +89,8 @@ IMPLEMENTED_UNTESTED != PASS
 |---|---|---|---|---|
 | exact source checkout | implemented | run #39 `RAFAELIA_CHECKOUT=PASS` | N/A | bounded to exact SHA |
 | parser fuzz / sanitizer gate | implemented | corpus 8192; ASAN/UBSAN PASS | N/A | executed software scope |
-| assurance consistency gate | implemented | `PASS_EXECUTED_SCOPE` | N/A | bounded software scope |
+| assurance consistency gate | implemented | baseline `PASS_EXECUTED_SCOPE`; custody split delta requires its own exact-head PASS before promotion | N/A | fail-closed |
+| ZIPRAF embedded/reference custody split | implemented in hardening delta | explicit gate requires `embedded + referenced` counters and custody classes | exact-head ZIPRAF still required | software semantics only until physical execution |
 | unavailable-sensor semantics | implemented | `SENSOR_UNAVAILABLE_SEMANTICS=PASS` | exact-head device run still required | no false promotion |
 | binary-origin receipt | implemented | run #39 PASS | N/A | bounded byte-origin metadata |
 | same-environment APK reproducibility | implemented | build A = build B = `1656df3e...` | same pinned CI environment only | `PASS`; independent reproduction NOT_CLAIMED |

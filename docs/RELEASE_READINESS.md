@@ -8,11 +8,13 @@ The exact receipt recorded below is an **immutable executed baseline**. A docume
 SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
 IMPLEMENTED_UNTESTED != PASS
 TOKEN_VAZIO != 0
+EMBEDDED_BYTES != REFERENCED_HASH
+REPRODUCIBLE_SAME_ENV != INDEPENDENT_REPRODUCTION
 ```
 
 ## Executed software baseline
 
-Validated runtime-bearing baseline before this documentation-only reconciliation:
+Validated runtime-bearing baseline before the current custody delta:
 
 - source: `main@469eb83b0d23286190c306b17c3fd378118dadd4`
 - canonical GitHub Actions run: `37014682335` / #39 = `SUCCESS`
@@ -48,6 +50,25 @@ The baseline canonical receipt supports the executed software scope below:
 - clean second build in the same pinned CI environment with exact APK byte identity.
 
 This does **not** imply a physical-device PASS or independent reproduction.
+
+## ZIPRAF custody gate
+
+The current hardening delta closes one narrower ambiguity without adding a product feature:
+
+```text
+materialized_count = embedded_artifact_count + referenced_artifact_count
+```
+
+Required semantics:
+
+- raw evidence copied into `80_raw/evidence.txt` = `EMBEDDED`;
+- installed APK hash = `REFERENCED_NOT_EMBEDDED`;
+- concrete ZRF/CFR/mastered-PCM hashes = `REFERENCED_NOT_EMBEDDED` unless their bytes are explicitly added as ZIP entries;
+- missing referenced artifacts remain typed `TOKEN_VAZIO_NOT_MATERIALIZED`;
+- `99_SHA256SUMS.txt` binds embedded ZIP entries, not external bytes merely named by hash;
+- the legacy aggregate `materialized_count` is retained for compatibility but cannot be interpreted as self-contained replay coverage.
+
+This delta must pass its own exact-head CI before promotion.
 
 ## Required before claiming exact-head physical capability
 
@@ -146,10 +167,11 @@ Release notes and receipts must not convert any of the following into a stronger
 - `PENDING`;
 - `NOT_RUN`;
 - `TOKEN_VAZIO`;
+- a referenced hash into embedded bytes/self-contained replay;
 - same-environment reproducibility into independent reproduction;
 - static installability into installed physical execution;
 - pre-link freestanding core status into a claim that the final Android `.so` is bare-metal/freestanding;
 - a hash into authenticity, scientific validity or calibration;
 - an older executed receipt into a floating statement about a later branch head.
 
-The obsolete `main@1a1b00... / run 36545296255` baseline is historical only and is no longer the readiness anchor. The `469eb83... / #39` receipt above remains an immutable executed baseline until a newer receipt is explicitly appended/promoted.
+The obsolete `main@1a1b00... / run 36545296255` baseline is historical only. The `469eb83... / #39` receipt remains an immutable executed baseline; newer deltas append their own exact receipts rather than rewriting it.

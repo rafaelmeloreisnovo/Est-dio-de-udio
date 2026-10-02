@@ -5,6 +5,7 @@ SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
 
 **Executed software baseline:** `IMPLEMENTED + CI_GATE_PASS` for `main@469eb83b0d23286190c306b17c3fd378118dadd4`, run `37014682335` / #39.  
 **Receipt semantics:** the exact SHA/run/hash is immutable executed evidence, not a floating `main` pointer.  
+**Custody hardening delta:** `IMPLEMENTED_PENDING_FINAL_EXACT_HEAD_CI`; explicit embedded/reference counters are added without redefining the legacy aggregate.  
 **Exact-head physical ZIPRAF:** `NOT_RUN / TOKEN_VAZIO` until issue #29 binds the newest target APK to a device.  
 **External standards audit:** `NOT_AUDITED`.  
 **Claim policy:** `claim_allowed=false`.
@@ -20,11 +21,13 @@ SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
 TOKEN_VAZIO != 0
 IMPLEMENTED_UNTESTED != PASS
 REFERENCE_TO_STANDARD != AUDITED_CONFORMITY
+EMBEDDED_BYTES != REFERENCED_HASH
+REPRODUCIBLE_SAME_ENV != INDEPENDENT_REPRODUCTION
 ```
 
 ## 2. Symbolic composition
 
-The requested symbolic form is preserved as:
+The symbolic form is preserved as:
 
 ```text
 ★ = {†[material]} × {‡([materialized^n]) + ∅ × ∆ × § × ¶}
@@ -38,7 +41,7 @@ It is **not** interpreted as an invented numerical score.
 | `‡` | evidence coverage: embedded bytes and/or explicitly hash-bound material coordinates |
 | `∅` | unresolved gap / `TOKEN_VAZIO` / missing authority or reference |
 | `∆` | observed behavior delta from executed probes |
-| `§` | metric contract: unit, execution, finite value and required reference |
+| `§` | metric contract: availability, unit, execution, finite value and required reference |
 | `¶` | typed provenance/relationship edge |
 | `★` | fail-closed state derived from those predicates |
 
@@ -54,6 +57,7 @@ button
   -> hash installed APK
   -> hash available ZRF/CFR/master PCM
   -> qualify metric states
+  -> separate embedded bytes from external hash references
   -> materialize relations
   -> materialize gaps + exit criteria
   -> materialize bounded claims
@@ -80,11 +84,11 @@ The current container embeds the raw evidence text under:
 80_raw/evidence.txt
 ```
 
-The other JSON/TXT receipt entries are also actual ZIP entries and are covered by `99_SHA256SUMS.txt`.
+The JSON/TXT receipt entries are also actual ZIP entries and are covered by `99_SHA256SUMS.txt`.
 
 ### Hash-bound / referenced material
 
-Installed APK, ZRF, CFR and mastered PCM may be represented by identity fields, paths and SHA-256 coordinates without their complete bytes being copied into this ZIPRAF. Such a coordinate proves only what the captured evidence can bind; it is not equivalent to self-contained replay material.
+Installed APK, ZRF, CFR and mastered PCM may be represented by identity fields and SHA-256 coordinates without their complete bytes being copied into this ZIPRAF. Such a coordinate proves only what the captured evidence can bind; it is not equivalent to self-contained replay material.
 
 Therefore:
 
@@ -95,7 +99,32 @@ INTEGRITY != AUTHENTICITY
 HASH != SCIENTIFIC_VALIDITY
 ```
 
-The existing `materialized_count` field is retained for V1 compatibility as a **coverage coordinate**, not an `embedded_artifact_count`. A future schema revision may split explicit counters without silently redefining V1.
+The legacy `materialized_count` remains a V1 compatibility/coverage coordinate. The custody hardening delta adds explicit counters without silently changing that field's numeric meaning:
+
+```text
+materialized_count = embedded_artifact_count + referenced_artifact_count
+```
+
+Current custody classes are explicit:
+
+| Object | Custody state |
+|---|---|
+| `80_raw/evidence.txt` | `EMBEDDED` |
+| installed APK | `REFERENCED_NOT_EMBEDDED` |
+| ZRF with concrete SHA | `REFERENCED_NOT_EMBEDDED` |
+| CFR with concrete SHA | `REFERENCED_NOT_EMBEDDED` |
+| mastered PCM with concrete SHA | `REFERENCED_NOT_EMBEDDED` |
+| missing ZRF/CFR/PCM | `TOKEN_VAZIO_NOT_MATERIALIZED` |
+
+The receipt exports:
+
+```text
+embedded_artifact_count=<n>
+referenced_artifact_count=<n>
+custody_boundary=EMBEDDED_BYTES_SEPARATE_FROM_HASH_REFERENCES
+```
+
+`99_SHA256SUMS.txt` binds the embedded ZIP entries. It does not claim possession of external bytes merely referenced by a digest.
 
 ## 5. ZIPRAF entries
 
@@ -112,15 +141,7 @@ The existing `materialized_count` field is retained for V1 compatibility as a **
 99_SHA256SUMS.txt
 ```
 
-Entries are emitted in lexical order using stored ZIP entries with a fixed archive-entry timestamp. `99_SHA256SUMS.txt` binds every preceding **embedded ZIP entry**.
-
-This is an integrity/custody mechanism:
-
-```text
-ZIPRAF != encryption
-integrity != authenticity
-hash != scientific validity
-```
+Entries are emitted in lexical order using stored ZIP entries with a fixed archive-entry timestamp.
 
 ## 6. Metric qualification
 
@@ -128,6 +149,7 @@ A runtime metric can become `OBSERVED_METRIC_SCOPED` only when:
 
 ```text
 executed
++ available when hardware-dependent
 + finite value
 + explicit unit
 + required reference present when the claim needs one
@@ -172,9 +194,9 @@ metrics --BOUNDS--> claims
 
 Missing coordinates do not become fabricated observations. They remain typed `TOKEN_VAZIO` / unavailable / not-run states according to the actual failure or absence mode.
 
-## 8. Executed software receipt
+## 8. Executed parent software receipt
 
-Run #39 for `main@469eb83b0d23286190c306b17c3fd378118dadd4` executed the software assurance path and recorded, among other gates:
+Run #39 for `main@469eb83b0d23286190c306b17c3fd378118dadd4` recorded:
 
 ```text
 ASSURANCE_CONSISTENCY_GATE=PASS_EXECUTED_SCOPE
@@ -198,7 +220,7 @@ APK_REPRODUCIBLE_SAME_ENV=PASS
 INDEPENDENT_REPRODUCTION=NOT_CLAIMED
 ```
 
-This receipt does not supply device execution. Its exact APK remains `INSTALLED_PHYSICAL=NOT_RUN`. If `main` advances after this receipt, the next physical target must use the newer exact SHA/run/APK hash tracked by issue #29 rather than treating this receipt as a floating pointer.
+This receipt does not supply device execution. Its exact APK remains `INSTALLED_PHYSICAL=NOT_RUN`. When `main` advances, issue #29 must be rebound to the newer exact SHA/run/APK hash rather than treating the parent receipt as a floating pointer.
 
 ## 9. Android/freestanding boundary
 
@@ -214,12 +236,27 @@ FINAL_ELF_TRUE_FREESTANDING=NO
 
 Therefore a freestanding core claim must never be broadened into a statement that the final APK `.so` is bare-metal or freestanding.
 
-## 10. Claims boundary
+## 10. Custody consistency CI gate
+
+`ci/assurance-consistency-gate.sh` fail-closes the new semantics. Before promotion it must prove, on the exact candidate head:
+
+```text
+MATERIALIZED_BASE=EMBEDDED_RAW_EVIDENCE+REFERENCED_INSTALLED_APK
+MATERIALIZED_AGGREGATE=EMBEDDED+REFERENCED
+ZIPRAF_EMBEDDED_REFERENCE_SPLIT=PASS_EXECUTED_SCOPE
+ASSURANCE_CONSISTENCY_GATE=PASS_EXECUTED_SCOPE
+CLAIM_ALLOWED=false
+```
+
+The same candidate must continue to pass the existing compile, fuzz/sanitizer, freestanding core, final-ELF boundary, reproducibility, static installability and binary-receipt gates.
+
+## 11. Claims boundary
 
 The package can support bounded statements such as byte identity when the corresponding bytes/hashes and provenance exist.
 
 It does not automatically promote:
 
+- a referenced hash into embedded/self-contained custody;
 - scientific causality;
 - physical calibration without a reference;
 - exact-head physical execution without device evidence;
@@ -230,7 +267,7 @@ It does not automatically promote:
 
 Those remain explicit gaps until their own evidence exists.
 
-## 11. Promotion rule
+## 12. Promotion rule
 
 ```text
 SOURCE
