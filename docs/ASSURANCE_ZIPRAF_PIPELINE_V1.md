@@ -3,7 +3,8 @@
 Copyright (c) 2026 Rafael Melo Reis  
 SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
 
-**Baseline before this custody delta:** `main@def87c720b14ab30ff39371637530d172223da6c`, run `37013439446` = `SUCCESS`  
+**Baseline before this custody delta:** `main@469eb83b0d23286190c306b17c3fd378118dadd4`, run `37014682335` = `SUCCESS`  
+**Parent reproducibility gate:** `APK_REPRODUCIBLE_SAME_ENV=PASS`; `INDEPENDENT_REPRODUCTION=NOT_CLAIMED`  
 **Delta state:** `IMPLEMENTED_PENDING_PR_CI + claim_allowed=false`  
 **External standards audit:** `NOT_AUDITED`
 
@@ -19,6 +20,7 @@ TOKEN_VAZIO != 0
 IMPLEMENTED_UNTESTED != PASS
 REFERENCE_TO_STANDARD != AUDITED_CONFORMITY
 EMBEDDED_BYTES != REFERENCED_HASH
+REPRODUCIBLE_SAME_ENV != INDEPENDENT_REPRODUCTION
 ```
 
 ## 2. Symbolic composition
@@ -185,9 +187,9 @@ The package can support bounded statements such as byte identity when the corres
 It does not automatically promote:
 
 - an external hash reference into embedded custody;
+- same-environment exact-byte reproducibility into independent reproduction;
 - scientific causality;
 - physical calibration without a reference;
-- independent reproduction;
 - standards conformity/certification/accreditation;
 - product-market or performance superiority.
 
@@ -220,4 +222,4 @@ SOURCE
 != external audit
 ```
 
-A successful project CI run can prove only the executed project scope. It does not substitute for a current-head physical run, provider enforcement, authorial signing, reproducible build or external normative audit.
+A successful project CI run can prove only the executed project scope. Same-environment exact-byte reproducibility is retained as a separate PASS. It does not substitute for a current-head physical run, provider enforcement, authorial signing, independent reproduction or external normative audit.
