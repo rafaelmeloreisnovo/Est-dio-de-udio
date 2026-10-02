@@ -120,7 +120,7 @@ int main(void) {
         if (guarded[65] != (rfa_i16)23456) return 41;
     }
 
-    /* Shared division helper: sign, zero-denominator, and INT64_MIN boundary. */
+    /* Shared division helper: sign, zero, INT64_MIN and high-denominator edges. */
     if (rfa_div_i64_u64_shift(100LL, 4ULL) != 25LL) return 50;
     if (rfa_div_i64_u64_shift(-100LL, 4ULL) != -25LL) return 51;
     if (rfa_div_i64_u64_shift(7LL, 3ULL) != 2LL) return 52;
@@ -128,6 +128,12 @@ int main(void) {
     if (rfa_div_i64_u64_shift(123LL, 0ULL) != 0LL) return 54;
     if (rfa_div_i64_u64_shift((-9223372036854775807LL - 1LL), 1ULL) !=
         (-9223372036854775807LL - 1LL)) return 55;
+    if (rfa_div_i64_u64_shift((-9223372036854775807LL - 1LL),
+                              (1ULL << 63)) != -1LL) return 56;
+    if (rfa_div_i64_u64_shift(9223372036854775807LL,
+                              (1ULL << 63)) != 0LL) return 57;
+    if (rfa_div_i64_u64_shift((-9223372036854775807LL - 1LL),
+                              (1ULL << 63) + 1ULL) != 0LL) return 58;
 
     return 0;
 }
