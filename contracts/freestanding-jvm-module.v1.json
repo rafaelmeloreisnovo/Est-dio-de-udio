@@ -1,0 +1,51 @@
+{
+  "schema": "rafaelia.freestanding-jvm-module/v1",
+  "id": "audio-dsp-core",
+  "repository": "rafaelmeloreisnovo/Est-dio-de-udio",
+  "authority": "Audio Studio owns DSP/fixed-point C cores; Android and JNI own platform adaptation only",
+  "authority_path": "app/src/main/cpp/",
+  "module_kind": "AUDIO_DSP",
+  "boundary": "FREESTANDING_CORE",
+  "jvm_is_freestanding": false,
+  "hosted_adapter_policy": "mutable Android/JNI state remains outside the freestanding DSP cores",
+  "required_flags": [
+    "SOURCE_BOUND",
+    "AUTHORITY_BOUND",
+    "FAIL_CLOSED",
+    "SHADOW_GUARD"
+  ],
+  "friction_controls": {
+    "tail_recursion": false,
+    "reflection_dispatch": false,
+    "shadow_state": "ANDROID_BOUNDARY_OWNS_MUTABLE_PLATFORM_STATE",
+    "warning_transport": "BITMASK_OR_TYPED_STATUS"
+  },
+  "state": "IMPLEMENTED_UNTESTED",
+  "urgency": "P0",
+  "claim_allowed": false,
+  "central_contract": "rafaelmeloreisnovo/RafGitTools:docs/architecture/FREESTANDING_JVM_ORCHESTRATION_V1.md",
+  "token_vazio": [
+    {
+      "id": "TOKEN_VAZIO_AUDIO_JVM_PIPELINE_CURRENT_HEAD",
+      "missing": "same-head JVM/JNI-to-DSP pipeline execution receipt",
+      "evidence_needed": "ABI identity + unit/native gate + packaged adapter receipt on the same commit",
+      "urgency": "P1",
+      "next": "bind one existing DSP ABI through the typed orchestration adapter without moving Android state into C"
+    },
+    {
+      "id": "TOKEN_VAZIO_AUDIO_PHYSICAL_MIC_SENSOR",
+      "missing": "physical microphone/speaker/sensor evidence for hardware-facing claims",
+      "evidence_needed": "exact APK+device+permission+sensor/microphone runtime receipt",
+      "urgency": "P0",
+      "next": "execute physical Android evidence gate before any hardware-quality or sensor claim promotion"
+    },
+    {
+      "id": "TOKEN_VAZIO_AUDIO_ABSOLUTE_SPL_REFERENCE",
+      "missing": "calibrated physical acoustic reference",
+      "evidence_needed": "traceable acoustic reference and calibration receipt",
+      "urgency": "P2",
+      "next": "keep absolute SPL unclaimed until a physical reference exists"
+    }
+  ],
+  "rollback": "close draft PR or revert only this leaf; preserve raw PCM and existing JNI/core boundary"
+}
