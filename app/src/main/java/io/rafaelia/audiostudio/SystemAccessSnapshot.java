@@ -24,22 +24,36 @@ final class SystemAccessSnapshot {
                 "MIC=GRANTED" : "MIC=ASK_ON_USE";
         String sensorEvidence = "SENSOR_MUDELTA=EXPLICIT_PROOF_ACTION";
         String sensorAccess =
-                "SENSOR_ACCESS=NO_RUNTIME_PERMISSION_REQUIRED_ACCEL_MAG_CURRENT_PROFILE";
+                "SENSOR_ACCESS=TYPE_ALL_INVENTORY+UNPROTECTED_PHYSICAL_DIRECT";
         String sensorRate =
                 "SENSOR_RATE=PLATFORM_BOUNDED_NO_HIGH_RATE_PERMISSION";
+        String protectedPolicy =
+                "PROTECTED_SENSOR_ACCESS=PERMISSION_SPECIFIC_NOT_AUTO_GRANTED";
+        String count = sm == null ?
+                "SENSOR_COUNT=TOKEN_VAZIO_SERVICE_UNAVAILABLE" :
+                "SENSOR_COUNT=" + sm.getSensorList(Sensor.TYPE_ALL).size();
 
         String accel = sensor(sm, Sensor.TYPE_ACCELEROMETER) ?
                 "ACCEL=PRESENT" : "ACCEL=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
         String mag = sensor(sm, Sensor.TYPE_MAGNETIC_FIELD) ?
                 "MAG=PRESENT" : "MAG=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
+        String gyro = sensor(sm, Sensor.TYPE_GYROSCOPE) ?
+                "GYRO=PRESENT" : "GYRO=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
         String light = sensor(sm, Sensor.TYPE_LIGHT) ?
                 "LIGHT=PRESENT" : "LIGHT=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
         String prox = sensor(sm, Sensor.TYPE_PROXIMITY) ?
                 "PROX=PRESENT" : "PROX=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
+        String pressure = sensor(sm, Sensor.TYPE_PRESSURE) ?
+                "PRESSURE=PRESENT" : "PRESSURE=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
+        String temp = sensor(sm, Sensor.TYPE_AMBIENT_TEMPERATURE) ?
+                "AMBIENT_TEMP=PRESENT" : "AMBIENT_TEMP=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
+        String humidity = sensor(sm, Sensor.TYPE_RELATIVE_HUMIDITY) ?
+                "HUMIDITY=PRESENT" : "HUMIDITY=TOKEN_VAZIO_SENSOR_NOT_PRESENT";
 
         return mic + " | " + sensorAccess + " | " + sensorRate + " | " +
-                sensorEvidence + " | " + accel + " | " + mag + " | " +
-                light + " | " + prox;
+                protectedPolicy + " | " + sensorEvidence + " | " + count + " | " +
+                accel + " | " + mag + " | " + gyro + " | " + light + " | " +
+                prox + " | " + pressure + " | " + temp + " | " + humidity;
     }
 
     static String signatureState() {
