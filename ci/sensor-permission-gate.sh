@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
 manifest='app/src/main/AndroidManifest.xml'
 main='app/src/main/java/io/rafaelia/audiostudio/MainActivity.java'
 snapshot='app/src/main/java/io/rafaelia/audiostudio/SystemAccessSnapshot.java'
@@ -77,6 +80,7 @@ grep -Fq 'ação explícita: coletando μ∆ local' "$main" || \
 grep -Fq 'ACTIVITY_RECOGNITION=NOT_DECLARED_NO_STEP_ACTIVITY_FEATURE' "$origin" || \
   fail 'EMBEDDED_PERMISSION_CONTRACT_STALE'
 
+printf 'REPO_ROOT=%s\n' "$repo_root"
 printf 'PERMISSION_SURFACE=RECORD_AUDIO,ACCESS_NETWORK_STATE\n'
 printf 'ACTIVITY_RECOGNITION=ABSENT\n'
 printf 'HIGH_SAMPLING_RATE_SENSORS=ABSENT\n'
