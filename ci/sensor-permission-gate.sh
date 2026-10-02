@@ -57,7 +57,7 @@ if grep -Fq 'REQ_ACTIVITY' "$main"; then
   fail 'DEAD_ACTIVITY_REQUEST_CODE_PRESENT'
 fi
 
-if grep -RFnE 'Sensor\.TYPE_STEP_(COUNTER|DETECTOR)|TYPE_SIGNIFICANT_MOTION' app/src/main/java >/dev/null; then
+if grep -RnE 'Sensor\.TYPE_STEP_(COUNTER|DETECTOR)|TYPE_SIGNIFICANT_MOTION' app/src/main/java >/dev/null; then
   fail 'STEP_ACTIVITY_SENSOR_API_PRESENT_WITHOUT_REVIEW'
 fi
 
