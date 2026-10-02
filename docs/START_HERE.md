@@ -14,6 +14,7 @@ Rafaelia Audio Studio is an Android audio workstation and measurement research p
 | understand architecture | `AUDIO_MANIFOLD_CONTRACT_V1.md` |
 | inspect relative CFR analysis | `CFR_RELATIVE_ANALYSIS_V1.md` |
 | understand adaptive noise/reference gating | `NLMS_REFERENCE_GATE_V1.md` |
+| audit parser fuzz / ARM runtime regressions | `PARSER_FUZZ_ARM_RUNTIME_GATE_V1.md` |
 | validate an installation | `INSTALLATION_VALIDATION.md` |
 | test hardware | `HARDWARE_TEST_PROTOCOL.md` |
 | understand μ∆ vibration | `MICRO_DELTA_VIBRATION_V1.md` |
@@ -39,6 +40,7 @@ The evidence button inside the app creates an installation/hardware/development 
 - `LOW_LEVEL_BOUNDARY_V1.md` — freestanding core vs irreducible Android shell.
 - `TOKEN_GAP_RECONCILIATION_V1.md` — when to resolve, classify or retain an empty token.
 - `NLMS_REFERENCE_GATE_V1.md` — adaptive cancellation reference/VAD boundary and evidence gates.
+- `PARSER_FUZZ_ARM_RUNTIME_GATE_V1.md` — malformed-input sanitizer gate and ARM runtime-helper regression control.
 
 
 ## System / origin / signing
