@@ -3,11 +3,16 @@
 ## Current exact software baseline
 
 ```text
-SOURCE_SHA=def87c720b14ab30ff39371637530d172223da6c
-CI_RUN_ID=37013439446
-CI_RUN_NUMBER=37
+SOURCE_SHA=469eb83b0d23286190c306b17c3fd378118dadd4
+CI_RUN_ID=37014682335
+CI_RUN_NUMBER=39
 CI_CONCLUSION=SUCCESS
-APK_SHA256=09703c7564980f9aa1374a689a10fc3408ffd321488ecaab56726de416eb19ee
+REPRO_BUILD_A_SHA256=1656df3ed0aed0038162400fc9734b4856a465539a513593172edc53c32f1c43
+REPRO_BUILD_B_SHA256=1656df3ed0aed0038162400fc9734b4856a465539a513593172edc53c32f1c43
+APK_REPRODUCIBLE_SAME_ENV=PASS
+REPRO_SCOPE=SAME_SOURCE_SAME_PINNED_CI_ENVIRONMENT
+INDEPENDENT_REPRODUCTION=NOT_CLAIMED
+APK_SHA256=1656df3ed0aed0038162400fc9734b4856a465539a513593172edc53c32f1c43
 APK_PACKAGE_ID=io.rafaelia.audiostudio
 APK_MIN_SDK=29
 APK_TARGET_SDK=35
@@ -34,6 +39,7 @@ This baseline supersedes older baseline references for **current software state 
 - local shadow diagnostics remain enforced;
 - final Android ELF boundary explicitly classified rather than mislabeled as true freestanding;
 - debug/release assembly PASS for the requested route;
+- same-source same-pinned-environment exact-byte reproducibility gate PASS;
 - static APK integrity/signature/zipalign/installability PASS;
 - artifact digest recorded;
 - capability matrix reconciled to the exact source/run.
@@ -59,7 +65,8 @@ For the current baseline the final `.so` files declare Android platform librarie
 - receipt records environment and outcome;
 - new ZIPRAF generated from that exact execution;
 - internal ZIPRAF SHA256SUMS verified;
-- raw evidence embedded in ZIPRAF is byte-identical to separately exported raw evidence.
+- raw evidence embedded in ZIPRAF is byte-identical to separately exported raw evidence;
+- hash-only artifact references must remain distinguished from bytes embedded in the ZIPRAF.
 
 Current exact-head physical state:
 
@@ -115,18 +122,31 @@ SIGNING_MODE=DEBUG_NONAUTHORIAL
 AUTHORIAL_SIGNING=TOKEN_VAZIO
 ```
 
-## Required before reproducibility claims
+## Reproducibility boundary
 
-- same exact source SHA built in a second controlled environment;
-- toolchain/environment receipt captured independently;
-- produced artifact digests compared;
-- any mismatch classified before promotion.
+The current CI proves one narrower property:
+
+```text
+same exact source
++ same pinned CI environment
++ clean rebuild
++ byte-identical APK SHA-256
+= APK_REPRODUCIBLE_SAME_ENV=PASS
+```
+
+That result is useful but is not independent reproduction. Before claiming independent reproducibility:
+
+- build the same exact source SHA in a separately controlled environment;
+- capture toolchain/environment receipt independently;
+- compare produced artifact digests;
+- classify any mismatch before promotion.
 
 Current state:
 
 ```text
-REPRODUCIBLE_BUILD_2ND_ENV=TOKEN_VAZIO
-INDEPENDENT_REPRODUCTION=TOKEN_VAZIO
+APK_REPRODUCIBLE_SAME_ENV=PASS
+REPRO_SCOPE=SAME_SOURCE_SAME_PINNED_CI_ENVIRONMENT
+INDEPENDENT_REPRODUCTION=NOT_CLAIMED
 ```
 
 ## Provider promotion enforcement
@@ -153,6 +173,7 @@ IMPLEMENTED_UNTESTED
 TOKEN_VAZIO
 NOT_AUDITED
 OBSERVED_UNPROMOTED
+NOT_CLAIMED
 ```
 
 The governing invariant remains:
@@ -161,4 +182,5 @@ The governing invariant remains:
 SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
 TOKEN_VAZIO != 0
 IMPLEMENTED_UNTESTED != PASS
+REPRODUCIBLE_SAME_ENV != INDEPENDENT_REPRODUCTION
 ```
