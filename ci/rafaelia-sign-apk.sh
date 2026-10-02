@@ -37,7 +37,13 @@ printf '%s' "$RFA_ANDROID_KEYSTORE_B64" | base64 --decode > "$ks"
 export RFA_KS_PASS_INTERNAL="$RFA_ANDROID_STORE_PASSWORD"
 export RFA_KEY_PASS_INTERNAL="$RFA_ANDROID_KEY_PASSWORD"
 
-"$apksigner" sign   --ks "$ks"   --ks-key-alias "$RFA_ANDROID_KEY_ALIAS"   --ks-pass env:RFA_KS_PASS_INTERNAL   --key-pass env:RFA_KEY_PASS_INTERNAL   --out "$signed_apk"   "$unsigned_apk"
+"$apksigner" sign \
+  --ks "$ks" \
+  --ks-key-alias "$RFA_ANDROID_KEY_ALIAS" \
+  --ks-pass env:RFA_KS_PASS_INTERNAL \
+  --key-pass env:RFA_KEY_PASS_INTERNAL \
+  --out "$signed_apk" \
+  "$unsigned_apk"
 
 verify_out="$tmp/apksigner.verify.txt"
 "$apksigner" verify --verbose --print-certs "$signed_apk" > "$verify_out"
@@ -57,6 +63,10 @@ expected="$(
 [ "${#expected}" -eq 64 ] || die "EXPECTED_CERT_SHA256_INVALID"
 [ "$cert" = "$expected" ] || die "CERT_SHA256_MISMATCH"
 
+# The exact signed artifact must also satisfy the static installability contract
+# before publication. This is not a physical adb install claim.
+bash ci/apk-installability-static.sh "$signed_apk"
+
 apk_sha="$(sha256sum "$signed_apk" | awk '{print $1}')"
 unsigned_sha="$(sha256sum "$unsigned_apk" | awk '{print $1}')"
 
@@ -73,6 +83,8 @@ certificate_match=PASS
 unsigned_apk_sha256=$unsigned_sha
 signed_apk_sha256=$apk_sha
 signature_tool=Android_build_tools_35.0.0_apksigner
+installable_static=PASS
+installed_physical=NOT_RUN
 private_key_material=SECRET_NOT_EXPORTED
 EOF
 
