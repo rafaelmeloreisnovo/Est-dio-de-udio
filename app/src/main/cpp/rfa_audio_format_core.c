@@ -95,23 +95,32 @@ rfa_u32 rfa_audio_format_write_header(
     rfa_u32 out_capacity,
     rfa_u32 *written) {
     rfa_u32 header_size = rfa_audio_format_header_size(format);
-    rfa_u64 frame_bytes = (rfa_u64)channels * 2u;
+    rfa_u32 frame_shift;
+    rfa_u64 frame_mask;
 
     if (written == (rfa_u32 *)0) return RFA_AUDIO_FORMAT_FAIL;
     *written = 0u;
     if (header_size == RFA_AUDIO_FORMAT_INVALID_SIZE) return RFA_AUDIO_FORMAT_FAIL;
-    if (sample_rate == 0u || channels == 0u || channels > 2u) return RFA_AUDIO_FORMAT_FAIL;
-    if (frame_bytes == 0u || (data_bytes % frame_bytes) != 0u) return RFA_AUDIO_FORMAT_FAIL;
+    if (sample_rate == 0u) return RFA_AUDIO_FORMAT_FAIL;
+    if (channels == 1u) {
+        frame_shift = 1u;
+    } else if (channels == 2u) {
+        frame_shift = 2u;
+    } else {
+        return RFA_AUDIO_FORMAT_FAIL;
+    }
+    frame_mask = (((rfa_u64)1u) << frame_shift) - 1u;
+    if ((data_bytes & frame_mask) != 0u) return RFA_AUDIO_FORMAT_FAIL;
     if (header_size == 0u) return RFA_AUDIO_FORMAT_OK;
     if (out == (rfa_u8 *)0 || out_capacity < header_size) return RFA_AUDIO_FORMAT_FAIL;
 
     if (format == RFA_AUDIO_FORMAT_WAV_PCM16) {
-        rfa_u32 block_align;
+        rfa_u32 block_align = channels << 1;
+        rfa_u64 byte_rate_wide = (rfa_u64)sample_rate * (rfa_u64)block_align;
         rfa_u32 byte_rate;
         if (data_bytes > 0xffffffffull - 36ull) return RFA_AUDIO_FORMAT_FAIL;
-        block_align = channels * 2u;
-        if (sample_rate > 0xffffffffu / block_align) return RFA_AUDIO_FORMAT_FAIL;
-        byte_rate = sample_rate * block_align;
+        if (byte_rate_wide > 0xffffffffull) return RFA_AUDIO_FORMAT_FAIL;
+        byte_rate = (rfa_u32)byte_rate_wide;
         rfa_put_ascii4(out + 0, 'R', 'I', 'F', 'F');
         rfa_put_u32le(out + 4, (rfa_u32)(36ull + data_bytes));
         rfa_put_ascii4(out + 8, 'W', 'A', 'V', 'E');
@@ -130,7 +139,7 @@ rfa_u32 rfa_audio_format_write_header(
     }
 
     if (format == RFA_AUDIO_FORMAT_AIFF_PCM16) {
-        rfa_u64 frames = data_bytes / frame_bytes;
+        rfa_u64 frames = data_bytes >> frame_shift;
         if (frames > 0xffffffffull || data_bytes > 0xffffffffull - 46ull) {
             return RFA_AUDIO_FORMAT_FAIL;
         }
@@ -165,7 +174,8 @@ rfa_u32 rfa_audio_format_write_header(
     }
 
     if (format == RFA_AUDIO_FORMAT_CAF_PCM16) {
-        rfa_u32 bytes_per_packet = channels * 2u;
+        rfa_u32 bytes_per_packet = channels << 1;
+        if (data_bytes > 0xfffffffffffffffbull) return RFA_AUDIO_FORMAT_FAIL;
         rfa_put_ascii4(out + 0, 'c', 'a', 'f', 'f');
         rfa_put_u16be(out + 4, 1u);
         rfa_put_u16be(out + 6, 0u);
