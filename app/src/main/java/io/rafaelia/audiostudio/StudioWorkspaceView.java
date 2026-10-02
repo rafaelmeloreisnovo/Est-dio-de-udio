@@ -4,7 +4,8 @@
  * Research/evaluation use: see LICENSE_RESEARCH_COMMERCIAL.md.
  * Commercial use requires a separate written agreement with the rights holder.
  *
- * Platform edge only: this View renders state produced by the freestanding cores.
+ * Platform edge only: this View renders state produced by the auditable cores.
+ * UI rule: show executed/observed state prominently; keep unverified claims explicit.
  */
 package io.rafaelia.audiostudio;
 
@@ -25,67 +26,67 @@ final class StudioWorkspaceView extends View {
         void onRequestSensorAccess();
     }
 
-    private static final String[] TABS = {
-            "REC", "EDIT", "CAL", "SPEC", "ROOM", "VOICE", "MASTER", "EXPORT", "SYS"
-    };
-    private static final String[] SCREEN_TITLES = {
-            "Recorder / transport",
-            "Timeline / waveform",
-            "Electroacoustic calibration",
-            "Spectrum / transfer",
-            "Impulse / room correction",
-            "Voice / phoneme / timing",
-            "DSP rack / A-B",
-            "ZRF / CFR / render",
-            "System / permissions / origin"
+    private static final int SECTION_DASHBOARD = 0;
+    private static final int SECTION_MEASURE = 1;
+    private static final int SECTION_SESSION = 2;
+    private static final int SECTION_EVIDENCE = 3;
+    private static final int SECTION_SYSTEM = 4;
+
+    private static final String[] SECTIONS = {
+            "DASH", "MEASURE", "SESSION", "EVIDENCE", "SYSTEM"
     };
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint thin = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
-    private final RectF calibrationAction = new RectF();
+
+    private final RectF[] navTargets = {
+            new RectF(), new RectF(), new RectF(), new RectF(), new RectF()
+    };
     private final RectF transportRecord = new RectF();
     private final RectF transportStop = new RectF();
     private final RectF transportPlay = new RectF();
     private final RectF transportCal = new RectF();
     private final RectF transportEvidence = new RectF();
+    private final RectF calibrationAction = new RectF();
+    private final RectF evidenceAction = new RectF();
     private final RectF systemPermissionAction = new RectF();
-
-    private float logicalWidth;
-    private boolean wideLayout;
-    private float wideRail;
-    private float wideInspector;
 
     private final short[] waveMin = new short[128];
     private final short[] waveMax = new short[128];
     private final long[] spectrum = new long[16];
     private final long[] calibrationPowerRatioQ20 = new long[16];
 
-    private int screen;
+    private int section = SECTION_DASHBOARD;
     private int waveBins;
-    private int densityMode;
-    private float uiScale = 1f;
     private int peakPct;
     private int rmsPct;
     private long clipped;
     private long capturedSamples;
+    private int calibrationValidBands;
+
     private String inputSource = "INPUT_IDLE";
     private String masterState = "MASTER=PENDING";
     private String calibrationState = "CAL=RELATIVE_ONLY";
-    private int calibrationValidBands;
     private String roomAnalysisState = "ROOM=NOT_RUN";
     private String containerState = "ZRF/CFR=IMPLEMENTED_UNTESTED";
     private String systemState = "SENSORS=OBSERVE | PERMISSIONS=MINIMAL";
     private String originState = "ORIGIN=PROJECT+PLATFORM+TOOLCHAIN";
     private String signatureState = "SIGNATURE=TOKEN_VAZIO";
+
     private ActionListener actionListener;
 
     StudioWorkspaceView(Context context) {
         super(context);
-        paint.setTypeface(android.graphics.Typeface.MONOSPACE);
-        thin.setTypeface(android.graphics.Typeface.MONOSPACE);
-        setMinimumHeight(dp(420));
+        paint.setTypeface(android.graphics.Typeface.create(
+                android.graphics.Typeface.MONOSPACE,
+                android.graphics.Typeface.NORMAL));
+        thin.setTypeface(paint.getTypeface());
+        thin.setStyle(Paint.Style.STROKE);
+        setMinimumHeight(dp(500));
         setFocusable(true);
+        setClickable(true);
+        setContentDescription("RAFAELIA Audio professional measurement dashboard");
     }
 
     void setActionListener(ActionListener listener) {
@@ -93,32 +94,31 @@ final class StudioWorkspaceView extends View {
     }
 
     void setCaptureStats(int peak, int rms, long clip, long samples, String source) {
-        peakPct = peak;
-        rmsPct = rms;
-        clipped = clip;
-        capturedSamples = samples;
+        peakPct = boundPercent(peak);
+        rmsPct = boundPercent(rms);
+        clipped = clip < 0L ? 0L : clip;
+        capturedSamples = samples < 0L ? 0L : samples;
         inputSource = source == null ? "INPUT_UNAVAILABLE" : source;
         invalidate();
     }
 
     void setWaveform(short[] samples, int count) {
-        int bins = waveMin.length;
-        int i;
         if (samples == null || count <= 0) {
             waveBins = 0;
             invalidate();
             return;
         }
         if (count > samples.length) count = samples.length;
-        if (count < bins) bins = count;
+        int bins = Math.min(waveMin.length, count);
+        int i;
         for (i = 0; i < bins; ++i) {
-            int start = (int) (((long)i * count) / bins);
-            int end = (int) (((long)(i + 1) * count) / bins);
-            int j;
-            short lo = 32767;
-            short hi = -32768;
+            int start = (int) (((long) i * count) / bins);
+            int end = (int) (((long) (i + 1) * count) / bins);
             if (end <= start) end = start + 1;
             if (end > count) end = count;
+            short lo = 32767;
+            short hi = -32768;
+            int j;
             for (j = start; j < end; ++j) {
                 short v = samples[j];
                 if (v < lo) lo = v;
@@ -132,10 +132,10 @@ final class StudioWorkspaceView extends View {
     }
 
     void setSpectrum(long[] values) {
-        int i;
         if (values == null) return;
+        int i;
         for (i = 0; i < spectrum.length; ++i) {
-            spectrum[i] = i < values.length ? values[i] : 0L;
+            spectrum[i] = i < values.length && values[i] > 0L ? values[i] : 0L;
         }
         invalidate();
     }
@@ -151,13 +151,14 @@ final class StudioWorkspaceView extends View {
     }
 
     void setCalibrationAnalysis(long[] powerRatiosQ20, int validBands, String roomState) {
-        for (int i = 0; i < calibrationPowerRatioQ20.length; ++i) {
+        int i;
+        for (i = 0; i < calibrationPowerRatioQ20.length; ++i) {
             calibrationPowerRatioQ20[i] =
-                    powerRatiosQ20 != null && i < powerRatiosQ20.length ?
-                            powerRatiosQ20[i] : 0L;
+                    powerRatiosQ20 != null && i < powerRatiosQ20.length && powerRatiosQ20[i] > 0L
+                            ? powerRatiosQ20[i] : 0L;
         }
-        calibrationValidBands = validBands < 0 ? 0 :
-                Math.min(validBands, calibrationPowerRatioQ20.length);
+        calibrationValidBands = validBands < 0 ? 0
+                : Math.min(validBands, calibrationPowerRatioQ20.length);
         roomAnalysisState = roomState == null ? "ROOM=UNAVAILABLE" : roomState;
         invalidate();
     }
@@ -182,509 +183,497 @@ final class StudioWorkspaceView extends View {
         invalidate();
     }
 
-    private int tabColumns() {
-        if (densityMode == 0) return 3;
-        if (densityMode == 1) return 5;
-        return TABS.length;
-    }
-
-    private int tabRows() {
-        int columns = tabColumns();
-        return (TABS.length + columns - 1) / columns;
-    }
-
-    private float tabHeightPx() {
-        if (densityMode == 0) return dp(72);
-        if (densityMode == 1) return dp(64);
-        return dp(50);
-    }
-
-    @Override
-    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-        super.onSizeChanged(w, h, oldw, oldh);
-        int shortEdge = w < h ? w : h;
-        densityMode = shortEdge < dp(360) ? 0 : (w > h ? 2 : 1);
-        uiScale = densityMode == 0 ? 0.84f : (densityMode == 2 ? 1.10f : 1f);
-    }
-
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = MeasureSpec.getSize(widthMeasureSpec);
-        int wanted;
-        if (width <= dp(360)) wanted = dp(430);
-        else if (width <= dp(600)) wanted = dp(500);
-        else wanted = dp(560);
-        int height = resolveSize(wanted, heightMeasureSpec);
-        setMeasuredDimension(resolveSize(width, widthMeasureSpec), height);
+        int wanted = width <= dp(360) ? dp(520) : dp(560);
+        setMeasuredDimension(
+                resolveSize(width, widthMeasureSpec),
+                resolveSize(wanted, heightMeasureSpec));
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
-        float totalW = getWidth();
-        float totalH = getHeight();
-        float transportH = densityMode == 0 ? dp(56) : dp(62);
-        float usableH = totalH - transportH;
-        float tabH = tabHeightPx();
-
-        wideLayout = densityMode == 2 && totalW >= dp(720);
+        float w = getWidth();
+        float h = getHeight();
+        float navH = dp(46);
+        float headerH = dp(66);
+        float transportH = dp(62);
+        float contentTop = navH + headerH;
+        float contentBottom = h - transportH;
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setARGB(255, 16, 18, 22);
-        canvas.drawRect(0, 0, totalW, totalH, paint);
+        paint.setARGB(255, 10, 13, 17);
+        canvas.drawRect(0f, 0f, w, h, paint);
 
-        if (wideLayout) {
-            wideRail = dp(76);
-            wideInspector = dp(220);
-            float centerW = totalW - wideRail - wideInspector;
+        drawPrimaryNavigation(canvas, w, navH);
+        drawHeader(canvas, w, navH, headerH);
 
-            if (centerW < dp(360)) {
-                wideLayout = false;
-            } else {
-                logicalWidth = centerW;
-                drawSideTabs(canvas, wideRail, usableH);
-
-                canvas.save();
-                canvas.translate(wideRail, 0f);
-                drawHeader(canvas, dp(10), centerW);
-                drawWorkspaceBody(canvas, centerW, usableH);
-                canvas.restore();
-
-                drawInspector(
-                        canvas,
-                        totalW - wideInspector,
-                        0f,
-                        wideInspector,
-                        usableH);
-            }
+        if (section == SECTION_DASHBOARD) {
+            drawDashboard(canvas, w, contentTop, contentBottom);
+        } else if (section == SECTION_MEASURE) {
+            drawMeasure(canvas, w, contentTop, contentBottom);
+        } else if (section == SECTION_SESSION) {
+            drawSession(canvas, w, contentTop, contentBottom);
+        } else if (section == SECTION_EVIDENCE) {
+            drawEvidence(canvas, w, contentTop, contentBottom);
+        } else {
+            drawSystem(canvas, w, contentTop, contentBottom);
         }
 
-        if (!wideLayout) {
-            logicalWidth = totalW;
-            drawTabs(canvas, totalW, tabH);
-            drawHeader(
-                    canvas,
-                    tabH + dp(densityMode == 0 ? 4 : 8),
-                    totalW);
-            drawWorkspaceBody(canvas, totalW, usableH);
-        }
-
-        drawTransport(canvas, totalW, totalH - transportH, transportH);
+        drawTransport(canvas, w, h - transportH, transportH);
     }
 
-    private void drawWorkspaceBody(Canvas canvas, float w, float h) {
-        if (screen == 0) drawRecorder(canvas, w, h);
-        else if (screen == 1) drawEditor(canvas, w, h);
-        else if (screen == 2) drawCalibration(canvas, w, h);
-        else if (screen == 3) drawSpectrum(canvas, w, h);
-        else if (screen == 4) drawRoom(canvas, w, h);
-        else if (screen == 5) drawVoice(canvas, w, h);
-        else if (screen == 6) drawMaster(canvas, w, h);
-        else if (screen == 7) drawExport(canvas, w, h);
-        else drawSystem(canvas, w, h);
-    }
-
-    private void drawSideTabs(Canvas canvas, float railW, float h) {
-        float slot = h / TABS.length;
+    private void drawPrimaryNavigation(Canvas canvas, float width, float height) {
+        float slot = width / SECTIONS.length;
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(10));
+        paint.setTextSize(dp(width <= dp(360) ? 9 : 10));
         int i;
-        for (i = 0; i < TABS.length; ++i) {
-            paint.setARGB(255, i == screen ? 52 : 25, i == screen ? 66 : 29,
-                    i == screen ? 82 : 34);
-            rect.set(0f, slot * i, railW, slot * (i + 1));
-            canvas.drawRect(rect, paint);
-            paint.setARGB(255, 235, 239, 244);
-            canvas.drawText(TABS[i], railW * 0.5f, slot * (i + 0.5f) + dp(4), paint);
+        for (i = 0; i < SECTIONS.length; ++i) {
+            float left = i * slot;
+            float right = left + slot;
+            navTargets[i].set(left, 0f, right, height);
+            paint.setARGB(255,
+                    i == section ? 24 : 13,
+                    i == section ? 40 : 18,
+                    i == section ? 52 : 24);
+            canvas.drawRect(left, 0f, right, height, paint);
+            if (i == section) {
+                paint.setARGB(255, 87, 190, 214);
+                canvas.drawRect(left + dp(8), height - dp(2), right - dp(8), height, paint);
+            }
+            paint.setARGB(255, i == section ? 239 : 153,
+                    i == section ? 245 : 165,
+                    i == section ? 248 : 177);
+            canvas.drawText(SECTIONS[i], left + slot * 0.5f, height * 0.62f, paint);
         }
         paint.setTextAlign(Paint.Align.LEFT);
     }
 
-    private void drawInspector(
-            Canvas canvas, float left, float top, float width, float height) {
-        paint.setARGB(255, 20, 24, 29);
-        canvas.drawRect(left, top, left + width, top + height, paint);
-        float x = left + dp(12);
-        float y = top + dp(24);
-        drawText(canvas, "INSPECTOR", x, y, 12);
-        y += dp(30);
-        drawText(canvas, inputSource, x, y, 11);
-        y += dp(24);
-        drawText(canvas, "PEAK " + peakPct + "%FS", x, y, 11);
-        y += dp(22);
-        drawText(canvas, "RMS  " + rmsPct + "%FS", x, y, 11);
-        y += dp(22);
-        drawText(canvas, "CLIP " + clipped, x, y, 11);
-        y += dp(34);
-        drawWrappedState(canvas, calibrationState, x, y, width - dp(24));
-        y += dp(58);
-        drawWrappedState(canvas, masterState, x, y, width - dp(24));
-        y += dp(58);
-        drawWrappedState(canvas, containerState, x, y, width - dp(24));
+    private void drawHeader(Canvas canvas, float width, float top, float height) {
+        float left = dp(14);
+        String title;
+        String subtitle;
+        if (section == SECTION_DASHBOARD) {
+            title = "RAFAELIA AUDIO";
+            subtitle = "MEASUREMENT · EVIDENCE · DEVICE QA";
+        } else if (section == SECTION_MEASURE) {
+            title = "MEASUREMENT";
+            subtitle = "RELATIVE CAL · SPECTRUM · ROOM";
+        } else if (section == SECTION_SESSION) {
+            title = "SESSION";
+            subtitle = "CAPTURE · WAVEFORM · MASTER";
+        } else if (section == SECTION_EVIDENCE) {
+            title = "EVIDENCE";
+            subtitle = "ZRF · CFR · RECEIPT · PROVENANCE";
+        } else {
+            title = "SYSTEM";
+            subtitle = "DEVICE · SENSORS · PERMISSIONS · ORIGIN";
+        }
+
+        drawText(canvas, title, left, top + dp(25), 15, 236, 242, 247);
+        drawText(canvas, subtitle, left, top + dp(47), 9, 124, 145, 160);
+
+        paint.setTextAlign(Paint.Align.RIGHT);
+        drawText(canvas, sessionTime(), width - dp(14), top + dp(27), 15, 224, 231, 236);
+        paint.setTextAlign(Paint.Align.LEFT);
+
+        paint.setARGB(255, 22, 28, 34);
+        canvas.drawRect(0f, top + height - dp(1), width, top + height, paint);
     }
 
-    private void drawWrappedState(
-            Canvas canvas, String value, float x, float y, float width) {
-        if (value == null) return;
-        paint.setTextSize(dp(9));
-        paint.setARGB(255, 165, 176, 188);
-        String text = value;
-        int split = text.length() > 30 ? 30 : text.length();
-        canvas.drawText(text.substring(0, split), x, y, paint);
-        if (split < text.length()) {
-            int end = text.length() > split + 30 ? split + 30 : text.length();
-            canvas.drawText(text.substring(split, end), x, y + dp(16), paint);
+    private void drawDashboard(Canvas canvas, float w, float top, float bottom) {
+        float gap = dp(8);
+        float margin = dp(10);
+        float cardW = (w - margin * 2f - gap) * 0.5f;
+        float cardH = dp(112);
+        float x1 = margin;
+        float x2 = margin + cardW + gap;
+        float y1 = top + dp(8);
+        float y2 = y1 + cardH + gap;
+
+        drawCard(canvas, x1, y1, x1 + cardW, y1 + cardH, "SIGNAL");
+        drawBigMetric(canvas, peakPct + "%", "PEAK FS", x1 + dp(10), y1 + dp(49));
+        drawSmallMetric(canvas, "RMS", rmsPct + "%", x1 + dp(10), y1 + dp(78));
+        drawSmallMetric(canvas, "CLIP", Long.toString(clipped), x1 + cardW * 0.53f, y1 + dp(78));
+
+        drawCard(canvas, x2, y1, x2 + cardW, y1 + cardH, "INPUT");
+        drawStateLine(canvas, inputSource, x2 + dp(10), y1 + dp(46), cardW - dp(20), 10);
+        drawStateLine(canvas, "48 kHz · PCM16", x2 + dp(10), y1 + dp(72), cardW - dp(20), 10);
+        drawStatus(canvas, waveBins > 0 ? "LIVE" : "READY",
+                x2 + dp(10), y1 + dp(88), waveBins > 0);
+
+        drawCard(canvas, x1, y2, x1 + cardW, y2 + cardH, "CALIBRATION");
+        drawStateLine(canvas, calibrationState, x1 + dp(10), y2 + dp(46), cardW - dp(20), 9);
+        drawSmallMetric(canvas, "BANDS", Integer.toString(calibrationValidBands),
+                x1 + dp(10), y2 + dp(82));
+        drawStatus(canvas, calibrationValidBands > 0 ? "OBSERVED" : "RELATIVE",
+                x1 + cardW * 0.47f, y2 + dp(72), calibrationValidBands > 0);
+
+        drawCard(canvas, x2, y2, x2 + cardW, y2 + cardH, "EVIDENCE");
+        drawStateLine(canvas, containerState, x2 + dp(10), y2 + dp(46), cardW - dp(20), 9);
+        drawStateLine(canvas, signatureState, x2 + dp(10), y2 + dp(70), cardW - dp(20), 9);
+        drawStatus(canvas, containsTokenVazio(signatureState) ? "GAP" : "BOUND",
+                x2 + dp(10), y2 + dp(88), !containsTokenVazio(signatureState));
+
+        float waveTop = y2 + cardH + dp(10);
+        float waveBottom = bottom - dp(10);
+        if (waveBottom - waveTop > dp(66)) {
+            drawPanel(canvas, margin, waveTop, w - margin, waveBottom);
+            drawText(canvas, "LIVE WAVEFORM", margin + dp(10), waveTop + dp(20),
+                    9, 126, 148, 164);
+            drawWave(canvas,
+                    margin + dp(10), waveTop + dp(30),
+                    w - margin - dp(10), waveBottom - dp(10));
         }
     }
 
+    private void drawMeasure(Canvas canvas, float w, float top, float bottom) {
+        float margin = dp(10);
+        float y = top + dp(8);
+        float chartH = dp(148);
+
+        drawPanel(canvas, margin, y, w - margin, y + chartH);
+        drawText(canvas, "16-BAND SPECTRUM · RELATIVE", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawSpectrumBars(canvas,
+                margin + dp(10), y + dp(32),
+                w - margin - dp(10), y + chartH - dp(10));
+
+        y += chartH + dp(8);
+        float calH = dp(150);
+        drawPanel(canvas, margin, y, w - margin, y + calH);
+        drawText(canvas, "RELATIVE SWEEP PROFILE", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawCalibrationProfile(canvas,
+                margin + dp(10), y + dp(32),
+                w - margin - dp(10), y + calH - dp(34));
+        drawStateLine(canvas, roomAnalysisState,
+                margin + dp(10), y + calH - dp(13), w - margin * 2f - dp(20), 8);
+
+        y += calH + dp(8);
+        calibrationAction.set(margin, y, w - margin, Math.min(bottom - dp(8), y + dp(42)));
+        drawActionButton(canvas, calibrationAction,
+                "RUN RELATIVE CAL · SAFE LEVEL", 35, 67, 82);
+    }
+
+    private void drawSession(Canvas canvas, float w, float top, float bottom) {
+        float margin = dp(10);
+        float y = top + dp(8);
+        float waveH = dp(166);
+
+        drawPanel(canvas, margin, y, w - margin, y + waveH);
+        drawText(canvas, "SOURCE WAVEFORM · RAW PCM PRESERVED", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawWave(canvas,
+                margin + dp(10), y + dp(32),
+                w - margin - dp(10), y + waveH - dp(12));
+
+        y += waveH + dp(8);
+        drawPanel(canvas, margin, y, w - margin, y + dp(102));
+        drawText(canvas, "SESSION STATE", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawStateLine(canvas, inputSource, margin + dp(10), y + dp(46), w - margin * 2f, 9);
+        drawStateLine(canvas, masterState, margin + dp(10), y + dp(69), w - margin * 2f, 9);
+        drawSmallMetric(canvas, "SAMPLES", Long.toString(capturedSamples),
+                margin + dp(10), y + dp(92));
+
+        y += dp(110);
+        drawPanel(canvas, margin, y, w - margin, Math.min(bottom - dp(8), y + dp(72)));
+        drawText(canvas, "WORKFLOW", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawText(canvas, "CAPTURE → RAW → MASTER → EXPORT",
+                margin + dp(10), y + dp(45), 10, 205, 214, 221);
+        drawText(canvas, "Source bytes stay distinct from derived output.",
+                margin + dp(10), y + dp(63), 8, 124, 145, 160);
+    }
+
+    private void drawEvidence(Canvas canvas, float w, float top, float bottom) {
+        float margin = dp(10);
+        float y = top + dp(8);
+
+        drawPanel(canvas, margin, y, w - margin, y + dp(126));
+        drawText(canvas, "CUSTODY", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawStateLine(canvas, containerState, margin + dp(10), y + dp(48),
+                w - margin * 2f - dp(20), 9);
+        drawStateLine(canvas, originState, margin + dp(10), y + dp(72),
+                w - margin * 2f - dp(20), 9);
+        drawStateLine(canvas, signatureState, margin + dp(10), y + dp(96),
+                w - margin * 2f - dp(20), 9);
+        drawStatus(canvas, containsTokenVazio(signatureState) ? "SIGNATURE GAP" : "SIGNATURE PRESENT",
+                margin + dp(10), y + dp(105), !containsTokenVazio(signatureState));
+
+        y += dp(134);
+        drawPanel(canvas, margin, y, w - margin, y + dp(112));
+        drawText(canvas, "EVIDENCE POLICY", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawText(canvas, "SOURCE ≠ ARTIFACT ≠ EXECUTION",
+                margin + dp(10), y + dp(47), 10, 212, 221, 228);
+        drawText(canvas, "EXECUTION ≠ EVIDENCE ≠ CLAIM",
+                margin + dp(10), y + dp(68), 10, 212, 221, 228);
+        drawText(canvas, "TOKEN_VAZIO ≠ 0 · UNTESTED ≠ PASS",
+                margin + dp(10), y + dp(91), 9, 164, 180, 191);
+
+        y += dp(120);
+        evidenceAction.set(margin, y, w - margin, Math.min(bottom - dp(8), y + dp(42)));
+        drawActionButton(canvas, evidenceAction, "VALIDATE + GENERATE ZIPRAF", 35, 67, 82);
+    }
+
+    private void drawSystem(Canvas canvas, float w, float top, float bottom) {
+        float margin = dp(10);
+        float y = top + dp(8);
+
+        drawPanel(canvas, margin, y, w - margin, y + dp(130));
+        drawText(canvas, "DEVICE STATE", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawStateLine(canvas, systemState, margin + dp(10), y + dp(48),
+                w - margin * 2f - dp(20), 9);
+        drawStateLine(canvas, "ACCEL: platform sensor · no invented runtime permission",
+                margin + dp(10), y + dp(73), w - margin * 2f - dp(20), 8);
+        drawStateLine(canvas, "MAG/LIGHT/PROX: availability is hardware/runtime state",
+                margin + dp(10), y + dp(96), w - margin * 2f - dp(20), 8);
+        drawStateLine(canvas, "MIC: RECORD_AUDIO remains explicit",
+                margin + dp(10), y + dp(119), w - margin * 2f - dp(20), 8);
+
+        y += dp(138);
+        drawPanel(canvas, margin, y, w - margin, y + dp(108));
+        drawText(canvas, "ORIGIN", margin + dp(10), y + dp(20),
+                9, 126, 148, 164);
+        drawStateLine(canvas, originState, margin + dp(10), y + dp(49),
+                w - margin * 2f - dp(20), 9);
+        drawStateLine(canvas, signatureState, margin + dp(10), y + dp(75),
+                w - margin * 2f - dp(20), 9);
+        drawStatus(canvas, containsTokenVazio(signatureState) ? "TOKEN_VAZIO" : "BOUND",
+                margin + dp(10), y + dp(84), !containsTokenVazio(signatureState));
+
+        y += dp(116);
+        systemPermissionAction.set(margin, y, w - margin, Math.min(bottom - dp(8), y + dp(42)));
+        drawActionButton(canvas, systemPermissionAction,
+                "CHECK OPTIONAL MOTION ACCESS", 35, 57, 70);
+    }
+
     private void drawTransport(Canvas canvas, float width, float top, float height) {
-        paint.setARGB(255, 12, 14, 18);
+        paint.setARGB(255, 7, 9, 12);
         canvas.drawRect(0f, top, width, top + height, paint);
-        float gap = dp(6);
-        float margin = dp(8);
+        paint.setARGB(255, 28, 34, 40);
+        canvas.drawRect(0f, top, width, top + dp(1), paint);
+
+        float gap = dp(5);
+        float margin = dp(7);
         float slot = (width - margin * 2f - gap * 4f) / 5f;
-        transportRecord.set(margin, top + dp(8), margin + slot, top + height - dp(8));
-        transportStop.set(transportRecord.right + gap, transportRecord.top,
-                transportRecord.right + gap + slot, transportRecord.bottom);
-        transportPlay.set(transportStop.right + gap, transportRecord.top,
-                transportStop.right + gap + slot, transportRecord.bottom);
-        transportCal.set(transportPlay.right + gap, transportRecord.top,
-                transportPlay.right + gap + slot, transportRecord.bottom);
-        transportEvidence.set(transportCal.right + gap, transportRecord.top,
-                transportCal.right + gap + slot, transportRecord.bottom);
-        drawTransportButton(canvas, transportRecord, "REC", 86, 45, 45);
-        drawTransportButton(canvas, transportStop, "STOP", 48, 54, 62);
-        drawTransportButton(canvas, transportPlay, "PLAY", 43, 69, 53);
-        drawTransportButton(canvas, transportCal, "CAL", 47, 64, 80);
-        drawTransportButton(canvas, transportEvidence, "PROOF", 48, 57, 72);
+        float y1 = top + dp(8);
+        float y2 = top + height - dp(8);
+
+        transportRecord.set(margin, y1, margin + slot, y2);
+        transportStop.set(transportRecord.right + gap, y1,
+                transportRecord.right + gap + slot, y2);
+        transportPlay.set(transportStop.right + gap, y1,
+                transportStop.right + gap + slot, y2);
+        transportCal.set(transportPlay.right + gap, y1,
+                transportPlay.right + gap + slot, y2);
+        transportEvidence.set(transportCal.right + gap, y1,
+                transportCal.right + gap + slot, y2);
+
+        drawTransportButton(canvas, transportRecord, "REC", 89, 38, 43);
+        drawTransportButton(canvas, transportStop, "MASTER", 42, 49, 57);
+        drawTransportButton(canvas, transportPlay, "PLAY", 31, 62, 51);
+        drawTransportButton(canvas, transportCal, "CAL", 33, 62, 75);
+        drawTransportButton(canvas, transportEvidence, "PROOF", 38, 54, 69);
     }
 
     private void drawTransportButton(
             Canvas canvas, RectF target, String label, int r, int g, int b) {
         paint.setARGB(255, r, g, b);
-        canvas.drawRoundRect(target, dp(6), dp(6), paint);
+        canvas.drawRoundRect(target, dp(7), dp(7), paint);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(11));
-        paint.setARGB(255, 240, 243, 246);
-        canvas.drawText(label, target.centerX(), target.centerY() + dp(4), paint);
+        drawText(canvas, label, target.centerX(), target.centerY() + dp(4),
+                label.length() > 5 ? 8 : 9, 238, 243, 246);
         paint.setTextAlign(Paint.Align.LEFT);
     }
 
-    private void drawTabs(Canvas canvas, float width, float tabH) {
-        int columns = tabColumns();
-        int rows = tabRows();
-        float slot = width / columns;
-        float rowH = tabH / rows;
-        int i;
-        paint.setTextSize(dp(densityMode == 0 ? 9 : 11));
+    private void drawCard(
+            Canvas canvas, float left, float top, float right, float bottom, String title) {
+        paint.setARGB(255, 17, 22, 27);
+        rect.set(left, top, right, bottom);
+        canvas.drawRoundRect(rect, dp(9), dp(9), paint);
+        thin.setStrokeWidth(dp(1));
+        thin.setARGB(255, 31, 42, 50);
+        canvas.drawRoundRect(rect, dp(9), dp(9), thin);
+        drawText(canvas, title, left + dp(10), top + dp(20), 8, 111, 137, 153);
+    }
+
+    private void drawPanel(Canvas canvas, float left, float top, float right, float bottom) {
+        paint.setARGB(255, 15, 20, 25);
+        rect.set(left, top, right, bottom);
+        canvas.drawRoundRect(rect, dp(9), dp(9), paint);
+        thin.setStrokeWidth(dp(1));
+        thin.setARGB(255, 28, 38, 46);
+        canvas.drawRoundRect(rect, dp(9), dp(9), thin);
+    }
+
+    private void drawBigMetric(Canvas canvas, String value, String label, float x, float y) {
+        drawText(canvas, value, x, y, 20, 232, 239, 243);
+        drawText(canvas, label, x, y + dp(18), 8, 114, 139, 154);
+    }
+
+    private void drawSmallMetric(Canvas canvas, String label, String value, float x, float y) {
+        drawText(canvas, label + "  " + value, x, y, 9, 176, 190, 199);
+    }
+
+    private void drawStatus(Canvas canvas, String label, float x, float y, boolean positive) {
+        paint.setTextSize(dp(8));
+        float width = paint.measureText(label) + dp(14);
+        float top = y;
+        float bottom = y + dp(20);
+        paint.setARGB(255,
+                positive ? 24 : 49,
+                positive ? 66 : 47,
+                positive ? 52 : 31);
+        rect.set(x, top, x + width, bottom);
+        canvas.drawRoundRect(rect, dp(10), dp(10), paint);
+        drawText(canvas, label, x + dp(7), y + dp(14), 8,
+                positive ? 151 : 219,
+                positive ? 220 : 181,
+                positive ? 184 : 120);
+    }
+
+    private void drawActionButton(Canvas canvas, RectF target, String label, int r, int g, int b) {
+        if (target.bottom <= target.top) return;
+        paint.setARGB(255, r, g, b);
+        canvas.drawRoundRect(target, dp(8), dp(8), paint);
         paint.setTextAlign(Paint.Align.CENTER);
-        for (i = 0; i < TABS.length; ++i) {
-            paint.setARGB(255, i == screen ? 52 : 28, i == screen ? 66 : 31,
-                    i == screen ? 82 : 36);
-            int column = i % columns;
-            int row = i / columns;
-            float x0 = slot * column;
-            float y0 = rowH * row;
-            rect.set(x0, y0, x0 + slot, y0 + rowH);
-            canvas.drawRect(rect, paint);
-            paint.setARGB(255, 235, 239, 244);
-            canvas.drawText(TABS[i], x0 + slot * 0.5f,
-                    y0 + rowH * 0.68f, paint);
+        drawText(canvas, label, target.centerX(), target.centerY() + dp(4),
+                9, 236, 242, 246);
+        paint.setTextAlign(Paint.Align.LEFT);
+    }
+
+    private void drawStateLine(
+            Canvas canvas, String value, float x, float y, float maxWidth, int size) {
+        String text = value == null ? "TOKEN_VAZIO" : value;
+        paint.setTextSize(dp(size));
+        if (paint.measureText(text) <= maxWidth) {
+            drawText(canvas, text, x, y, size, 185, 197, 205);
+            return;
         }
-        paint.setTextAlign(Paint.Align.LEFT);
+        String clippedText = fitText(text, maxWidth, size);
+        drawText(canvas, clippedText, x, y, size, 185, 197, 205);
     }
 
-    private void drawHeader(Canvas canvas, float top, float width) {
-        paint.setTextSize(dp(densityMode == 0 ? 13 : 15));
-        paint.setARGB(255, 236, 240, 244);
-        canvas.drawText(SCREEN_TITLES[screen], dp(12), top + dp(18), paint);
-        paint.setTextSize(dp(densityMode == 0 ? 9 : 11));
-        paint.setARGB(255, 150, 162, 176);
-        canvas.drawText("48 kHz | PCM16 | " + inputSource,
-                dp(12), top + dp(38), paint);
-
-        long seconds = capturedSamples / 48000L;
-        long millis = ((capturedSamples % 48000L) * 1000L) / 48000L;
-        String time = two(seconds / 60L) + ":" + two(seconds % 60L) + "." + three(millis);
-        paint.setTextAlign(Paint.Align.RIGHT);
-        paint.setTextSize(dp(densityMode == 0 ? 15 : 18));
-        paint.setARGB(255, 236, 240, 244);
-        canvas.drawText(time, width - dp(12), top + dp(28), paint);
-        paint.setTextAlign(Paint.Align.LEFT);
+    private String fitText(String text, float maxWidth, int size) {
+        if (text == null) return "TOKEN_VAZIO";
+        paint.setTextSize(dp(size));
+        if (paint.measureText(text) <= maxWidth) return text;
+        String suffix = "…";
+        int end = text.length();
+        while (end > 1 && paint.measureText(text.substring(0, end) + suffix) > maxWidth) {
+            --end;
+        }
+        return text.substring(0, end) + suffix;
     }
 
-    private void drawRecorder(Canvas canvas, float w, float h) {
-        float top = dp(112);
-        drawWave(canvas, dp(12), top, w - dp(12), top + dp(150));
-        drawMeter(canvas, dp(12), top + dp(170), w - dp(12), peakPct, rmsPct);
-        drawText(canvas, "Peak " + peakPct + "%FS | RMS " + rmsPct +
-                "%FS | clipped " + clipped, dp(12), top + dp(220), 12);
-        drawPills(canvas, top + dp(248), new String[]{
-                "ARM", "REC", "PAUSE", "STOP", "MARK", "MONITOR"
-        });
-        drawText(canvas, "Raw PCM preserved before DSP.", dp(12), h - dp(20), 11);
-    }
-
-    private void drawEditor(Canvas canvas, float w, float h) {
-        float top = dp(112);
-        drawTimeline(canvas, dp(12), top, w - dp(12));
-        drawWave(canvas, dp(12), top + dp(32), w - dp(12), top + dp(205));
-        drawPills(canvas, top + dp(230), new String[]{
-                "SELECT", "ZOOM", "SCRUB", "MARKER", "WARP", "A/B"
-        });
-        drawText(canvas, "time-warp W(t): monotonic | pitch/formant independently gated",
-                dp(12), h - dp(20), 11);
-    }
-
-    private void drawCalibration(Canvas canvas, float w, float h) {
-        float top = dp(120);
-        drawText(canvas, calibrationState, dp(12), top, 13);
-        drawText(canvas, "DIGITAL: dBFS / peak / RMS / noise / latency", dp(12), top + dp(28), 12);
-        drawText(canvas, "RELATIVE: transfer / phase / coherence / L-R match", dp(12), top + dp(52), 12);
-        drawText(canvas, "ABS SPL: PENDING_PHYSICAL_REFERENCE", dp(12), top + dp(76), 12);
-        drawPills(canvas, top + dp(108), new String[]{
-                "SILENCE", "WHITE", "PINK", "SWEEP", "STEP", "REF MIC"
-        });
-        drawMiniResponse(canvas, dp(12), top + dp(160), w - dp(12), top + dp(300));
-        calibrationAction.set(dp(12), top + dp(316), w - dp(12), top + dp(358));
-        paint.setARGB(255, 57, 78, 96);
-        canvas.drawRoundRect(calibrationAction, dp(7), dp(7), paint);
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(12));
-        paint.setARGB(255, 235, 239, 244);
-        canvas.drawText("RUN RELATIVE CAL — SAFE LEVEL",
-                (calibrationAction.left + calibrationAction.right) * 0.5f,
-                calibrationAction.top + dp(27), paint);
-        paint.setTextAlign(Paint.Align.LEFT);
-        drawText(canvas, "speaker -> room -> mic -> ADC is measured as one chain unless referenced",
-                dp(12), h - dp(20), 11);
-    }
-
-    private void drawSpectrum(Canvas canvas, float w, float h) {
-        float top = dp(120);
-        drawSpectrumBars(canvas, dp(12), top, w - dp(12), top + dp(220));
-        drawPills(canvas, top + dp(244), new String[]{
-                "SPECTRUM", "SPECTROGRAM", "PHASE", "COHERENCE", "THD", "IR"
-        });
-        drawText(canvas, "16-band Goertzel exists; calibrated FFT/STFT remains separately gated.",
-                dp(12), h - dp(20), 11);
-    }
-
-    private void drawRoom(Canvas canvas, float w, float h) {
-        float top = dp(120);
-        drawText(canvas, "IR -> ETC/EDC -> EDT/T20/T30 -> constrained correction", dp(12), top, 12);
-        drawText(canvas, roomAnalysisState, dp(12), top + dp(22), 10);
-        drawMiniResponse(canvas, dp(12), top + dp(36), w - dp(12), top + dp(176));
-        drawPills(canvas, top + dp(202), new String[]{
-                "CAPTURE IR", "CONVOLVE", "RT", "TARGET", "CORRECT", "BYPASS"
-        });
-        drawText(canvas, "regularized inverse only; deep spatial nulls are not blindly boosted",
-                dp(12), h - dp(20), 11);
-    }
-
-    private void drawVoice(Canvas canvas, float w, float h) {
-        float top = dp(120);
-        drawText(canvas, "f0 | formants | voicing | vibrato | phoneme | timing confidence",
-                dp(12), top, 12);
-        drawWave(canvas, dp(12), top + dp(28), w - dp(12), top + dp(150));
-        drawPills(canvas, top + dp(178), new String[]{
-                "PITCH", "FORMANT", "TIME", "PHONEME", "BREATH", "UNVOICED"
-        });
-        drawText(canvas, "phonetics is an acoustic feature layer; neuroscience/quantum claims remain experimental",
-                dp(12), h - dp(20), 11);
-    }
-
-    private void drawMaster(Canvas canvas, float w, float h) {
-        float top = dp(120);
-        drawText(canvas, masterState, dp(12), top, 13);
-        drawPills(canvas, top + dp(28), new String[]{
-                "HPF", "GATE", "DENOISE", "EQ-N", "LEVEL", "LIMIT", "NORM", "ROOM"
-        });
-        drawText(canvas, "per-module: ENABLE | BYPASS | SOLO | A/B | reset", dp(12), top + dp(92), 12);
-        drawMiniResponse(canvas, dp(12), top + dp(120), w - dp(12), top + dp(280));
-        drawText(canvas, "SOURCE is immutable; preview state is separate from final render.",
-                dp(12), h - dp(20), 11);
-    }
-
-    private void drawExport(Canvas canvas, float w, float h) {
-        float top = dp(120);
-        drawText(canvas, containerState, dp(12), top, 13);
-        drawText(canvas, "ZRF: session/wave/matrix chunks | CFR: calibration/response chunks",
-                dp(12), top + dp(30), 12);
-        drawText(canvas, "PCM | WAVE | MATR | CAL | IR | SPEC | PHON | ROOM | RCPT",
-                dp(12), top + dp(56), 12);
-        drawPills(canvas, top + dp(90), new String[]{
-                "RAW PCM", "ZRF", "CFR", "OGG/OPUS", "RECEIPT"
-        });
-        drawText(canvas, "Custom formats: project-local, versioned, fail-closed; not external standards.",
-                dp(12), h - dp(20), 11);
-    }
-
-    private void drawSystem(Canvas canvas, float w, float h) {
-        float top = dp(120);
-        drawText(canvas, systemState, dp(12), top, 13);
-        drawWrappedState(canvas, originState, dp(12), top + dp(36), w - dp(24));
-        drawWrappedState(canvas, signatureState, dp(12), top + dp(92), w - dp(24));
-        drawPills(canvas, top + dp(150), new String[]{
-                "MIC", "ACCEL", "MOTION", "MAG", "LIGHT", "NET", "ORIGIN", "SIGN"
-        });
-        systemPermissionAction.set(
-                dp(12), top + dp(212), w - dp(12), top + dp(256));
-        paint.setARGB(255, 57, 78, 96);
-        canvas.drawRoundRect(systemPermissionAction, dp(7), dp(7), paint);
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(12));
-        paint.setARGB(255, 235, 239, 244);
-        canvas.drawText(
-                "REQUEST OPTIONAL MOTION SENSOR ACCESS",
-                systemPermissionAction.centerX(),
-                systemPermissionAction.top + dp(28), paint);
-        paint.setTextAlign(Paint.Align.LEFT);
-        drawText(canvas,
-                "No permission is invented for accelerometer/magnetometer/light/proximity.",
-                dp(12), h - dp(38), 10);
-        drawText(canvas,
-                "Android/platform/toolchain bytes remain externally attributed.",
-                dp(12), h - dp(20), 10);
+    private void drawText(
+            Canvas canvas, String text, float x, float y, int size,
+            int r, int g, int b) {
+        paint.setTextSize(dp(size));
+        paint.setARGB(255, r, g, b);
+        canvas.drawText(text == null ? "TOKEN_VAZIO" : text, x, y, paint);
     }
 
     private void drawWave(Canvas canvas, float left, float top, float right, float bottom) {
-        thin.setStrokeWidth(1f);
-        thin.setARGB(255, 58, 67, 78);
         float mid = (top + bottom) * 0.5f;
+        thin.setStrokeWidth(dp(1));
+        thin.setARGB(255, 38, 50, 59);
         canvas.drawLine(left, mid, right, mid, thin);
         if (waveBins <= 0) {
-            drawText(canvas, "waveform buffer: TOKEN_VAZIO", left + dp(8), mid, 11);
+            drawText(canvas, "waveform: TOKEN_VAZIO", left + dp(6), mid + dp(4),
+                    8, 112, 132, 145);
             return;
         }
-        thin.setARGB(255, 128, 210, 184);
-        int i;
+        thin.setARGB(255, 91, 202, 174);
         float width = right - left;
-        float half = (bottom - top) * 0.46f;
+        float half = (bottom - top) * 0.44f;
+        int i;
         for (i = 0; i < waveBins; ++i) {
             int denominator = waveBins > 1 ? waveBins - 1 : 1;
-            float x = left + width * i / (float)denominator;
+            float x = left + width * i / (float) denominator;
             float y1 = mid - (waveMax[i] / 32768f) * half;
             float y2 = mid - (waveMin[i] / 32768f) * half;
             canvas.drawLine(x, y1, x, y2, thin);
         }
     }
 
-    private void drawTimeline(Canvas canvas, float left, float top, float right) {
-        thin.setARGB(255, 90, 100, 112);
-        canvas.drawLine(left, top, right, top, thin);
-        int i;
-        for (i = 0; i <= 10; ++i) {
-            float x = left + (right - left) * i / 10f;
-            canvas.drawLine(x, top, x, top + dp(i % 5 == 0 ? 12 : 6), thin);
-        }
-    }
-
-    private void drawMeter(Canvas canvas, float left, float top, float right, int peak, int rms) {
-        float width = right - left;
-        paint.setARGB(255, 45, 50, 58);
-        canvas.drawRect(left, top, right, top + dp(18), paint);
-        paint.setARGB(255, 104, 185, 151);
-        int peakBounded = peak < 0 ? 0 : (peak > 100 ? 100 : peak);
-        int rmsBounded = rms < 0 ? 0 : (rms > 100 ? 100 : rms);
-        canvas.drawRect(left, top, left + width * peakBounded / 100f,
-                top + dp(7), paint);
-        paint.setARGB(255, 103, 145, 203);
-        canvas.drawRect(left, top + dp(11), left + width * rmsBounded / 100f,
-                top + dp(18), paint);
-    }
-
     private void drawSpectrumBars(Canvas canvas, float left, float top, float right, float bottom) {
         long max = 1L;
         int i;
-        for (i = 0; i < spectrum.length; ++i) if (spectrum[i] > max) max = spectrum[i];
-        float slot = (right - left) / spectrum.length;
-        paint.setARGB(255, 112, 172, 210);
         for (i = 0; i < spectrum.length; ++i) {
-            float ratio = (float)((double)spectrum[i] / (double)max);
-            float height = (bottom - top) * ratio;
-            canvas.drawRect(left + i * slot + dp(2), bottom - height,
+            if (spectrum[i] > max) max = spectrum[i];
+        }
+        float slot = (right - left) / spectrum.length;
+        paint.setARGB(255, 84, 173, 205);
+        for (i = 0; i < spectrum.length; ++i) {
+            float ratio = (float) ((double) spectrum[i] / (double) max);
+            float barH = (bottom - top) * ratio;
+            canvas.drawRect(
+                    left + i * slot + dp(2), bottom - barH,
                     left + (i + 1) * slot - dp(2), bottom, paint);
         }
     }
 
-    private void drawMiniResponse(Canvas canvas, float left, float top, float right, float bottom) {
-        thin.setARGB(255, 66, 75, 86);
-        canvas.drawRect(left, top, right, bottom, thin);
+    private void drawCalibrationProfile(
+            Canvas canvas, float left, float top, float right, float bottom) {
         float mid = (top + bottom) * 0.5f;
+        thin.setStrokeWidth(dp(1));
+        thin.setARGB(255, 38, 50, 59);
         canvas.drawLine(left, mid, right, mid, thin);
-        int i;
-        for (i = 1; i < 8; ++i) {
-            float x = left + (right - left) * i / 8f;
-            canvas.drawLine(x, top, x, bottom, thin);
+        if (calibrationValidBands <= 0) {
+            drawText(canvas, "profile: NOT_RUN", left + dp(6), mid + dp(4),
+                    8, 112, 132, 145);
+            return;
         }
-        if (calibrationValidBands > 0) {
-            float slot = (right - left) / (calibrationPowerRatioQ20.length - 1);
-            paint.setARGB(255, 112, 172, 210);
-            float lastX = left;
-            float lastY = mid;
-            boolean haveLast = false;
-            for (i = 0; i < calibrationPowerRatioQ20.length; ++i) {
-                long raw = calibrationPowerRatioQ20[i];
-                if (raw <= 0L) {
-                    haveLast = false;
-                    continue;
-                }
-                double powerRatio = (double) raw / 1048576.0;
-                double db = 10.0 * Math.log10(powerRatio);
-                if (db > 24.0) db = 24.0;
-                if (db < -24.0) db = -24.0;
-                float x = left + slot * i;
-                float y = mid - (float) db * (bottom - top) / 48.0f;
-                if (haveLast) canvas.drawLine(lastX, lastY, x, y, paint);
-                canvas.drawCircle(x, y, dp(2), paint);
-                lastX = x;
-                lastY = y;
-                haveLast = true;
-            }
-            drawText(canvas, "relative 16-band sweep profile | 0 dB=center | uncalibrated",
-                    left + dp(8), top + dp(16), 10);
-        } else {
-            String curveState = calibrationState != null &&
-                    calibrationState.contains("CAPTURED") ?
-                    "raw CFR captured | profile unavailable" :
-                    "measured curve: NOT_RUN";
-            drawText(canvas, curveState, left + dp(8), mid - dp(8), 10);
-        }
-    }
 
-    private void drawPills(Canvas canvas, float y, String[] labels) {
-        float x = dp(12);
+        float slot = (right - left) / (calibrationPowerRatioQ20.length - 1);
+        paint.setARGB(255, 91, 180, 212);
+        boolean haveLast = false;
+        float lastX = left;
+        float lastY = mid;
         int i;
-        paint.setTextSize(dp(10));
-        for (i = 0; i < labels.length; ++i) {
-            float width = paint.measureText(labels[i]) + dp(20);
-            if (x + width > logicalWidth - dp(12)) {
-                x = dp(12);
-                y += dp(34);
+        for (i = 0; i < calibrationPowerRatioQ20.length; ++i) {
+            long raw = calibrationPowerRatioQ20[i];
+            if (raw <= 0L) {
+                haveLast = false;
+                continue;
             }
-            paint.setARGB(255, 42, 49, 58);
-            rect.set(x, y, x + width, y + dp(26));
-            canvas.drawRoundRect(rect, dp(5), dp(5), paint);
-            paint.setARGB(255, 220, 226, 232);
-            canvas.drawText(labels[i], x + dp(10), y + dp(18), paint);
-            x += width + dp(6);
+            double powerRatio = (double) raw / 1048576.0;
+            double db = 10.0 * Math.log10(powerRatio);
+            if (db > 24.0) db = 24.0;
+            if (db < -24.0) db = -24.0;
+            float x = left + slot * i;
+            float y = mid - (float) db * (bottom - top) / 48.0f;
+            if (haveLast) canvas.drawLine(lastX, lastY, x, y, paint);
+            canvas.drawCircle(x, y, dp(2), paint);
+            lastX = x;
+            lastY = y;
+            haveLast = true;
         }
-    }
-
-    private void drawText(Canvas canvas, String text, float x, float y, int sizeSp) {
-        paint.setTextSize(dp(sizeSp));
-        paint.setARGB(255, 197, 205, 214);
-        canvas.drawText(text, x, y, paint);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() != MotionEvent.ACTION_UP) return true;
-
         float x = event.getX();
         float y = event.getY();
+
+        int i;
+        for (i = 0; i < navTargets.length; ++i) {
+            if (navTargets[i].contains(x, y)) {
+                section = i;
+                invalidate();
+                performClick();
+                return true;
+            }
+        }
 
         if (transportRecord.contains(x, y)) {
             if (actionListener != null) actionListener.onRecord();
@@ -701,63 +690,23 @@ final class StudioWorkspaceView extends View {
             performClick();
             return true;
         }
-        if (transportCal.contains(x, y)) {
+        if (transportCal.contains(x, y) ||
+                (section == SECTION_MEASURE && calibrationAction.contains(x, y))) {
             if (actionListener != null) actionListener.onRunRelativeCalibration();
             performClick();
             return true;
         }
-        if (transportEvidence.contains(x, y)) {
+        if (transportEvidence.contains(x, y) ||
+                (section == SECTION_EVIDENCE && evidenceAction.contains(x, y))) {
             if (actionListener != null) actionListener.onGenerateEvidence();
             performClick();
             return true;
         }
-
-        if (screen == 2) {
-            float localX = wideLayout ? x - wideRail : x;
-            if (calibrationAction.contains(localX, y)) {
-                if (actionListener != null) actionListener.onRunRelativeCalibration();
-                performClick();
-                return true;
-            }
-        }
-
-        if (screen == 8) {
-            float localX = wideLayout ? x - wideRail : x;
-            if (systemPermissionAction.contains(localX, y)) {
-                if (actionListener != null) actionListener.onRequestSensorAccess();
-                performClick();
-                return true;
-            }
-        }
-
-        if (wideLayout && x <= wideRail) {
-            float usableH = getHeight() - dp(62);
-            float slot = usableH / (float)TABS.length;
-            int target = slot <= 0f ? 0 : (int)(y / slot);
-            if (target < 0) target = 0;
-            if (target >= TABS.length) target = TABS.length - 1;
-            screen = target;
-            invalidate();
+        if (section == SECTION_SYSTEM && systemPermissionAction.contains(x, y)) {
+            if (actionListener != null) actionListener.onRequestSensorAccess();
             performClick();
             return true;
         }
-        if (event.getAction() == MotionEvent.ACTION_UP &&
-                event.getY() <= tabHeightPx()) {
-            int columns = tabColumns();
-            int rows = tabRows();
-            float slot = getWidth() / (float)columns;
-            float rowH = tabHeightPx() / (float)rows;
-            int column = slot <= 0f ? 0 : (int)(event.getX() / slot);
-            int row = rowH <= 0f ? 0 : (int)(event.getY() / rowH);
-            int target = row * columns + column;
-            if (target < 0) target = 0;
-            if (target >= TABS.length) target = TABS.length - 1;
-            screen = target;
-            invalidate();
-            performClick();
-            return true;
-        }
-
         return true;
     }
 
@@ -767,8 +716,24 @@ final class StudioWorkspaceView extends View {
         return true;
     }
 
+    private String sessionTime() {
+        long seconds = capturedSamples / 48000L;
+        long millis = ((capturedSamples % 48000L) * 1000L) / 48000L;
+        return two(seconds / 60L) + ":" + two(seconds % 60L) + "." + three(millis);
+    }
+
+    private boolean containsTokenVazio(String value) {
+        return value == null || value.contains("TOKEN_VAZIO") || value.contains("PENDING");
+    }
+
+    private int boundPercent(int value) {
+        if (value < 0) return 0;
+        if (value > 100) return 100;
+        return value;
+    }
+
     private int dp(int value) {
-        return (int)(value * getResources().getDisplayMetrics().density + 0.5f);
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private static String two(long value) {
