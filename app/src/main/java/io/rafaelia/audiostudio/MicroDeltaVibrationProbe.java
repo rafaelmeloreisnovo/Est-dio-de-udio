@@ -76,9 +76,9 @@ final class MicroDeltaVibrationProbe implements SensorEventListener {
             this.maxZ = maxZ;
         }
 
-        static Result unavailable() {
+        static Result unavailable(String reason) {
             return new Result(
-                    "TOKEN_VAZIO_SENSOR_UNAVAILABLE",
+                    "TOKEN_VAZIO_SENSOR_UNAVAILABLE_" + reason,
                     "TOKEN_VAZIO", "TOKEN_VAZIO", 0,
                     0, 0, 0L, 0L, 0.0, 0.0, 0.0,
                     0f, 0f, 0f, 0f, 0f, 0f);
@@ -118,12 +118,16 @@ final class MicroDeltaVibrationProbe implements SensorEventListener {
     static void run(Context context, long durationMs, Callback callback) {
         SensorManager manager =
                 (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
-        Sensor sensor = manager == null ? null :
-                manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-
-        if (manager == null || sensor == null) {
+        if (manager == null) {
             new Handler(Looper.getMainLooper()).post(
-                    () -> callback.onComplete(Result.unavailable()));
+                    () -> callback.onComplete(Result.unavailable("SERVICE_UNAVAILABLE")));
+            return;
+        }
+
+        Sensor sensor = manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        if (sensor == null) {
+            new Handler(Looper.getMainLooper()).post(
+                    () -> callback.onComplete(Result.unavailable("NOT_PRESENT")));
             return;
         }
 
@@ -136,7 +140,7 @@ final class MicroDeltaVibrationProbe implements SensorEventListener {
                 probe, sensor, SensorManager.SENSOR_DELAY_GAME);
 
         if (!registered) {
-            callback.onComplete(Result.unavailable());
+            callback.onComplete(Result.unavailable("LISTENER_REGISTRATION_FAILED"));
             return;
         }
 
