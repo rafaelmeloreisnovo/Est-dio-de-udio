@@ -127,6 +127,12 @@ jobs:
         shell: bash
         run: bash ci/rafaelia-pipeline.sh quality
 
+      - name: 45 · parser fuzz / ARM runtime regression
+        shell: bash
+        run: |
+          bash ci/parser-fuzz-asan.sh
+          bash ci/freestanding-runtime-gate.sh
+
       - name: 50 · architecture / ABI
         shell: bash
         run: bash ci/rafaelia-pipeline.sh architecture
