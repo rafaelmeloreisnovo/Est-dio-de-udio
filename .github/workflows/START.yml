@@ -1,0 +1,241 @@
+name: Rafaelia Audio START
+
+run-name: Rafaelia Audio · ${{ github.event_name }} · ${{ github.ref_name }}
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Delivery mode after the quality gate.
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - live-debug
+          - signed-release
+      source_sha:
+        description: Optional exact 40-char source SHA; blank uses the selected ref SHA.
+        required: false
+        type: string
+
+concurrency:
+  group: rafaelia-audio-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: 00 · plan / route
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.route.outputs.source_sha }}
+      delivery: ${{ steps.route.outputs.delivery }}
+    steps:
+      - name: Resolve exact source and delivery route
+        id: route
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+
+          case "$EVENT_NAME" in
+            pull_request)
+              source_sha="$PR_HEAD_SHA"
+              delivery="validate"
+              ;;
+            push)
+              source_sha="$EVENT_SHA"
+              delivery="live-debug"
+              ;;
+            workflow_dispatch)
+              source_sha="$REQUESTED_SHA"
+              if test -z "$source_sha"; then source_sha="$EVENT_SHA"; fi
+              delivery="${REQUESTED_MODE:-validate}"
+              ;;
+            *)
+              echo "UNSUPPORTED_EVENT=$EVENT_NAME"
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "SOURCE_SHA_INVALID=$source_sha"
+            exit 1
+          fi
+
+          case "$delivery" in
+            validate|live-debug|signed-release) ;;
+            *)
+              echo "DELIVERY_MODE_INVALID=$delivery"
+              exit 1
+              ;;
+          esac
+
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "delivery=$delivery" >> "$GITHUB_OUTPUT"
+          echo "SOURCE_SHA=$source_sha"
+          echo "DELIVERY_MODE=$delivery"
+          echo "EXTERNAL_STANDARD_AUDIT=NOT_AUDITED"
+
+  gate:
+    name: gate / build
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      RFA_CI_RUN_ID: ${{ github.run_id }}
+      RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+      RFA_SIGNING_MODE: DEBUG_NONAUTHORIAL
+      RFA_SIGNER_ID: UNAVAILABLE_DEBUG_BUILD
+      RFA_EXPECTED_CERT_SHA256: TOKEN_VAZIO
+    steps:
+      - name: 10 · exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+          echo "RAFAELIA_CHECKOUT=PASS"
+
+      - name: 20 · capacity bootstrap
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh bootstrap
+
+      - name: 30 · single-root topology
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh topology
+
+      - name: 40 · quality capability
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh quality
+
+      - name: 50 · architecture / ABI
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh architecture
+
+      - name: 60 · evidence preparation
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh evidence
+
+      - name: 70 · deterministic debug build
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh build-debug
+
+      - name: 80 · binary receipt
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh binary-receipt
+
+      - name: 99 · scoped summary
+        if: ${{ always() }}
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh summary
+
+  deliver_live:
+    name: 90 · delivery / live-debug
+    if: ${{ needs.plan.outputs.delivery == 'live-debug' }}
+    needs:
+      - plan
+      - gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      RFA_CI_RUN_ID: ${{ github.run_id }}
+      RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+      RFA_SIGNING_MODE: DEBUG_NONAUTHORIAL
+      RFA_SIGNER_ID: UNAVAILABLE_DEBUG_BUILD
+      RFA_EXPECTED_CERT_SHA256: TOKEN_VAZIO
+    steps:
+      - name: Exact checkout after green gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+
+      - name: Build capability bootstrap
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh bootstrap
+
+      - name: Re-materialize provenance for delivered binary
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh evidence
+
+      - name: Build exact debug binary
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh build-debug
+
+      - name: Bind binary receipt
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh binary-receipt
+
+      - name: Publish traceable prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/rafaelia-pipeline.sh publish-live
+
+  deliver_signed:
+    name: 90 · delivery / signed-release
+    if: ${{ needs.plan.outputs.delivery == 'signed-release' }}
+    needs:
+      - plan
+      - gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      RFA_CI_RUN_ID: ${{ github.run_id }}
+      RFA_CI_RUN_NUMBER: ${{ github.run_number }}
+      RFA_SIGNING_MODE: AUTHORIAL_ANDROID_APKSIGNER
+      RFA_SIGNER_ID: ${{ vars.RAFAELIA_SIGNER_ID }}
+      RFA_EXPECTED_CERT_SHA256: ${{ vars.RAFAELIA_EXPECTED_CERT_SHA256 }}
+      RFA_ANDROID_KEY_ALIAS: ${{ vars.RAFAELIA_ANDROID_KEY_ALIAS }}
+      RFA_ANDROID_KEYSTORE_B64: ${{ secrets.RAFAELIA_ANDROID_KEYSTORE_B64 }}
+      RFA_ANDROID_STORE_PASSWORD: ${{ secrets.RAFAELIA_ANDROID_STORE_PASSWORD }}
+      RFA_ANDROID_KEY_PASSWORD: ${{ secrets.RAFAELIA_ANDROID_KEY_PASSWORD }}
+      RFA_PAGES_REPO: ${{ vars.RAFAELIA_PAGES_REPO }}
+      RFA_PAGES_PAT: ${{ secrets.RAFAELIA_PAGES_PAT }}
+    steps:
+      - name: Exact checkout after green gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+
+      - name: Signing capability bootstrap
+        shell: bash
+        run: bash ci/rafaelia-pipeline.sh bootstrap
+
+      - name: Build, sign, verify and publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/rafaelia-pipeline.sh signed-release
