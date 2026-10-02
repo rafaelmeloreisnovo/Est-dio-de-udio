@@ -220,7 +220,9 @@ final class EvidenceBundleWriter {
             line(b, "z_min_uT", f6(magnetometer.minZ));
             line(b, "z_max_uT", f6(magnetometer.maxZ));
             line(b, "interpretation",
-                    "OBSERVATION_ONLY; magnetic change is not causal attribution");
+                    AssurancePipelineModel.isSensorUnavailable(magnetometer.state) ?
+                            "SENSOR_UNAVAILABLE_ON_DEVICE; no magnetic observation was made" :
+                            "OBSERVATION_ONLY; magnetic change is not causal attribution");
         }
 
         section(b, "passive_connectivity");
@@ -287,8 +289,12 @@ final class EvidenceBundleWriter {
         line(b, "cfr_relative_sweep_profile", "AVAILABLE_IN_APP_16_BANDS");
         line(b, "relative_decay_metrics", "AVAILABLE_IN_APP_NONSTANDARD_RELATIVE");
         line(b, "absolute_spl", "PENDING_PHYSICAL_REFERENCE");
-        line(b, "sensor_vibration", "OBSERVED_UNPROMOTED");
-        line(b, "sensor_magnetic", "OBSERVED_UNPROMOTED");
+        line(b, "sensor_vibration", sensorClaimState(
+                vibration == null ? null : vibration.state,
+                vibration == null ? 0 : vibration.samples));
+        line(b, "sensor_magnetic", sensorClaimState(
+                magnetometer == null ? null : magnetometer.state,
+                magnetometer == null ? 0 : magnetometer.samples));
         line(b, "passive_radio_metadata", "PLATFORM_OBSERVATION_ONLY");
         line(b, "rac1_codec", "CORE_IMPLEMENTED_UNPROMOTED");
         line(b, "hardware_diagnosis", "NOT_CLAIMED");
@@ -296,6 +302,13 @@ final class EvidenceBundleWriter {
                 "package metadata + installed APK SHA-256 + source/CI provenance when embedded");
 
         return b.toString();
+    }
+
+    private static String sensorClaimState(String state, int samples) {
+        if (state == null) return "NOT_RUN";
+        if (AssurancePipelineModel.isSensorUnavailable(state)) return state;
+        if (samples <= 1) return "INSUFFICIENT_EVIDENCE";
+        return state;
     }
 
     private static void appendAudioInputDevices(
