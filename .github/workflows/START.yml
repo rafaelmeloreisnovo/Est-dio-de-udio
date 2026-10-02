@@ -127,6 +127,10 @@ jobs:
         shell: bash
         run: bash ci/rafaelia-pipeline.sh quality
 
+      - name: 42 · explicit compile / Java + native ABIs
+        shell: bash
+        run: bash ci/compile-debug-gate.sh
+
       - name: 45 · parser fuzz / ARM runtime regression
         shell: bash
         run: |
