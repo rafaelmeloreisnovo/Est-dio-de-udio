@@ -1,6 +1,6 @@
 # Capability Matrix
 
-Current software baseline: `main@def87c720b14ab30ff39371637530d172223da6c`, GitHub Actions run `37013439446` = `SUCCESS`.
+Current software baseline: `main@469eb83b0d23286190c306b17c3fd378118dadd4`, GitHub Actions run `37014682335` = `SUCCESS`.
 
 Epistemic boundary:
 
@@ -8,6 +8,7 @@ Epistemic boundary:
 SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
 IMPLEMENTED_UNTESTED != PASS
 INSTALLABLE_STATIC != INSTALLED_PHYSICAL
+REPRODUCIBLE_SAME_ENV != INDEPENDENT_REPRODUCTION
 TOKEN_VAZIO != 0
 ```
 
@@ -53,9 +54,11 @@ TOKEN_VAZIO != 0
 | Node.js application runtime | absent | CI-gated | N/A | 0 |
 | npm/yarn/pnpm dependency graph | absent | CI-gated | N/A | 0 |
 | R8/shrink path | disabled | current main gate reports `R8_SHRINK=0` | N/A | 0 |
-| canonical CI orchestration | implemented | run `37013439446` PASS | N/A | PASS_EXECUTED_SCOPE |
-| exact checkout binding | implemented | `RAFAELIA_CHECKOUT=PASS` on run `37013439446` | N/A | exact source bound |
+| canonical CI orchestration | implemented | run `37014682335` PASS | N/A | PASS_EXECUTED_SCOPE |
+| exact checkout binding | implemented | `RAFAELIA_CHECKOUT=PASS` on run `37014682335` | N/A | exact source bound |
 | parser fuzz / ASAN / UBSAN | implemented | corpus 8192; ASAN/UBSAN PASS on current main | N/A | PASS_EXECUTED_SCOPE |
+| exact-byte reproducibility in same pinned CI environment | implemented | two clean builds produced identical SHA-256 on run `37014682335` | N/A | `APK_REPRODUCIBLE_SAME_ENV=PASS` |
+| independent reproduction | protocol boundary explicit | not established by same-environment rebuild | `NOT_RUN` | `NOT_CLAIMED` |
 | static APK installability | implemented | current main PASS | not equivalent to install | `INSTALLABLE_STATIC=PASS` |
 | physical installation of current head | procedure defined | CI cannot prove it | `NOT_RUN` | tracked by issue #29 |
 | installed APK signing certificate evidence | implemented | build-gated | device-dependent | bounded |
@@ -66,10 +69,15 @@ TOKEN_VAZIO != 0
 
 ## Current exact APK coordinate
 
-For `main@def87c720b14ab30ff39371637530d172223da6c`, run `37013439446` recorded:
+For `main@469eb83b0d23286190c306b17c3fd378118dadd4`, run `37014682335` recorded:
 
 ```text
-APK_SHA256=09703c7564980f9aa1374a689a10fc3408ffd321488ecaab56726de416eb19ee
+REPRO_BUILD_A_SHA256=1656df3ed0aed0038162400fc9734b4856a465539a513593172edc53c32f1c43
+REPRO_BUILD_B_SHA256=1656df3ed0aed0038162400fc9734b4856a465539a513593172edc53c32f1c43
+APK_REPRODUCIBLE_SAME_ENV=PASS
+REPRO_SCOPE=SAME_SOURCE_SAME_PINNED_CI_ENVIRONMENT
+INDEPENDENT_REPRODUCTION=NOT_CLAIMED
+APK_SHA256=1656df3ed0aed0038162400fc9734b4856a465539a513593172edc53c32f1c43
 APK_PACKAGE_ID=io.rafaelia.audiostudio
 APK_MIN_SDK=29
 APK_TARGET_SDK=35
