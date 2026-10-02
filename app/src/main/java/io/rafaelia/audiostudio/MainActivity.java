@@ -193,7 +193,7 @@ public final class MainActivity extends Activity {
         box.addView(transport);
 
         LinearLayout evidenceRow = row();
-        Button evidence = button("PROVAS + μ∆");
+        Button evidence = button("★ VALIDAR + ZIPRAF");
         evidence.setOnClickListener(v -> generateEvidenceBundle());
         Button shareEvidence = button("COMPARTILHAR");
         shareEvidence.setOnClickListener(v -> shareEvidenceBundle());
@@ -296,7 +296,8 @@ public final class MainActivity extends Activity {
         note.setText(
                 "CORE: C freestanding/fixed-point. ANDROID EDGE: tela, toque, áudio, " +
                 "sensor, armazenamento e carregamento do core. " +
-                "TOKEN_VAZIO é preservado quando a evidência física não existe.");
+                "TOKEN_VAZIO é preservado quando a evidência física não existe. " +
+                "AUDITORIA NORMATIVA EXTERNA=NOT_AUDITED.");
         note.setTextSize(11f);
         box.addView(note);
 
@@ -398,20 +399,29 @@ public final class MainActivity extends Activity {
 
     private void generateEvidenceBundle() {
         if (evidenceRunning) {
-            status.setText("Geração de provas já está em execução.");
+            status.setText("Geração de provas/ZIPRAF já está em execução.");
             return;
         }
 
         evidenceRunning = true;
         status.setText(
-                "EVIDENCE — coletando instalação, build, sensores e μ∆ do acelerômetro…");
+                "★ ASSURANCE — coletando material, execução, métricas, relações e gaps…");
 
         MicroDeltaVibrationProbe.run(this, 2200L, vibration -> {
             MicroDeltaMagnetometerProbe.run(this, 2200L, magnetometer -> {
                 new Thread(() -> {
                     try {
-                        EvidenceBundleWriter.Result result = EvidenceBundleWriter.write(
+                        EvidenceBundleWriter.Result rawResult = EvidenceBundleWriter.write(
                                 this,
+                                vibration,
+                                magnetometer,
+                                lastZrf,
+                                lastCfr,
+                                lastMasteredPcm,
+                                lastCalibrationResult);
+                        AssuranceZiprafWriter.Result result = AssuranceZiprafWriter.write(
+                                this,
+                                rawResult,
                                 vibration,
                                 magnetometer,
                                 lastZrf,
@@ -420,36 +430,35 @@ public final class MainActivity extends Activity {
                                 lastCalibrationResult);
                         lastEvidenceUri = result.uri;
                         runOnUiThread(() -> status.setText(
-                                "PROVAS GERADAS — " + result.displayName +
-                                "\ninstalação + APK SHA-256 + CI + hardware + μ∆" +
-                                "\nΔa RMS=" +
-                                String.format(Locale.US, "%.6f", vibration.rmsDeltaMs2) +
-                                " m/s² | ΔB RMS=" +
-                                String.format(Locale.US, "%.6f", magnetometer.rmsDeltaUt) +
-                                " µT" +
-                                "\nDocumento salvo em Downloads/RafaeliaAudio/Evidence."));
+                                "★ ZIPRAF GERADO — " + result.displayName +
+                                "\nstate=" + result.starState +
+                                " | relations=" + result.relationCount +
+                                " | gaps=" + result.gapCount +
+                                "\nraw evidence + hashes + métricas + relações + claims" +
+                                "\nNORMAS=NOT_AUDITED | claim_allowed=false" +
+                                "\nSalvo em Downloads/RafaeliaAudio/Assurance."));
                     } catch (Exception e) {
                         runOnUiThread(() ->
-                                status.setText("Falha ao gerar provas: " + e.getMessage()));
+                                status.setText("Falha ao gerar assurance ZIPRAF: " + e.getMessage()));
                     } finally {
                         evidenceRunning = false;
                     }
-                }, "rafaelia-evidence-writer").start();
+                }, "rafaelia-assurance-zipraf-writer").start();
             });
         });
     }
 
     private void shareEvidenceBundle() {
         if (lastEvidenceUri == null) {
-            status.setText("Gere o bundle de provas antes de compartilhar.");
+            status.setText("Gere o ZIPRAF de assurance antes de compartilhar.");
             return;
         }
 
         Intent send = new Intent(Intent.ACTION_SEND);
-        send.setType("text/plain");
+        send.setType("application/zip");
         send.putExtra(Intent.EXTRA_STREAM, lastEvidenceUri);
         send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(send, "Compartilhar provas Rafaelia"));
+        startActivity(Intent.createChooser(send, "Compartilhar ZIPRAF Rafaelia"));
     }
 
     private void ensurePermissionAndRecord(boolean narration) {
@@ -534,7 +543,7 @@ public final class MainActivity extends Activity {
                             " | captured=" + result.capturedFrames + " frames" +
                             " | bands=" + result.validTransferBands() + "/16" +
                             "\n" + roomState +
-                            " | ISO3382=NOT_CLAIMED" +
+                            " | EXTERNAL_STANDARD_AUDIT=NOT_AUDITED" +
                             "\nABS_SPL=PENDING_PHYSICAL_REFERENCE — referência acústica física necessária." +
                             "\nCFR: " + result.cfrFile.getAbsolutePath());
                 });
@@ -730,7 +739,7 @@ public final class MainActivity extends Activity {
                             "\nTrue-peak estimado pós-gain: " + tpPermille +
                             "‰ FS (ceiling -1 dBTP)" +
                             "\nOgg/Opus: " + finalOutputUri +
-                            "\nConformidade normativa: PENDING test vectors.");
+                            "\nAuditoria normativa externa: NOT_AUDITED; vetores formais permanecem pendentes.");
                 });
             } catch (Exception e) {
                 if (outputUri != null) {
