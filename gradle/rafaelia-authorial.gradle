@@ -25,6 +25,16 @@ tasks.register("rafaeliaAssuranceModelSmoke") {
     }
 }
 
+tasks.register("rafaeliaAssuranceConsistencyGate") {
+    group = "rafaelia verification"
+    description = "Fail closed when ZIPRAF counts, authorial-signing gaps or receipt fields drift."
+    doLast {
+        exec {
+            commandLine "bash", rootProject.file("ci/assurance-consistency-gate.sh").absolutePath
+        }
+    }
+}
+
 tasks.register("rafaeliaSensorPermissionGate") {
     group = "rafaelia verification"
     description = "Fail closed on Android permission, step/activity and sensor-rate regressions."
@@ -39,14 +49,27 @@ tasks.register("rafaeliaJavaGate") {
     group = "rafaelia verification"
     description = "Compile the Android Java edge early and fail before full APK work."
     dependsOn("rafaeliaAssuranceModelSmoke")
+    dependsOn("rafaeliaAssuranceConsistencyGate")
     dependsOn("rafaeliaSensorPermissionGate")
     dependsOn("compileDebugJavaWithJavac")
 }
 
+tasks.register("rafaeliaFinalElfBoundaryGate") {
+    group = "rafaelia verification"
+    description = "Classify final Android shared-object imports separately from freestanding core-object gates."
+    dependsOn("assembleDebug")
+    doLast {
+        exec {
+            commandLine "bash", rootProject.file("ci/final-elf-boundary-gate.sh").absolutePath,
+                    file("build/outputs/apk/debug/app-debug.apk").absolutePath
+        }
+    }
+}
+
 tasks.register("rafaeliaDebugApk") {
     group = "rafaelia build"
-    description = "Build the canonical debug APK with R8/resource shrinking disabled."
-    dependsOn("assembleDebug")
+    description = "Build the canonical debug APK, then classify the final ELF platform link boundary."
+    dependsOn("rafaeliaFinalElfBoundaryGate")
 }
 
 tasks.register("rafaeliaLowApk") {
@@ -62,11 +85,15 @@ tasks.register("rafaeliaBuildContract") {
         println("RAFAELIA_BUILD_CONTRACT=V1")
         println("JAVA_EDGE=ANDROID_PLATFORM_ONLY")
         println("C_CORE=FREESTANDING")
+        println("C_CORE_ZERO_UNDEFINED_SCOPE=PRE_ANDROID_LINK_OBJECTS")
+        println("FINAL_ANDROID_SO=PLATFORM_LINK_EDGE_CLASSIFIED_AFTER_ASSEMBLY")
         println("R8=OFF")
         println("RESOURCE_SHRINK=OFF")
         println("ABIS=armeabi-v7a,arm64-v8a")
         println("ASSURANCE_ZIPRAF=FAIL_CLOSED_MODEL_V1")
+        println("ASSURANCE_CONSISTENCY_GATE=BOUND_TO_JAVA_GATE")
         println("SENSOR_PERMISSION_GATE=BOUND_TO_JAVA_GATE")
+        println("FINAL_ELF_BOUNDARY_GATE=BOUND_TO_DEBUG_APK")
         println("EXTERNAL_STANDARD_AUDIT=NOT_AUDITED")
     }
 }
