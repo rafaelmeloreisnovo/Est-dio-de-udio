@@ -149,6 +149,10 @@ jobs:
         shell: bash
         run: bash ci/rafaelia-pipeline.sh build-debug
 
+      - name: 72 · exact-byte reproducibility / same pinned CI environment
+        shell: bash
+        run: bash ci/reproducible-debug-gate.sh
+
       - name: 75 · static APK installability
         shell: bash
         run: bash ci/apk-installability-static.sh app/build/outputs/apk/debug/app-debug.apk
@@ -200,6 +204,10 @@ jobs:
       - name: Build exact debug binary
         shell: bash
         run: bash ci/rafaelia-pipeline.sh build-debug
+
+      - name: Verify exact debug build reproducibility
+        shell: bash
+        run: bash ci/reproducible-debug-gate.sh
 
       - name: Verify exact debug binary installability
         shell: bash
