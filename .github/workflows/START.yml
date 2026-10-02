@@ -57,7 +57,7 @@ jobs:
               ;;
             push)
               source_sha="$EVENT_SHA"
-              delivery="live-debug"
+              delivery="validate"
               ;;
             workflow_dispatch)
               source_sha="$REQUESTED_SHA"
