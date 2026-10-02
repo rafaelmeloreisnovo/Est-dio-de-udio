@@ -13,6 +13,14 @@ public final class AssurancePipelineSmoke {
         }
     }
 
+    private static void expectTrue(boolean value, String message) {
+        if (!value) throw new AssertionError(message);
+    }
+
+    private static void expectFalse(boolean value, String message) {
+        if (value) throw new AssertionError(message);
+    }
+
     public static void main(String[] args) {
         expect(
                 "TOKEN_VAZIO_MATERIAL",
@@ -44,6 +52,35 @@ public final class AssurancePipelineSmoke {
                 AssurancePipelineModel.metricState(true, true, true, false, false));
 
         expect(
+                "TOKEN_VAZIO_SENSOR_UNAVAILABLE",
+                AssurancePipelineModel.sensorMetricState(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE", 0, true, true));
+        expect(
+                "INSUFFICIENT_EVIDENCE",
+                AssurancePipelineModel.sensorMetricState(
+                        "INSUFFICIENT_EVIDENCE", 1, true, true));
+        expect(
+                "FAIL_METRIC_CONTRACT",
+                AssurancePipelineModel.sensorMetricState(
+                        "OBSERVED_UNPROMOTED", 16, false, true));
+        expect(
+                "OBSERVED_METRIC_SCOPED",
+                AssurancePipelineModel.sensorMetricState(
+                        "OBSERVED_UNPROMOTED", 16, true, true));
+        expectTrue(
+                AssurancePipelineModel.isSensorUnavailable(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE"),
+                "unavailable sensor state must remain explicit");
+        expectFalse(
+                AssurancePipelineModel.isObservedSensorState(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE", 0),
+                "unavailable sensor cannot become observed evidence");
+        expectTrue(
+                AssurancePipelineModel.isObservedSensorState(
+                        "OBSERVED_UNPROMOTED", 16),
+                "sufficient observed sensor samples must remain observable");
+
+        expect(
                 "NOT_AUDITED",
                 AssurancePipelineModel.claimState(true, true, true, false));
         expect(
@@ -62,6 +99,7 @@ public final class AssurancePipelineSmoke {
         }
 
         System.out.println("ASSURANCE_PIPELINE_SMOKE=PASS");
+        System.out.println("SENSOR_UNAVAILABLE_SEMANTICS=PASS");
         System.out.println("COMPLIANCE_CLAIM=NOT_AUDITED");
         System.out.println("CLAIM_ALLOWED=false");
     }
