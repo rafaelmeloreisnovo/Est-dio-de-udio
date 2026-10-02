@@ -5,6 +5,7 @@
  */
 
 def assuranceSmokeOut = layout.buildDirectory.dir("rafaelia-assurance-smoke")
+def audioInteropSmokeOut = layout.buildDirectory.dir("rafaelia-audio-interop-smoke")
 
 tasks.register("rafaeliaAssuranceModelSmoke") {
     group = "rafaelia verification"
@@ -21,6 +22,25 @@ tasks.register("rafaeliaAssuranceModelSmoke") {
         exec {
             commandLine "java", "-cp", outDir.absolutePath,
                     "io.rafaelia.audiostudio.AssurancePipelineSmoke"
+        }
+    }
+}
+
+tasks.register("rafaeliaAudioInteropSmoke") {
+    group = "rafaelia verification"
+    description = "Run provider-free byte-layout vectors for authorial PCM export containers."
+    doLast {
+        def outDir = audioInteropSmokeOut.get().asFile
+        delete(outDir)
+        outDir.mkdirs()
+        exec {
+            commandLine "javac", "-d", outDir.absolutePath,
+                    "src/main/java/io/rafaelia/audiostudio/AudioInteropWriter.java",
+                    rootProject.file("native/tests/AudioInteropWriterSmoke.java").absolutePath
+        }
+        exec {
+            commandLine "java", "-cp", outDir.absolutePath,
+                    "io.rafaelia.audiostudio.AudioInteropWriterSmoke"
         }
     }
 }
@@ -49,6 +69,7 @@ tasks.register("rafaeliaJavaGate") {
     group = "rafaelia verification"
     description = "Compile the Android Java edge early and fail before full APK work."
     dependsOn("rafaeliaAssuranceModelSmoke")
+    dependsOn("rafaeliaAudioInteropSmoke")
     dependsOn("rafaeliaAssuranceConsistencyGate")
     dependsOn("rafaeliaSensorPermissionGate")
     dependsOn("compileDebugJavaWithJavac")
@@ -92,6 +113,9 @@ tasks.register("rafaeliaBuildContract") {
         println("ABIS=armeabi-v7a,arm64-v8a")
         println("ASSURANCE_ZIPRAF=FAIL_CLOSED_MODEL_V1")
         println("ASSURANCE_CONSISTENCY_GATE=BOUND_TO_JAVA_GATE")
+        println("AUDIO_INTEROP_SMOKE=BOUND_TO_JAVA_GATE")
+        println("AUDIO_INTEROP_FORMATS=RAW_PCM16,WAV_PCM16,AIFF_PCM16,AU_PCM16,CAF_LPCM16")
+        println("AUDIO_INTEROP_EXTERNAL_CODEC_LIBRARY=NONE")
         println("SENSOR_PERMISSION_GATE=BOUND_TO_JAVA_GATE")
         println("FINAL_ELF_BOUNDARY_GATE=BOUND_TO_DEBUG_APK")
         println("EXTERNAL_STANDARD_AUDIT=NOT_AUDITED")
