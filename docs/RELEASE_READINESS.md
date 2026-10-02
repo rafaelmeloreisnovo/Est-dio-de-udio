@@ -1,45 +1,152 @@
 # Release Readiness
 
-## Required for a testable APK release
+Release readiness is evaluated per evidence class. A green software gate does not promote provider policy, physical execution, calibration, signing authority or external audit.
 
-- host DSP/meter/manifold smokes PASS;
-- freestanding source gate PASS;
-- ARMv7 zero-undefined + ABI PASS;
-- AArch64 zero-undefined PASS;
-- assembleDebug/release PASS;
-- artifact digest recorded;
-- documentation capability matrix reconciled.
+```text
+SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM
+IMPLEMENTED_UNTESTED != PASS
+TOKEN_VAZIO != 0
+```
 
-## Required before claiming physical capability
+## Current software receipt
 
-- target Android version/device recorded;
-- installation evidence bundle generated;
-- relevant hardware action executed;
-- raw artifact preserved;
-- receipt records environment and outcome.
+Current authoritative software baseline for this document:
+
+- source: `main@469eb83b0d23286190c306b17c3fd378118dadd4`
+- canonical GitHub Actions run: `37014682335` / #39 = `SUCCESS`
+- debug APK SHA-256: `1656df3ed0aed0038162400fc9734b4856a465539a513593172edc53c32f1c43`
+- package: `io.rafaelia.audiostudio`
+- ABIs: `armeabi-v7a`, `arm64-v8a`
+- static installability: `PASS`
+- physical installation of this exact APK: `NOT_RUN`
+- same pinned CI/toolchain rebuild A/B byte identity: `PASS`
+- independent reproduction: `NOT_CLAIMED`
+- signing mode: `DEBUG_NONAUTHORIAL`
+- authorial signing certificate expectation: `TOKEN_VAZIO` for this debug receipt
+- provider main protection: `TOKEN_VAZIO_UNRESOLVED`
+- external standards audit: `NOT_AUDITED`
+- `claim_allowed=false`
+
+## Testable debug APK — software gate
+
+The current canonical receipt supports the executed software scope below:
+
+- exact detached checkout of the declared source SHA;
+- Java compile + native build for both Android ABIs;
+- host quality/smoke gates;
+- parser mutation/fuzz corpus with ASAN/UBSAN PASS;
+- ARMv7/AArch64 pre-Android-link freestanding objects with zero undefined symbols;
+- public ABI manifest check on ARMv7;
+- no writable persistent symbols in the freestanding object scope;
+- `-Wshadow -Werror` diagnostic gate;
+- final Android `.so` boundary classified separately as `ANDROID_PLATFORM_LINKED` with allowed `NEEDED=libc.so,libm.so,libdl.so`;
+- assurance consistency and unavailable-sensor semantics gates;
+- APK ZIP integrity/signature verification/zipalign/static installability;
+- binary-origin receipt;
+- clean second build in the same pinned CI environment with exact APK byte identity.
+
+This does **not** imply a physical-device PASS or independent reproduction.
+
+## Required before claiming current-head physical capability
+
+All must bind to the exact APK hash above, or to a later exact receipt that supersedes it:
+
+- target Android version and hardware identity recorded;
+- installed APK SHA-256 verified against the expected CI artifact;
+- installed signing certificate captured;
+- relevant hardware action actually executed;
+- platform-reported sensor inventory captured;
+- unavailable sensors retain typed `TOKEN_VAZIO_SENSOR_UNAVAILABLE_*` states;
+- raw evidence TXT preserved;
+- ZRF/CFR/PCM preserved when applicable;
+- ZIPRAF generated and every embedded-entry SHA-256 verified;
+- embedded bytes distinguished from externally referenced/hash-bound artifacts;
+- receipt records source SHA, CI run, APK hash, device/environment and outcome.
+
+Until those are satisfied:
+
+```text
+CURRENT_HEAD_DEVICE_RUN=NOT_RUN
+CURRENT_HEAD_PHYSICAL_ZIPRAF=TOKEN_VAZIO
+```
+
+## Required before authorial signed release
+
+- provider enforcement gate must pass against the actual protected ref;
+- real keystore/alias/password material must be configured through the intended secret path;
+- expected authorial certificate SHA-256 must be configured;
+- built APK must be signed by the authorial path;
+- observed certificate digest must equal the expected digest;
+- signed APK digest and signing receipt must be retained;
+- delivery must target the exact gated source SHA.
+
+Current state:
+
+```text
+PROVIDER_ENFORCEMENT=TOKEN_VAZIO_UNRESOLVED
+AUTHORIAL_SIGNING=TOKEN_VAZIO_UNTIL_CONFIGURED_AND_EXECUTED
+```
+
+## Required before independent reproducibility claim
+
+The same-environment gate is necessary evidence but not sufficient for independent reproduction. A stronger receipt requires at least:
+
+- a second controlled build environment that is not the same CI job/environment;
+- the exact same source SHA and declared/pinned toolchain inputs;
+- artifact SHA-256 comparison;
+- entry-level diff if the APK differs;
+- environment identity in both receipts.
+
+Current state: `INDEPENDENT_REPRODUCTION=NOT_CLAIMED`.
 
 ## Required before acoustic calibration claims
 
-Relative software gate:
+### Relative software/analysis boundary
+
 - known source/response alignment;
-- 16-band relative sweep profile validated by deterministic host vectors;
-- relative decay estimator validated by deterministic host vectors.
+- deterministic validation of the relative 16-band profile;
+- deterministic validation of the relative decay estimator;
+- no promotion of a relative metric into an absolute or standards-conformant measurement.
 
-Relative physical evidence:
-- repeated CFR captures on the target device/room;
+### Relative physical evidence
+
+- repeated CFR captures on the same controlled target setup;
 - raw reference/response preserved;
-- repeatability and noise/dynamic-range recorded.
+- sample rate, device orientation, thermal/power state and environment recorded where material;
+- repeatability statistics such as N, median, dispersion and range;
+- noise/dynamic-range evidence sufficient for the intended bounded claim.
 
-Absolute:
-- traceable or otherwise documented acoustic reference;
-- calibration method and uncertainty;
-- physical repeatability.
+### Absolute acoustic claim
+
+- traceable or otherwise documented physical acoustic reference;
+- calibration method;
+- uncertainty budget;
+- physical repeatability;
+- explicit separation of reference accuracy from app/software repeatability.
+
+Current state:
+
+```text
+ABSOLUTE_SPL_REFERENCE=TOKEN_VAZIO
+MEASUREMENT_UNCERTAINTY=TOKEN_VAZIO
+```
+
+## Standards boundary
+
+ISO/NIST/ITU/EBU or other normative material may be used as engineering references or to define future test vectors. Internal CI success does not establish conformity, certification or accreditation.
+
+`EXTERNAL_STANDARD_AUDIT=NOT_AUDITED`.
 
 ## No-go
 
-Release notes must not convert `PENDING`, `NOT_RUN` or `TOKEN_VAZIO` into marketing claims.
+Release notes and receipts must not convert any of the following into a stronger claim:
 
+- `PENDING`;
+- `NOT_RUN`;
+- `TOKEN_VAZIO`;
+- same-environment reproducibility into independent reproduction;
+- static installability into installed physical execution;
+- pre-link freestanding core status into a claim that the final Android `.so` is bare-metal/freestanding;
+- a hash into authenticity, scientific validity or calibration.
 
-## Baseline evidence before Delta 5
-
-`main@1a1b00bb93b0988224d8b24085a82029d1228c45` passed GitHub run `36545296255`, including host smokes, freestanding gate, ARMv7/AArch64 gates, APK assembly, binary-origin receipt and live prerelease publication. Delta 5 must obtain its own CI result before promotion.
+The obsolete `main@1a1b00... / run 36545296255` baseline is historical only and is no longer the current readiness anchor.
