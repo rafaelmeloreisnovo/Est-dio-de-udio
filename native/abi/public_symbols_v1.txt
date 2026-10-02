@@ -38,6 +38,10 @@ rfa_lms_core:rfa_lms_bind_q15
 rfa_lms_core:rfa_lms_cancel_block_q15
 rfa_lms_core:rfa_lms_cancel_sample_q15
 rfa_lms_core:rfa_lms_reset_q15
+rfa_lms_core:rfa_nlms_bind_q15
+rfa_lms_core:rfa_nlms_cancel_block_q15
+rfa_lms_core:rfa_nlms_cancel_sample_q15
+rfa_lms_core:rfa_nlms_reset_q15
 rfa_biquad_core:rfa_biquad_bank_process_q30
 rfa_biquad_core:rfa_biquad_bank_reset_q30
 rfa_biquad_core:rfa_biquad_bank_set_q30
