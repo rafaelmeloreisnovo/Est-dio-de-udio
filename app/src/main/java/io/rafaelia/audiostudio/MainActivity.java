@@ -12,7 +12,8 @@ import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -41,10 +42,10 @@ public final class MainActivity extends Activity {
     private static final int REQ_PICK = 101;
 
     private static final String[] PROFILES = {
-            "WhatsApp / voz — -16 LUFS workflow",
-            "Narração — -18 LUFS workflow",
-            "Broadcast — -23 LUFS EBU R128",
-            "Música clean — -18 LUFS conservador"
+            "Mobile voice · target energy",
+            "Narration · target energy",
+            "Broadcast · target energy · NOT_AUDITED",
+            "Music clean · target energy"
     };
 
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -57,7 +58,6 @@ public final class MainActivity extends Activity {
     private SeekBar speedSeek;
     private TextView speedLabel;
     private Spinner profileSpinner;
-    private SpectrumView spectrumView;
     private StudioWorkspaceView studioWorkspaceView;
     private final short[] liveWave = new short[512];
 
@@ -94,18 +94,17 @@ public final class MainActivity extends Activity {
         @Override
         public void run() {
             if (!telemetryRunning || recorder == null) return;
-            AudioRecorderEngine.CaptureStats s = recorder.getStats();
-            int peakPct = (int) ((long) s.peak * 100L / 32768L);
-            int rmsPct = (int) ((long) s.rms * 100L / 32768L);
+            AudioRecorderEngine.CaptureStats capture = recorder.getStats();
+            int peakPct = (int) ((long) capture.peak * 100L / 32768L);
+            int rmsPct = (int) ((long) capture.rms * 100L / 32768L);
             status.setText(
-                    "GRAVANDO 48 kHz PCM16 — " + s.source +
-                    "\nPeak amostral: " + peakPct + "% FS" +
-                    " | RMS bruto: " + rmsPct + "% FS" +
-                    " | clipping samples: " + s.clipped);
+                    "RECORDING · 48 kHz PCM16 · " + capture.source +
+                    "\nPeak " + peakPct + "% FS · RMS " + rmsPct +
+                    "% FS · clipped " + capture.clipped);
             if (studioWorkspaceView != null) {
                 int liveCount = recorder.copyLatest(liveWave);
                 studioWorkspaceView.setCaptureStats(
-                        peakPct, rmsPct, s.clipped, s.samples, s.source);
+                        peakPct, rmsPct, capture.clipped, capture.samples, capture.source);
                 studioWorkspaceView.setWaveform(liveWave, liveCount);
             }
             ui.postDelayed(this, 500);
@@ -128,18 +127,15 @@ public final class MainActivity extends Activity {
 
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(10);
-        box.setPadding(pad, pad, pad, pad);
-
-        TextView title = new TextView(this);
-        title.setText("RAFAELIA AUDIO · μ∆");
-        title.setTextSize(20f);
-        box.addView(title);
+        int pad = dp(8);
+        box.setPadding(pad, pad, pad, dp(16));
+        box.setBackgroundColor(Color.rgb(10, 13, 17));
 
         status = new TextView(this);
-        status.setTextSize(13f);
+        status.setTextSize(11f);
+        status.setTextColor(Color.rgb(188, 200, 209));
+        status.setPadding(dp(6), dp(3), dp(6), dp(8));
         box.addView(status);
-        refreshReadyState();
 
         studioWorkspaceView = new StudioWorkspaceView(this);
         studioWorkspaceView.setCalibrationState(
@@ -162,75 +158,15 @@ public final class MainActivity extends Activity {
             @Override public void onGenerateEvidence() {
                 generateEvidenceBundle();
             }
-            @Override public void onRequestSensorAccess() {
-                requestOptionalSensorAccess();
-            }
         });
         refreshSystemPanel();
-        boolean landscape =
-                getResources().getConfiguration().orientation ==
-                        Configuration.ORIENTATION_LANDSCAPE;
-        int studioHeight = landscape ? dp(430) : dp(560);
         box.addView(studioWorkspaceView,
                 new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout transport = row();
-        Button rawVoice = button("● REC");
-        rawVoice.setOnClickListener(v -> ensurePermissionAndRecord(false));
-        Button stop = button("■ MASTER");
-        stop.setOnClickListener(v -> stopAndMaster());
-        Button play = button("▶ PLAY");
-        play.setOnClickListener(v -> playMaster());
-        Button stopPlay = button("Ⅱ STOP");
-        stopPlay.setOnClickListener(v -> playback.stop());
-        transport.addView(rawVoice, weight());
-        transport.addView(stop, weight());
-        transport.addView(play, weight());
-        transport.addView(stopPlay, weight());
-        box.addView(transport);
-
-        LinearLayout evidenceRow = row();
-        Button evidence = button("★ VALIDAR + ZIPRAF");
-        evidence.setOnClickListener(v -> generateEvidenceBundle());
-        Button shareEvidence = button("COMPARTILHAR");
-        shareEvidence.setOnClickListener(v -> shareEvidenceBundle());
-        evidenceRow.addView(evidence, weight());
-        evidenceRow.addView(shareEvidence, weight());
-        box.addView(evidenceRow);
-
-        TextView toolsTitle = new TextView(this);
-        toolsTitle.setText("FERRAMENTAS · toque somente no que precisar");
-        toolsTitle.setTextSize(12f);
-        box.addView(toolsTitle);
-
-        LinearLayout tools = row();
-        Button wizard = button("PRÉ-VOO");
-        wizard.setOnClickListener(v -> StudioWizard.show(this, this::refreshReadyState));
-        Button narration = button("NARRAÇÃO");
-        narration.setOnClickListener(v -> ensurePermissionAndRecord(true));
-        Button importAudio = button("IMPORTAR");
-        importAudio.setOnClickListener(v -> pickAudio());
-        Button share = button("EXPORTAR");
-        share.setOnClickListener(v -> shareLast());
-        tools.addView(wizard, weight());
-        tools.addView(narration, weight());
-        tools.addView(importAudio, weight());
-        tools.addView(share, weight());
-        box.addView(tools);
-
-        LinearLayout interop = row();
-        Button rawExport = button("RAW PCM");
-        rawExport.setOnClickListener(v -> exportMasterRaw());
-        Button wavExport = button("WAV PCM16");
-        wavExport.setOnClickListener(v -> exportMasterWav());
-        Button opusShare = button("OPUS / SHARE");
-        opusShare.setOnClickListener(v -> shareLast());
-        interop.addView(rawExport, weight());
-        interop.addView(wavExport, weight());
-        interop.addView(opusShare, weight());
-        box.addView(interop);
+        TextView profileLabel = sectionLabel("PROCESSING PROFILE");
+        box.addView(profileLabel);
 
         profileSpinner = new Spinner(this);
         ArrayAdapter<String> profiles = new ArrayAdapter<>(
@@ -239,69 +175,131 @@ public final class MainActivity extends Activity {
         profileSpinner.setAdapter(profiles);
         box.addView(profileSpinner);
 
+        LinearLayout utilityRow = row();
+        Button narrationToggle = button("Narration");
+        Button importAudio = button("Import audio");
+        Button moreToggle = button("More tools");
+        utilityRow.addView(narrationToggle, weight());
+        utilityRow.addView(importAudio, weight());
+        utilityRow.addView(moreToggle, weight());
+        box.addView(utilityRow);
+
+        LinearLayout narrationPanel = verticalPanel();
+        narrationPanel.setVisibility(View.GONE);
+        buildNarrationPanel(narrationPanel);
+        box.addView(narrationPanel);
+
+        LinearLayout advancedPanel = verticalPanel();
+        advancedPanel.setVisibility(View.GONE);
+        buildAdvancedPanel(advancedPanel);
+        box.addView(advancedPanel);
+
+        narrationToggle.setOnClickListener(v ->
+                togglePanel(narrationPanel, narrationToggle, "Narration", "Close narration"));
+        importAudio.setOnClickListener(v -> pickAudio());
+        moreToggle.setOnClickListener(v ->
+                togglePanel(advancedPanel, moreToggle, "More tools", "Close tools"));
+
+        root.addView(box);
+        refreshReadyState();
+        return root;
+    }
+
+    private void buildNarrationPanel(LinearLayout panel) {
+        panel.addView(sectionLabel("NARRATION / TELEPROMPTER"));
+
         scriptEdit = new EditText(this);
-        scriptEdit.setHint("Roteiro / teleprompter");
+        scriptEdit.setHint("Script / teleprompter text");
         scriptEdit.setMinLines(2);
         scriptEdit.setMaxLines(5);
+        scriptEdit.setTextColor(Color.rgb(222, 229, 234));
+        scriptEdit.setHintTextColor(Color.rgb(120, 137, 149));
         scriptEdit.setInputType(
                 InputType.TYPE_CLASS_TEXT |
                 InputType.TYPE_TEXT_FLAG_MULTI_LINE |
                 InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        box.addView(scriptEdit);
+        panel.addView(scriptEdit);
 
-        LinearLayout promptButtons = row();
-        Button loadScript = button("CARREGAR TEXTO");
+        LinearLayout controls = row();
+        Button loadScript = button("Load text");
         loadScript.setOnClickListener(v -> loadPrompter());
-        Button promptStart = button("▶ TEXTO");
-        promptStart.setOnClickListener(v -> startPrompter());
-        Button promptStop = button("■ TEXTO");
-        promptStop.setOnClickListener(v -> stopPrompter());
-        promptButtons.addView(loadScript, weight());
-        promptButtons.addView(promptStart, weight());
-        promptButtons.addView(promptStop, weight());
-        box.addView(promptButtons);
+        Button recordNarration = button("Record narration");
+        recordNarration.setOnClickListener(v -> ensurePermissionAndRecord(true));
+        Button stopText = button("Stop text");
+        stopText.setOnClickListener(v -> stopPrompter());
+        controls.addView(loadScript, weight());
+        controls.addView(recordNarration, weight());
+        controls.addView(stopText, weight());
+        panel.addView(controls);
 
         speedLabel = new TextView(this);
-        box.addView(speedLabel);
+        speedLabel.setTextColor(Color.rgb(164, 180, 191));
+        speedLabel.setTextSize(10f);
+        panel.addView(speedLabel);
+
         speedSeek = new SeekBar(this);
         speedSeek.setMax(160);
         speedSeek.setProgress(60);
         speedSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 updateSpeedLabel();
             }
-            @Override public void onStartTrackingTouch(SeekBar s) {}
-            @Override public void onStopTrackingTouch(SeekBar s) {}
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
-        box.addView(speedSeek);
+        panel.addView(speedSeek);
         updateSpeedLabel();
 
         prompterScroll = new ScrollView(this);
         prompterScroll.setFillViewport(true);
         prompterText = new TextView(this);
         prompterText.setTextSize(22f);
+        prompterText.setTextColor(Color.rgb(232, 238, 242));
         prompterText.setLineSpacing(8f, 1.10f);
         prompterText.setPadding(dp(8), dp(8), dp(8), dp(30));
         prompterText.setText("Teleprompter");
         prompterScroll.addView(prompterText);
-        box.addView(prompterScroll,
+        panel.addView(prompterScroll,
                 new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, dp(150)));
+    }
 
-        spectrumView = new SpectrumView(this);
-        box.addView(spectrumView);
+    private void buildAdvancedPanel(LinearLayout panel) {
+        panel.addView(sectionLabel("EXECUTABLE TOOLS"));
 
-        TextView note = new TextView(this);
-        note.setText(
-                "CORE: C freestanding/fixed-point. ANDROID EDGE: tela, toque, áudio, " +
-                "sensor, armazenamento e carregamento do core. " +
-                "TOKEN_VAZIO é preservado quando a evidência física não existe. " +
-                "AUDITORIA NORMATIVA EXTERNA=NOT_AUDITED.");
-        note.setTextSize(11f);
-        box.addView(note);
+        LinearLayout first = row();
+        Button preflight = button("Pre-flight");
+        preflight.setOnClickListener(v -> StudioWizard.show(this, this::refreshReadyState));
+        Button stopPlayback = button("Stop playback");
+        stopPlayback.setOnClickListener(v -> playback.stop());
+        first.addView(preflight, weight());
+        first.addView(stopPlayback, weight());
+        panel.addView(first);
 
-        root.addView(box);
-        return root;
+        LinearLayout export = row();
+        Button rawExport = button("Export RAW PCM");
+        rawExport.setOnClickListener(v -> exportMasterRaw());
+        Button wavExport = button("Export WAV PCM16");
+        wavExport.setOnClickListener(v -> exportMasterWav());
+        export.addView(rawExport, weight());
+        export.addView(wavExport, weight());
+        panel.addView(export);
+
+        LinearLayout share = row();
+        Button shareAudio = button("Share processed audio");
+        shareAudio.setOnClickListener(v -> shareLast());
+        Button shareEvidence = button("Share ZIPRAF");
+        shareEvidence.setOnClickListener(v -> shareEvidenceBundle());
+        share.addView(shareAudio, weight());
+        share.addView(shareEvidence, weight());
+        panel.addView(share);
+    }
+
+    private LinearLayout verticalPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(4), dp(8), dp(4), dp(8));
+        return panel;
     }
 
     private LinearLayout row() {
@@ -315,10 +313,30 @@ public final class MainActivity extends Activity {
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
     }
 
+    private TextView sectionLabel(String label) {
+        TextView text = new TextView(this);
+        text.setText(label);
+        text.setTextSize(9f);
+        text.setTextColor(Color.rgb(124, 145, 160));
+        text.setPadding(dp(5), dp(10), dp(5), dp(4));
+        return text;
+    }
+
     private Button button(String label) {
-        Button b = new Button(this);
-        b.setText(label);
-        return b;
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextSize(11f);
+        button.setTextColor(Color.rgb(235, 241, 245));
+        button.setBackgroundTintList(ColorStateList.valueOf(Color.rgb(35, 49, 60)));
+        return button;
+    }
+
+    private void togglePanel(
+            View panel, Button trigger, String closedLabel, String openLabel) {
+        boolean opening = panel.getVisibility() != View.VISIBLE;
+        panel.setVisibility(opening ? View.VISIBLE : View.GONE);
+        trigger.setText(opening ? openLabel : closedLabel);
     }
 
     private int dp(int value) {
@@ -326,9 +344,10 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshReadyState() {
+        if (status == null) return;
         status.setText(
-                "READY — fonte preservada, DSP pós-captura, normalização gated.\n" +
-                "Escolha um perfil, carregue o roteiro ou importe um áudio.");
+                "READY · source preserved · 48 kHz PCM16 · " +
+                "tap dashboard cards/graphs to inspect");
         refreshSystemPanel();
     }
 
@@ -339,34 +358,25 @@ public final class MainActivity extends Activity {
         studioWorkspaceView.setSignatureState(SystemAccessSnapshot.signatureState());
     }
 
-    private void requestOptionalSensorAccess() {
-        refreshSystemPanel();
-        status.setText(
-                "Sensores locais: nenhuma permissão Android adicional é necessária para " +
-                "acelerômetro/magnetômetro/luz/proximidade no perfil atual. " +
-                "A observação μ∆ ocorre somente após a ação explícita ★ VALIDAR + ZIPRAF.");
-    }
-
     private int currentWpm() {
         return 80 + speedSeek.getProgress();
     }
 
     private void updateSpeedLabel() {
         if (speedLabel != null && speedSeek != null) {
-            speedLabel.setText(
-                    "Velocidade aproximada do teleprompter: " + currentWpm() + " WPM");
+            speedLabel.setText("Teleprompter speed · " + currentWpm() + " WPM");
         }
     }
 
     private void loadPrompter() {
         String text = scriptEdit.getText().toString().trim();
         if (text.length() == 0) {
-            status.setText("Roteiro vazio: escreva ou cole um texto.");
+            status.setText("Script empty · write or paste text first.");
             return;
         }
         prompterText.setText(text + "\n\n");
         prompterScroll.scrollTo(0, 0);
-        status.setText("Roteiro carregado. Ajuste WPM e faça o pré-voo.");
+        status.setText("Narration script loaded.");
     }
 
     private void startPrompter() {
@@ -390,14 +400,13 @@ public final class MainActivity extends Activity {
 
     private void generateEvidenceBundle() {
         if (evidenceRunning) {
-            status.setText("Geração de provas/ZIPRAF já está em execução.");
+            status.setText("Evidence / ZIPRAF generation is already running.");
             return;
         }
 
         evidenceRunning = true;
         status.setText(
-                "★ ASSURANCE — ação explícita: coletando μ∆ local de acelerômetro/" +
-                "magnetômetro por janela limitada, além de material, métricas e gaps…");
+                "PROOF · ação explícita: coletando μ∆ local · bounded sensor window + evidence…");
 
         MicroDeltaVibrationProbe.run(this, 2200L, vibration -> {
             MicroDeltaMagnetometerProbe.run(this, 2200L, magnetometer -> {
@@ -422,16 +431,14 @@ public final class MainActivity extends Activity {
                                 lastCalibrationResult);
                         lastEvidenceUri = result.uri;
                         runOnUiThread(() -> status.setText(
-                                "★ ZIPRAF GERADO — " + result.displayName +
+                                "ZIPRAF GENERATED · " + result.displayName +
                                 "\nstate=" + result.starState +
-                                " | relations=" + result.relationCount +
-                                " | gaps=" + result.gapCount +
-                                "\nraw evidence + hashes + métricas + relações + claims" +
-                                "\nNORMAS=NOT_AUDITED | claim_allowed=false" +
-                                "\nSalvo em Downloads/RafaeliaAudio/Assurance."));
+                                " · relations=" + result.relationCount +
+                                " · gaps=" + result.gapCount +
+                                "\nNORMATIVE_AUDIT=NOT_AUDITED · claim_allowed=false"));
                     } catch (Exception e) {
                         runOnUiThread(() ->
-                                status.setText("Falha ao gerar assurance ZIPRAF: " + e.getMessage()));
+                                status.setText("ZIPRAF generation failed · " + e.getMessage()));
                     } finally {
                         evidenceRunning = false;
                     }
@@ -442,7 +449,7 @@ public final class MainActivity extends Activity {
 
     private void shareEvidenceBundle() {
         if (lastEvidenceUri == null) {
-            status.setText("Gere o ZIPRAF de assurance antes de compartilhar.");
+            status.setText("Generate a ZIPRAF bundle before sharing.");
             return;
         }
 
@@ -450,7 +457,7 @@ public final class MainActivity extends Activity {
         send.setType("application/zip");
         send.putExtra(Intent.EXTRA_STREAM, lastEvidenceUri);
         send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(send, "Compartilhar ZIPRAF Rafaelia"));
+        startActivity(Intent.createChooser(send, "Share Rafaelia ZIPRAF"));
     }
 
     private void ensurePermissionAndRecord(boolean narration) {
@@ -485,18 +492,17 @@ public final class MainActivity extends Activity {
 
     private void runRelativeCalibration() {
         if (calibrationRunning) {
-            status.setText("Calibração relativa já está em execução.");
+            status.setText("Relative calibration is already running.");
             return;
         }
         if (recorder != null) {
-            status.setText("Pare a gravação antes da calibração acústica.");
+            status.setText("Stop recording before acoustic calibration.");
             return;
         }
 
         calibrationRunning = true;
         playback.stop();
-        status.setText(
-                "CALIBRAÇÃO RELATIVA — preparando sync + sweep em nível conservador…");
+        status.setText("RELATIVE CAL · sync + sweep at conservative level…");
         if (studioWorkspaceView != null) {
             studioWorkspaceView.setCalibrationState(
                     "CAL=RUNNING_RELATIVE | ABS_SPL=PENDING_PHYSICAL_REFERENCE");
@@ -527,17 +533,12 @@ public final class MainActivity extends Activity {
                                 "CFR=RECORDED+SPEC16+ROOM_RELATIVE | ABS_SPL=PENDING_PHYSICAL_REFERENCE");
                     }
                     status.setText(
-                            "CFR RELATIVO ANALISADO" +
+                            "RELATIVE CFR ANALYZED" +
                             "\ninput=" + result.inputSource +
-                            " | lag=" + result.bestLag + " samples" +
-                            " | latency=" + result.latencyMicros() + " us" +
-                            "\npolarity=" + (result.correlation < 0L ? "INVERTED" : "NORMAL") +
-                            " | captured=" + result.capturedFrames + " frames" +
-                            " | bands=" + result.validTransferBands() + "/16" +
+                            " · latency=" + result.latencyMicros() + " us" +
+                            " · bands=" + result.validTransferBands() + "/16" +
                             "\n" + roomState +
-                            " | EXTERNAL_STANDARD_AUDIT=NOT_AUDITED" +
-                            "\nABS_SPL=PENDING_PHYSICAL_REFERENCE — referência acústica física necessária." +
-                            "\nCFR: " + result.cfrFile.getAbsolutePath());
+                            " · EXTERNAL_STANDARD_AUDIT=NOT_AUDITED");
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
@@ -548,7 +549,7 @@ public final class MainActivity extends Activity {
                         studioWorkspaceView.setCalibrationAnalysis(
                                 null, 0, "ROOM=NOT_RUN_AFTER_CAL_FAIL");
                     }
-                    status.setText("Falha na calibração relativa: " + e.getMessage());
+                    status.setText("Relative calibration failed · " + e.getMessage());
                 });
             } finally {
                 calibrationRunning = false;
@@ -561,13 +562,13 @@ public final class MainActivity extends Activity {
             startRecording(true);
             return;
         }
-        status.setText("Narração começa em " + value + "…");
+        status.setText("Narration starts in " + value + "…");
         ui.postDelayed(() -> countdown(value - 1), 1000);
     }
 
     private void startRecording(boolean narration) {
         if (recorder != null) {
-            status.setText("Já existe gravação ativa.");
+            status.setText("Recording is already active.");
             return;
         }
 
@@ -585,7 +586,7 @@ public final class MainActivity extends Activity {
 
             if (narration) {
                 if (scriptEdit.getText().toString().trim().length() > 0 &&
-                        prompterText.getText().toString().startsWith("O teleprompter")) {
+                        "Teleprompter".contentEquals(prompterText.getText())) {
                     loadPrompter();
                 }
                 prompterScroll.scrollTo(0, 0);
@@ -594,13 +595,13 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             recorder = null;
             telemetryRunning = false;
-            status.setText("Falha ao iniciar gravação: " + e.getMessage());
+            status.setText("Recording start failed · " + e.getMessage());
         }
     }
 
     private void stopAndMaster() {
         if (recorder == null) {
-            status.setText("Nenhuma gravação ativa.");
+            status.setText("No active recording.");
             return;
         }
 
@@ -615,44 +616,43 @@ public final class MainActivity extends Activity {
         recorder = null;
 
         status.setText(
-                "CAPTURA ENCERRADA — " + capture.source +
+                "CAPTURE CLOSED · " + capture.source +
                 "\npeak=" + capture.peak +
-                " rms=" + capture.rms +
-                " clipped_samples=" + capture.clipped +
-                "\nRemasterizando…");
+                " · rms=" + capture.rms +
+                " · clipped=" + capture.clipped +
+                "\nMastering…");
 
-        runPipelineFromPcm(recordedPcm, sampleRate, channels, "microfone");
+        runPipelineFromPcm(recordedPcm, sampleRate, channels, "microphone");
     }
 
     private int selectedPreset() {
-        int p = profileSpinner.getSelectedItemPosition();
-        if (p == 0) return NativeDsp.PRESET_WHATSAPP_VOICE;
-        if (p == 3) return NativeDsp.PRESET_MUSIC_CLEAN;
+        int position = profileSpinner.getSelectedItemPosition();
+        if (position == 0) return NativeDsp.PRESET_WHATSAPP_VOICE;
+        if (position == 3) return NativeDsp.PRESET_MUSIC_CLEAN;
         return NativeDsp.PRESET_NATURAL_VOICE;
     }
 
     private long selectedTargetEnergy() {
-        int p = profileSpinner.getSelectedItemPosition();
-        if (p == 0) return NativeDsp.TARGET_MOBILE_Q36;
-        if (p == 2) return NativeDsp.TARGET_EBU_R128_Q36;
+        int position = profileSpinner.getSelectedItemPosition();
+        if (position == 0) return NativeDsp.TARGET_MOBILE_Q36;
+        if (position == 2) return NativeDsp.TARGET_EBU_R128_Q36;
         return NativeDsp.TARGET_NARRATION_Q36;
     }
 
     private String selectedTargetLabel() {
-        int p = profileSpinner.getSelectedItemPosition();
-        if (p == 0) return "-16 LUFS workflow";
-        if (p == 2) return "-23 LUFS EBU R128";
-        return "-18 LUFS workflow";
+        int position = profileSpinner.getSelectedItemPosition();
+        if (position == 0) return "MOBILE_VOICE_TARGET";
+        if (position == 1) return "NARRATION_TARGET";
+        if (position == 2) return "BROADCAST_TARGET_NOT_AUDITED";
+        return "MUSIC_CLEAN_TARGET";
     }
 
     private void runPipelineFromPcm(
             File input, int sampleRate, int channels, String origin) {
-        status.setText(
-                "PROCESSANDO " + origin + " — " + selectedTargetLabel() + "…");
-
         final int preset = selectedPreset();
         final long target = selectedTargetEnergy();
         final String targetLabel = selectedTargetLabel();
+        status.setText("PROCESSING " + origin + " · " + targetLabel + "…");
 
         new Thread(() -> {
             File mastered = new File(getCacheDir(), "rafaelia_mastered_48k.pcm");
@@ -688,13 +688,13 @@ public final class MainActivity extends Activity {
 
                 outputUri = createPendingOutput();
                 if (outputUri == null) {
-                    throw new IllegalStateException("MediaStore insert retornou null");
+                    throw new IllegalStateException("MediaStore insert returned null");
                 }
 
                 try (ParcelFileDescriptor pfd =
                              getContentResolver().openFileDescriptor(outputUri, "w")) {
                     if (pfd == null) {
-                        throw new IllegalStateException("FD de saída indisponível");
+                        throw new IllegalStateException("Output file descriptor unavailable");
                     }
                     AudioPipeline.encodeOpusOgg(
                             result.pcmFile,
@@ -716,7 +716,6 @@ public final class MainActivity extends Activity {
 
                 final Uri finalOutputUri = outputUri;
                 runOnUiThread(() -> {
-                    spectrumView.setBands(result.spectrum);
                     if (studioWorkspaceView != null) {
                         studioWorkspaceView.setSpectrum(result.spectrum);
                         studioWorkspaceView.setMasterState(
@@ -725,35 +724,33 @@ public final class MainActivity extends Activity {
                                 " | gain=" + gainPct + "%");
                     }
                     status.setText(
-                            "MASTER GERADO — " + targetLabel +
-                            "\nGanho final: " + gainPct + "%" +
-                            " | gated blocks: " + result.gatedBlocks +
-                            "\nTrue-peak estimado pós-gain: " + tpPermille +
-                            "‰ FS (ceiling -1 dBTP)" +
-                            "\nOgg/Opus: " + finalOutputUri +
-                            "\nAuditoria normativa externa: NOT_AUDITED; vetores formais permanecem pendentes.");
+                            "MASTER GENERATED · " + targetLabel +
+                            "\ngain=" + gainPct + "% · gated_blocks=" + result.gatedBlocks +
+                            " · estimated_true_peak=" + tpPermille + "‰ FS" +
+                            "\nOgg/Opus=" + finalOutputUri +
+                            "\nEXTERNAL_STANDARD_AUDIT=NOT_AUDITED");
                 });
             } catch (Exception e) {
                 if (outputUri != null) {
                     getContentResolver().delete(outputUri, null, null);
                 }
                 runOnUiThread(() ->
-                        status.setText("Falha no pipeline: " + e.getMessage()));
+                        status.setText("Pipeline failed · " + e.getMessage()));
             }
         }, "rafaelia-mastering").start();
     }
 
     private void playMaster() {
         if (lastMasteredPcm == null || !lastMasteredPcm.exists()) {
-            status.setText("Ainda não há master PCM para reprodução.");
+            status.setText("No master PCM is available for playback yet.");
             return;
         }
         try {
             playback.play(
                     lastMasteredPcm, lastMasteredRate, lastMasteredChannels);
-            status.setText("REPRODUZINDO master PCM.");
+            status.setText("PLAYING · master PCM");
         } catch (Exception e) {
-            status.setText("Falha de reprodução: " + e.getMessage());
+            status.setText("Playback failed · " + e.getMessage());
         }
     }
 
@@ -789,7 +786,7 @@ public final class MainActivity extends Activity {
 
     private void exportMasterInterop(boolean wav) {
         if (lastMasteredPcm == null || !lastMasteredPcm.isFile()) {
-            status.setText("Ainda não há master PCM para exportar.");
+            status.setText("No master PCM is available to export yet.");
             return;
         }
 
@@ -810,14 +807,14 @@ public final class MainActivity extends Activity {
                 MediaStore.Downloads.EXTERNAL_CONTENT_URI;
         Uri uri = getContentResolver().insert(collection, values);
         if (uri == null) {
-            status.setText("Falha ao criar destino " + (wav ? "WAV." : "RAW."));
+            status.setText("Export destination could not be created.");
             return;
         }
 
         new Thread(() -> {
             try (java.io.OutputStream out =
                          getContentResolver().openOutputStream(uri, "w")) {
-                if (out == null) throw new IllegalStateException("stream indisponível");
+                if (out == null) throw new IllegalStateException("Output stream unavailable");
                 long bytes = wav ?
                         AudioInteropWriter.writeWav16(
                                 lastMasteredPcm, out,
@@ -829,18 +826,18 @@ public final class MainActivity extends Activity {
                 getContentResolver().update(uri, done, null, null);
                 runOnUiThread(() -> status.setText(
                         (wav ? "WAV PCM16" : "RAW PCM") +
-                        " exportado: " + bytes + " bytes"));
+                        " exported · " + bytes + " bytes"));
             } catch (Exception e) {
                 getContentResolver().delete(uri, null, null);
                 runOnUiThread(() ->
-                        status.setText("Falha no export: " + e.getMessage()));
+                        status.setText("Export failed · " + e.getMessage()));
             }
         }, wav ? "rafaelia-wav-export" : "rafaelia-raw-export").start();
     }
 
     private void shareLast() {
         if (lastOutput == null) {
-            status.setText("Ainda não há saída processada.");
+            status.setText("No processed output is available to share yet.");
             return;
         }
 
@@ -848,7 +845,7 @@ public final class MainActivity extends Activity {
         send.setType("audio/ogg");
         send.putExtra(Intent.EXTRA_STREAM, lastOutput);
         send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(send, "Compartilhar áudio"));
+        startActivity(Intent.createChooser(send, "Share processed audio"));
     }
 
     @Override
@@ -858,7 +855,7 @@ public final class MainActivity extends Activity {
         if (requestCode == REQ_PICK && resultCode == RESULT_OK &&
                 data != null && data.getData() != null) {
             Uri uri = data.getData();
-            status.setText("DECODIFICANDO arquivo selecionado…");
+            status.setText("DECODING selected audio…");
 
             new Thread(() -> {
                 try {
@@ -869,10 +866,10 @@ public final class MainActivity extends Activity {
                             decoded.pcmFile,
                             decoded.sampleRate,
                             decoded.channels,
-                            "arquivo importado"));
+                            "imported audio"));
                 } catch (Exception e) {
                     runOnUiThread(() ->
-                            status.setText("Falha ao decodificar: " + e.getMessage()));
+                            status.setText("Decode failed · " + e.getMessage()));
                 }
             }, "rafaelia-decode").start();
         }
@@ -895,7 +892,8 @@ public final class MainActivity extends Activity {
             }
         } else if (requestCode == REQ_AUDIO) {
             pendingCalibration = false;
-            status.setText("Permissão de microfone negada.");
+            pendingNarration = false;
+            status.setText("Microphone permission denied.");
         }
     }
 

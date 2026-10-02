@@ -4,8 +4,8 @@
  * Research/evaluation use: see LICENSE_RESEARCH_COMMERCIAL.md.
  * Commercial use requires a separate written agreement with the rights holder.
  *
- * Platform edge only: this View renders state produced by the auditable cores.
- * UI rule: show executed/observed state prominently; keep unverified claims explicit.
+ * Platform edge only: renders executed/observed state from auditable cores.
+ * Decorative placeholders are intentionally excluded from the primary surface.
  */
 package io.rafaelia.audiostudio;
 
@@ -23,7 +23,6 @@ final class StudioWorkspaceView extends View {
         void onPlayMaster();
         void onRunRelativeCalibration();
         void onGenerateEvidence();
-        void onRequestSensorAccess();
     }
 
     private static final int SECTION_DASHBOARD = 0;
@@ -43,6 +42,13 @@ final class StudioWorkspaceView extends View {
     private final RectF[] navTargets = {
             new RectF(), new RectF(), new RectF(), new RectF(), new RectF()
     };
+
+    private final RectF dashSignal = new RectF();
+    private final RectF dashInput = new RectF();
+    private final RectF dashCalibration = new RectF();
+    private final RectF dashEvidence = new RectF();
+    private final RectF dashWave = new RectF();
+
     private final RectF transportRecord = new RectF();
     private final RectF transportStop = new RectF();
     private final RectF transportPlay = new RectF();
@@ -50,7 +56,6 @@ final class StudioWorkspaceView extends View {
     private final RectF transportEvidence = new RectF();
     private final RectF calibrationAction = new RectF();
     private final RectF evidenceAction = new RectF();
-    private final RectF systemPermissionAction = new RectF();
 
     private final short[] waveMin = new short[128];
     private final short[] waveMax = new short[128];
@@ -86,7 +91,7 @@ final class StudioWorkspaceView extends View {
         setMinimumHeight(dp(500));
         setFocusable(true);
         setClickable(true);
-        setContentDescription("RAFAELIA Audio professional measurement dashboard");
+        setContentDescription("RAFAELIA Audio measurement and evidence workspace");
     }
 
     void setActionListener(ActionListener listener) {
@@ -120,9 +125,9 @@ final class StudioWorkspaceView extends View {
             short hi = -32768;
             int j;
             for (j = start; j < end; ++j) {
-                short v = samples[j];
-                if (v < lo) lo = v;
-                if (v > hi) hi = v;
+                short value = samples[j];
+                if (value < lo) lo = value;
+                if (value > hi) hi = value;
             }
             waveMin[i] = lo;
             waveMax[i] = hi;
@@ -195,64 +200,63 @@ final class StudioWorkspaceView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float w = getWidth();
-        float h = getHeight();
-        float navH = dp(46);
-        float headerH = dp(66);
-        float transportH = dp(62);
+        float width = getWidth();
+        float height = getHeight();
+        float navH = dp(44);
+        float headerH = dp(62);
+        float transportH = dp(60);
         float contentTop = navH + headerH;
-        float contentBottom = h - transportH;
+        float contentBottom = height - transportH;
 
         paint.setStyle(Paint.Style.FILL);
         paint.setARGB(255, 10, 13, 17);
-        canvas.drawRect(0f, 0f, w, h, paint);
+        canvas.drawRect(0f, 0f, width, height, paint);
 
-        drawPrimaryNavigation(canvas, w, navH);
-        drawHeader(canvas, w, navH, headerH);
+        drawPrimaryNavigation(canvas, width, navH);
+        drawHeader(canvas, width, navH, headerH);
 
         if (section == SECTION_DASHBOARD) {
-            drawDashboard(canvas, w, contentTop, contentBottom);
+            drawDashboard(canvas, width, contentTop, contentBottom);
         } else if (section == SECTION_MEASURE) {
-            drawMeasure(canvas, w, contentTop, contentBottom);
+            drawMeasure(canvas, width, contentTop, contentBottom);
         } else if (section == SECTION_SESSION) {
-            drawSession(canvas, w, contentTop, contentBottom);
+            drawSession(canvas, width, contentTop, contentBottom);
         } else if (section == SECTION_EVIDENCE) {
-            drawEvidence(canvas, w, contentTop, contentBottom);
+            drawEvidence(canvas, width, contentTop, contentBottom);
         } else {
-            drawSystem(canvas, w, contentTop, contentBottom);
+            drawSystem(canvas, width, contentTop, contentBottom);
         }
 
-        drawTransport(canvas, w, h - transportH, transportH);
+        drawTransport(canvas, width, height - transportH, transportH);
     }
 
     private void drawPrimaryNavigation(Canvas canvas, float width, float height) {
         float slot = width / SECTIONS.length;
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(dp(width <= dp(360) ? 9 : 10));
         int i;
         for (i = 0; i < SECTIONS.length; ++i) {
             float left = i * slot;
             float right = left + slot;
             navTargets[i].set(left, 0f, right, height);
             paint.setARGB(255,
-                    i == section ? 24 : 13,
-                    i == section ? 40 : 18,
-                    i == section ? 52 : 24);
+                    i == section ? 22 : 12,
+                    i == section ? 37 : 17,
+                    i == section ? 48 : 22);
             canvas.drawRect(left, 0f, right, height, paint);
             if (i == section) {
-                paint.setARGB(255, 87, 190, 214);
-                canvas.drawRect(left + dp(8), height - dp(2), right - dp(8), height, paint);
+                paint.setARGB(255, 81, 177, 202);
+                canvas.drawRect(left + dp(9), height - dp(2), right - dp(9), height, paint);
             }
-            paint.setARGB(255, i == section ? 239 : 153,
-                    i == section ? 245 : 165,
-                    i == section ? 248 : 177);
-            canvas.drawText(SECTIONS[i], left + slot * 0.5f, height * 0.62f, paint);
+            drawText(canvas, SECTIONS[i], left + slot * 0.5f, height * 0.63f,
+                    width <= dp(360) ? 8 : 9,
+                    i == section ? 235 : 146,
+                    i == section ? 241 : 160,
+                    i == section ? 245 : 171);
         }
         paint.setTextAlign(Paint.Align.LEFT);
     }
 
     private void drawHeader(Canvas canvas, float width, float top, float height) {
-        float left = dp(14);
         String title;
         String subtitle;
         if (section == SECTION_DASHBOARD) {
@@ -260,198 +264,209 @@ final class StudioWorkspaceView extends View {
             subtitle = "MEASUREMENT · EVIDENCE · DEVICE QA";
         } else if (section == SECTION_MEASURE) {
             title = "MEASUREMENT";
-            subtitle = "RELATIVE CAL · SPECTRUM · ROOM";
+            subtitle = "SPECTRUM · RELATIVE CAL · ROOM";
         } else if (section == SECTION_SESSION) {
             title = "SESSION";
-            subtitle = "CAPTURE · WAVEFORM · MASTER";
+            subtitle = "CAPTURE · SOURCE · MASTER";
         } else if (section == SECTION_EVIDENCE) {
             title = "EVIDENCE";
             subtitle = "ZRF · CFR · RECEIPT · PROVENANCE";
         } else {
             title = "SYSTEM";
-            subtitle = "DEVICE · SENSORS · PERMISSIONS · ORIGIN";
+            subtitle = "DEVICE · SENSORS · ORIGIN";
         }
 
-        drawText(canvas, title, left, top + dp(25), 15, 236, 242, 247);
-        drawText(canvas, subtitle, left, top + dp(47), 9, 124, 145, 160);
+        drawText(canvas, title, dp(14), top + dp(24), 14, 236, 242, 247);
+        drawText(canvas, subtitle, dp(14), top + dp(44), 8, 124, 145, 160);
 
         paint.setTextAlign(Paint.Align.RIGHT);
-        drawText(canvas, sessionTime(), width - dp(14), top + dp(27), 15, 224, 231, 236);
+        drawText(canvas, sessionTime(), width - dp(14), top + dp(26), 14, 224, 231, 236);
         paint.setTextAlign(Paint.Align.LEFT);
 
         paint.setARGB(255, 22, 28, 34);
         canvas.drawRect(0f, top + height - dp(1), width, top + height, paint);
     }
 
-    private void drawDashboard(Canvas canvas, float w, float top, float bottom) {
+    private void drawDashboard(Canvas canvas, float width, float top, float bottom) {
         float gap = dp(8);
         float margin = dp(10);
-        float cardW = (w - margin * 2f - gap) * 0.5f;
-        float cardH = dp(112);
+        float cardW = (width - margin * 2f - gap) * 0.5f;
+        float cardH = dp(108);
         float x1 = margin;
         float x2 = margin + cardW + gap;
         float y1 = top + dp(8);
         float y2 = y1 + cardH + gap;
 
-        drawCard(canvas, x1, y1, x1 + cardW, y1 + cardH, "SIGNAL");
-        drawBigMetric(canvas, peakPct + "%", "PEAK FS", x1 + dp(10), y1 + dp(49));
-        drawSmallMetric(canvas, "RMS", rmsPct + "%", x1 + dp(10), y1 + dp(78));
-        drawSmallMetric(canvas, "CLIP", Long.toString(clipped), x1 + cardW * 0.53f, y1 + dp(78));
+        dashSignal.set(x1, y1, x1 + cardW, y1 + cardH);
+        drawCard(canvas, dashSignal, "SIGNAL", true);
+        drawBigMetric(canvas, peakPct + "%", "PEAK FS", x1 + dp(10), y1 + dp(48));
+        drawSmallMetric(canvas, "RMS", rmsPct + "%", x1 + dp(10), y1 + dp(77));
+        drawSmallMetric(canvas, "CLIP", Long.toString(clipped), x1 + cardW * 0.54f, y1 + dp(77));
 
-        drawCard(canvas, x2, y1, x2 + cardW, y1 + cardH, "INPUT");
-        drawStateLine(canvas, inputSource, x2 + dp(10), y1 + dp(46), cardW - dp(20), 10);
-        drawStateLine(canvas, "48 kHz · PCM16", x2 + dp(10), y1 + dp(72), cardW - dp(20), 10);
+        dashInput.set(x2, y1, x2 + cardW, y1 + cardH);
+        drawCard(canvas, dashInput, "INPUT", true);
+        drawStateLine(canvas, inputSource, x2 + dp(10), y1 + dp(45), cardW - dp(20), 9);
+        drawStateLine(canvas, "48 kHz · PCM16", x2 + dp(10), y1 + dp(69), cardW - dp(20), 9);
         drawStatus(canvas, waveBins > 0 ? "LIVE" : "READY",
-                x2 + dp(10), y1 + dp(88), waveBins > 0);
+                x2 + dp(10), y1 + dp(82), waveBins > 0);
 
-        drawCard(canvas, x1, y2, x1 + cardW, y2 + cardH, "CALIBRATION");
-        drawStateLine(canvas, calibrationState, x1 + dp(10), y2 + dp(46), cardW - dp(20), 9);
+        dashCalibration.set(x1, y2, x1 + cardW, y2 + cardH);
+        drawCard(canvas, dashCalibration, "CALIBRATION", true);
+        drawStateLine(canvas, calibrationState, x1 + dp(10), y2 + dp(45), cardW - dp(20), 8);
         drawSmallMetric(canvas, "BANDS", Integer.toString(calibrationValidBands),
-                x1 + dp(10), y2 + dp(82));
+                x1 + dp(10), y2 + dp(79));
         drawStatus(canvas, calibrationValidBands > 0 ? "OBSERVED" : "RELATIVE",
-                x1 + cardW * 0.47f, y2 + dp(72), calibrationValidBands > 0);
+                x1 + cardW * 0.47f, y2 + dp(69), calibrationValidBands > 0);
 
-        drawCard(canvas, x2, y2, x2 + cardW, y2 + cardH, "EVIDENCE");
-        drawStateLine(canvas, containerState, x2 + dp(10), y2 + dp(46), cardW - dp(20), 9);
-        drawStateLine(canvas, signatureState, x2 + dp(10), y2 + dp(70), cardW - dp(20), 9);
-        drawStatus(canvas, containsTokenVazio(signatureState) ? "GAP" : "BOUND",
-                x2 + dp(10), y2 + dp(88), !containsTokenVazio(signatureState));
+        dashEvidence.set(x2, y2, x2 + cardW, y2 + cardH);
+        drawCard(canvas, dashEvidence, "EVIDENCE", true);
+        drawStateLine(canvas, containerState, x2 + dp(10), y2 + dp(45), cardW - dp(20), 8);
+        drawStateLine(canvas, signatureState, x2 + dp(10), y2 + dp(68), cardW - dp(20), 8);
+        drawStatus(canvas, containsGap(signatureState) ? "OPEN GAP" : "BOUND",
+                x2 + dp(10), y2 + dp(82), !containsGap(signatureState));
 
         float waveTop = y2 + cardH + dp(10);
         float waveBottom = bottom - dp(10);
-        if (waveBottom - waveTop > dp(66)) {
-            drawPanel(canvas, margin, waveTop, w - margin, waveBottom);
-            drawText(canvas, "LIVE WAVEFORM", margin + dp(10), waveTop + dp(20),
-                    9, 126, 148, 164);
+        dashWave.set(margin, waveTop, width - margin, waveBottom);
+        if (waveBottom - waveTop > dp(62)) {
+            drawPanel(canvas, dashWave);
+            drawText(canvas, "LIVE WAVEFORM   › SESSION",
+                    margin + dp(10), waveTop + dp(20), 8, 126, 148, 164);
             drawWave(canvas,
                     margin + dp(10), waveTop + dp(30),
-                    w - margin - dp(10), waveBottom - dp(10));
+                    width - margin - dp(10), waveBottom - dp(10));
         }
     }
 
-    private void drawMeasure(Canvas canvas, float w, float top, float bottom) {
+    private void drawMeasure(Canvas canvas, float width, float top, float bottom) {
         float margin = dp(10);
         float y = top + dp(8);
-        float chartH = dp(148);
-
-        drawPanel(canvas, margin, y, w - margin, y + chartH);
+        float chartH = dp(144);
+        RectF chart = new RectF(margin, y, width - margin, y + chartH);
+        drawPanel(canvas, chart);
         drawText(canvas, "16-BAND SPECTRUM · RELATIVE", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
-        drawSpectrumBars(canvas,
-                margin + dp(10), y + dp(32),
-                w - margin - dp(10), y + chartH - dp(10));
+                8, 126, 148, 164);
+        if (hasSpectrum()) {
+            drawSpectrumBars(canvas,
+                    margin + dp(10), y + dp(32),
+                    width - margin - dp(10), y + chartH - dp(10));
+        } else {
+            drawText(canvas, "AVAILABLE AFTER MASTER", margin + dp(10), y + dp(82),
+                    9, 132, 148, 159);
+        }
 
         y += chartH + dp(8);
-        float calH = dp(150);
-        drawPanel(canvas, margin, y, w - margin, y + calH);
+        float calH = dp(146);
+        RectF cal = new RectF(margin, y, width - margin, y + calH);
+        drawPanel(canvas, cal);
         drawText(canvas, "RELATIVE SWEEP PROFILE", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
+                8, 126, 148, 164);
         drawCalibrationProfile(canvas,
                 margin + dp(10), y + dp(32),
-                w - margin - dp(10), y + calH - dp(34));
+                width - margin - dp(10), y + calH - dp(34));
         drawStateLine(canvas, roomAnalysisState,
-                margin + dp(10), y + calH - dp(13), w - margin * 2f - dp(20), 8);
+                margin + dp(10), y + calH - dp(13), width - margin * 2f - dp(20), 8);
 
         y += calH + dp(8);
-        calibrationAction.set(margin, y, w - margin, Math.min(bottom - dp(8), y + dp(42)));
+        calibrationAction.set(margin, y, width - margin, Math.min(bottom - dp(8), y + dp(42)));
         drawActionButton(canvas, calibrationAction,
-                "RUN RELATIVE CAL · SAFE LEVEL", 35, 67, 82);
+                "RUN RELATIVE CAL · SAFE LEVEL", 34, 64, 78);
     }
 
-    private void drawSession(Canvas canvas, float w, float top, float bottom) {
+    private void drawSession(Canvas canvas, float width, float top, float bottom) {
         float margin = dp(10);
         float y = top + dp(8);
-        float waveH = dp(166);
-
-        drawPanel(canvas, margin, y, w - margin, y + waveH);
-        drawText(canvas, "SOURCE WAVEFORM · RAW PCM PRESERVED", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
+        float waveH = dp(164);
+        RectF wave = new RectF(margin, y, width - margin, y + waveH);
+        drawPanel(canvas, wave);
+        drawText(canvas, "SOURCE WAVEFORM · RAW PRESERVED", margin + dp(10), y + dp(20),
+                8, 126, 148, 164);
         drawWave(canvas,
                 margin + dp(10), y + dp(32),
-                w - margin - dp(10), y + waveH - dp(12));
+                width - margin - dp(10), y + waveH - dp(12));
 
         y += waveH + dp(8);
-        drawPanel(canvas, margin, y, w - margin, y + dp(102));
+        RectF state = new RectF(margin, y, width - margin, y + dp(104));
+        drawPanel(canvas, state);
         drawText(canvas, "SESSION STATE", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
-        drawStateLine(canvas, inputSource, margin + dp(10), y + dp(46), w - margin * 2f, 9);
-        drawStateLine(canvas, masterState, margin + dp(10), y + dp(69), w - margin * 2f, 9);
+                8, 126, 148, 164);
+        drawStateLine(canvas, inputSource, margin + dp(10), y + dp(45),
+                width - margin * 2f - dp(20), 9);
+        drawStateLine(canvas, masterState, margin + dp(10), y + dp(68),
+                width - margin * 2f - dp(20), 8);
         drawSmallMetric(canvas, "SAMPLES", Long.toString(capturedSamples),
                 margin + dp(10), y + dp(92));
 
-        y += dp(110);
-        drawPanel(canvas, margin, y, w - margin, Math.min(bottom - dp(8), y + dp(72)));
-        drawText(canvas, "WORKFLOW", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
+        y += dp(112);
+        RectF flow = new RectF(margin, y, width - margin, Math.min(bottom - dp(8), y + dp(70)));
+        drawPanel(canvas, flow);
         drawText(canvas, "CAPTURE → RAW → MASTER → EXPORT",
-                margin + dp(10), y + dp(45), 10, 205, 214, 221);
-        drawText(canvas, "Source bytes stay distinct from derived output.",
-                margin + dp(10), y + dp(63), 8, 124, 145, 160);
+                margin + dp(10), y + dp(32), 9, 205, 214, 221);
+        drawText(canvas, "source bytes remain distinct from derived output",
+                margin + dp(10), y + dp(53), 8, 124, 145, 160);
     }
 
-    private void drawEvidence(Canvas canvas, float w, float top, float bottom) {
+    private void drawEvidence(Canvas canvas, float width, float top, float bottom) {
         float margin = dp(10);
         float y = top + dp(8);
 
-        drawPanel(canvas, margin, y, w - margin, y + dp(126));
-        drawText(canvas, "CUSTODY", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
+        RectF custody = new RectF(margin, y, width - margin, y + dp(128));
+        drawPanel(canvas, custody);
+        drawText(canvas, "CUSTODY", margin + dp(10), y + dp(20), 8, 126, 148, 164);
         drawStateLine(canvas, containerState, margin + dp(10), y + dp(48),
-                w - margin * 2f - dp(20), 9);
+                width - margin * 2f - dp(20), 8);
         drawStateLine(canvas, originState, margin + dp(10), y + dp(72),
-                w - margin * 2f - dp(20), 9);
+                width - margin * 2f - dp(20), 8);
         drawStateLine(canvas, signatureState, margin + dp(10), y + dp(96),
-                w - margin * 2f - dp(20), 9);
-        drawStatus(canvas, containsTokenVazio(signatureState) ? "SIGNATURE GAP" : "SIGNATURE PRESENT",
-                margin + dp(10), y + dp(105), !containsTokenVazio(signatureState));
+                width - margin * 2f - dp(20), 8);
+        drawStatus(canvas, containsGap(signatureState) ? "SIGNATURE GAP" : "SIGNATURE PRESENT",
+                margin + dp(10), y + dp(105), !containsGap(signatureState));
 
-        y += dp(134);
-        drawPanel(canvas, margin, y, w - margin, y + dp(112));
+        y += dp(136);
+        RectF policy = new RectF(margin, y, width - margin, y + dp(108));
+        drawPanel(canvas, policy);
         drawText(canvas, "EVIDENCE POLICY", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
+                8, 126, 148, 164);
         drawText(canvas, "SOURCE ≠ ARTIFACT ≠ EXECUTION",
-                margin + dp(10), y + dp(47), 10, 212, 221, 228);
+                margin + dp(10), y + dp(46), 9, 212, 221, 228);
         drawText(canvas, "EXECUTION ≠ EVIDENCE ≠ CLAIM",
-                margin + dp(10), y + dp(68), 10, 212, 221, 228);
+                margin + dp(10), y + dp(67), 9, 212, 221, 228);
         drawText(canvas, "TOKEN_VAZIO ≠ 0 · UNTESTED ≠ PASS",
-                margin + dp(10), y + dp(91), 9, 164, 180, 191);
-
-        y += dp(120);
-        evidenceAction.set(margin, y, w - margin, Math.min(bottom - dp(8), y + dp(42)));
-        drawActionButton(canvas, evidenceAction, "VALIDATE + GENERATE ZIPRAF", 35, 67, 82);
-    }
-
-    private void drawSystem(Canvas canvas, float w, float top, float bottom) {
-        float margin = dp(10);
-        float y = top + dp(8);
-
-        drawPanel(canvas, margin, y, w - margin, y + dp(130));
-        drawText(canvas, "DEVICE STATE", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
-        drawStateLine(canvas, systemState, margin + dp(10), y + dp(48),
-                w - margin * 2f - dp(20), 9);
-        drawStateLine(canvas, "ACCEL: platform sensor · no invented runtime permission",
-                margin + dp(10), y + dp(73), w - margin * 2f - dp(20), 8);
-        drawStateLine(canvas, "MAG/LIGHT/PROX: availability is hardware/runtime state",
-                margin + dp(10), y + dp(96), w - margin * 2f - dp(20), 8);
-        drawStateLine(canvas, "MIC: RECORD_AUDIO remains explicit",
-                margin + dp(10), y + dp(119), w - margin * 2f - dp(20), 8);
-
-        y += dp(138);
-        drawPanel(canvas, margin, y, w - margin, y + dp(108));
-        drawText(canvas, "ORIGIN", margin + dp(10), y + dp(20),
-                9, 126, 148, 164);
-        drawStateLine(canvas, originState, margin + dp(10), y + dp(49),
-                w - margin * 2f - dp(20), 9);
-        drawStateLine(canvas, signatureState, margin + dp(10), y + dp(75),
-                w - margin * 2f - dp(20), 9);
-        drawStatus(canvas, containsTokenVazio(signatureState) ? "TOKEN_VAZIO" : "BOUND",
-                margin + dp(10), y + dp(84), !containsTokenVazio(signatureState));
+                margin + dp(10), y + dp(89), 8, 164, 180, 191);
 
         y += dp(116);
-        systemPermissionAction.set(margin, y, w - margin, Math.min(bottom - dp(8), y + dp(42)));
-        drawActionButton(canvas, systemPermissionAction,
-                "CHECK OPTIONAL MOTION ACCESS", 35, 57, 70);
+        evidenceAction.set(margin, y, width - margin, Math.min(bottom - dp(8), y + dp(42)));
+        drawActionButton(canvas, evidenceAction, "VALIDATE + GENERATE ZIPRAF", 34, 64, 78);
+    }
+
+    private void drawSystem(Canvas canvas, float width, float top, float bottom) {
+        float margin = dp(10);
+        float y = top + dp(8);
+
+        RectF device = new RectF(margin, y, width - margin, y + dp(142));
+        drawPanel(canvas, device);
+        drawText(canvas, "DEVICE / SENSOR STATE", margin + dp(10), y + dp(20),
+                8, 126, 148, 164);
+        drawStateLine(canvas, systemState, margin + dp(10), y + dp(48),
+                width - margin * 2f - dp(20), 9);
+        drawStateLine(canvas, "MIC · RECORD_AUDIO explicit",
+                margin + dp(10), y + dp(76), width - margin * 2f - dp(20), 8);
+        drawStateLine(canvas, "ACCEL / MAG / LIGHT / PROX · hardware availability",
+                margin + dp(10), y + dp(99), width - margin * 2f - dp(20), 8);
+        drawStateLine(canvas, "μ∆ observation runs only during explicit PROOF",
+                margin + dp(10), y + dp(122), width - margin * 2f - dp(20), 8);
+
+        y += dp(150);
+        RectF origin = new RectF(margin, y, width - margin, Math.min(bottom - dp(8), y + dp(126)));
+        drawPanel(canvas, origin);
+        drawText(canvas, "ORIGIN / SIGNATURE", margin + dp(10), y + dp(20),
+                8, 126, 148, 164);
+        drawStateLine(canvas, originState, margin + dp(10), y + dp(50),
+                width - margin * 2f - dp(20), 8);
+        drawStateLine(canvas, signatureState, margin + dp(10), y + dp(76),
+                width - margin * 2f - dp(20), 8);
+        drawStatus(canvas, containsGap(signatureState) ? "TOKEN_VAZIO" : "BOUND",
+                margin + dp(10), y + dp(91), !containsGap(signatureState));
     }
 
     private void drawTransport(Canvas canvas, float width, float top, float height) {
@@ -476,8 +491,8 @@ final class StudioWorkspaceView extends View {
         transportEvidence.set(transportCal.right + gap, y1,
                 transportCal.right + gap + slot, y2);
 
-        drawTransportButton(canvas, transportRecord, "REC", 89, 38, 43);
-        drawTransportButton(canvas, transportStop, "MASTER", 42, 49, 57);
+        drawTransportButton(canvas, transportRecord, "REC", 87, 38, 43);
+        drawTransportButton(canvas, transportStop, "STOP/MASTER", 42, 49, 57);
         drawTransportButton(canvas, transportPlay, "PLAY", 31, 62, 51);
         drawTransportButton(canvas, transportCal, "CAL", 33, 62, 75);
         drawTransportButton(canvas, transportEvidence, "PROOF", 38, 54, 69);
@@ -489,28 +504,26 @@ final class StudioWorkspaceView extends View {
         canvas.drawRoundRect(target, dp(7), dp(7), paint);
         paint.setTextAlign(Paint.Align.CENTER);
         drawText(canvas, label, target.centerX(), target.centerY() + dp(4),
-                label.length() > 5 ? 8 : 9, 238, 243, 246);
+                label.length() > 7 ? 7 : 9, 238, 243, 246);
         paint.setTextAlign(Paint.Align.LEFT);
     }
 
-    private void drawCard(
-            Canvas canvas, float left, float top, float right, float bottom, String title) {
+    private void drawCard(Canvas canvas, RectF target, String title, boolean navigable) {
         paint.setARGB(255, 17, 22, 27);
-        rect.set(left, top, right, bottom);
-        canvas.drawRoundRect(rect, dp(9), dp(9), paint);
+        canvas.drawRoundRect(target, dp(9), dp(9), paint);
         thin.setStrokeWidth(dp(1));
         thin.setARGB(255, 31, 42, 50);
-        canvas.drawRoundRect(rect, dp(9), dp(9), thin);
-        drawText(canvas, title, left + dp(10), top + dp(20), 8, 111, 137, 153);
+        canvas.drawRoundRect(target, dp(9), dp(9), thin);
+        drawText(canvas, title + (navigable ? "   ›" : ""),
+                target.left + dp(10), target.top + dp(20), 8, 111, 137, 153);
     }
 
-    private void drawPanel(Canvas canvas, float left, float top, float right, float bottom) {
+    private void drawPanel(Canvas canvas, RectF target) {
         paint.setARGB(255, 15, 20, 25);
-        rect.set(left, top, right, bottom);
-        canvas.drawRoundRect(rect, dp(9), dp(9), paint);
+        canvas.drawRoundRect(target, dp(9), dp(9), paint);
         thin.setStrokeWidth(dp(1));
         thin.setARGB(255, 28, 38, 46);
-        canvas.drawRoundRect(rect, dp(9), dp(9), thin);
+        canvas.drawRoundRect(target, dp(9), dp(9), thin);
     }
 
     private void drawBigMetric(Canvas canvas, String value, String label, float x, float y) {
@@ -525,13 +538,11 @@ final class StudioWorkspaceView extends View {
     private void drawStatus(Canvas canvas, String label, float x, float y, boolean positive) {
         paint.setTextSize(dp(8));
         float width = paint.measureText(label) + dp(14);
-        float top = y;
-        float bottom = y + dp(20);
         paint.setARGB(255,
                 positive ? 24 : 49,
                 positive ? 66 : 47,
                 positive ? 52 : 31);
-        rect.set(x, top, x + width, bottom);
+        rect.set(x, y, x + width, y + dp(20));
         canvas.drawRoundRect(rect, dp(10), dp(10), paint);
         drawText(canvas, label, x + dp(7), y + dp(14), 8,
                 positive ? 151 : 219,
@@ -552,13 +563,7 @@ final class StudioWorkspaceView extends View {
     private void drawStateLine(
             Canvas canvas, String value, float x, float y, float maxWidth, int size) {
         String text = value == null ? "TOKEN_VAZIO" : value;
-        paint.setTextSize(dp(size));
-        if (paint.measureText(text) <= maxWidth) {
-            drawText(canvas, text, x, y, size, 185, 197, 205);
-            return;
-        }
-        String clippedText = fitText(text, maxWidth, size);
-        drawText(canvas, clippedText, x, y, size, 185, 197, 205);
+        drawText(canvas, fitText(text, maxWidth, size), x, y, size, 185, 197, 205);
     }
 
     private String fitText(String text, float maxWidth, int size) {
@@ -587,7 +592,7 @@ final class StudioWorkspaceView extends View {
         thin.setARGB(255, 38, 50, 59);
         canvas.drawLine(left, mid, right, mid, thin);
         if (waveBins <= 0) {
-            drawText(canvas, "waveform: TOKEN_VAZIO", left + dp(6), mid + dp(4),
+            drawText(canvas, "waveform · waiting for capture", left + dp(6), mid + dp(4),
                     8, 112, 132, 145);
             return;
         }
@@ -628,8 +633,8 @@ final class StudioWorkspaceView extends View {
         thin.setARGB(255, 38, 50, 59);
         canvas.drawLine(left, mid, right, mid, thin);
         if (calibrationValidBands <= 0) {
-            drawText(canvas, "profile: NOT_RUN", left + dp(6), mid + dp(4),
-                    8, 112, 132, 145);
+            drawText(canvas, "relative profile · run calibration to populate",
+                    left + dp(6), mid + dp(4), 8, 112, 132, 145);
             return;
         }
 
@@ -668,9 +673,26 @@ final class StudioWorkspaceView extends View {
         int i;
         for (i = 0; i < navTargets.length; ++i) {
             if (navTargets[i].contains(x, y)) {
-                section = i;
-                invalidate();
-                performClick();
+                switchSection(i);
+                return true;
+            }
+        }
+
+        if (section == SECTION_DASHBOARD) {
+            if (dashSignal.contains(x, y) || dashWave.contains(x, y)) {
+                switchSection(SECTION_SESSION);
+                return true;
+            }
+            if (dashInput.contains(x, y)) {
+                switchSection(SECTION_SYSTEM);
+                return true;
+            }
+            if (dashCalibration.contains(x, y)) {
+                switchSection(SECTION_MEASURE);
+                return true;
+            }
+            if (dashEvidence.contains(x, y)) {
+                switchSection(SECTION_EVIDENCE);
                 return true;
             }
         }
@@ -702,12 +724,13 @@ final class StudioWorkspaceView extends View {
             performClick();
             return true;
         }
-        if (section == SECTION_SYSTEM && systemPermissionAction.contains(x, y)) {
-            if (actionListener != null) actionListener.onRequestSensorAccess();
-            performClick();
-            return true;
-        }
         return true;
+    }
+
+    private void switchSection(int target) {
+        section = target;
+        invalidate();
+        performClick();
     }
 
     @Override
@@ -722,8 +745,16 @@ final class StudioWorkspaceView extends View {
         return two(seconds / 60L) + ":" + two(seconds % 60L) + "." + three(millis);
     }
 
-    private boolean containsTokenVazio(String value) {
+    private boolean containsGap(String value) {
         return value == null || value.contains("TOKEN_VAZIO") || value.contains("PENDING");
+    }
+
+    private boolean hasSpectrum() {
+        int i;
+        for (i = 0; i < spectrum.length; ++i) {
+            if (spectrum[i] > 0L) return true;
+        }
+        return false;
     }
 
     private int boundPercent(int value) {
