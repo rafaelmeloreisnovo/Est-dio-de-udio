@@ -18,6 +18,16 @@ case "$mode" in
   *) fail "DELIVERY_MODE_INVALID=$mode" ;;
 esac
 
+# Store modes fail before creating a GitHub release if the Google authority is absent.
+case "$mode" in
+  store-internal|store-production)
+    [ -n "${RFA_PLAY_SERVICE_ACCOUNT_B64:-}" ] || fail 'PLAY_SERVICE_ACCOUNT_B64=TOKEN_VAZIO'
+    ;;
+esac
+if [ "$mode" = store-production ] && [ "${RFA_PLAY_PRODUCTION_APPROVED:-false}" != true ]; then
+  fail 'PLAY_PRODUCTION_APPROVED=false'
+fi
+
 # Existing signed-release path remains the canonical APK signing and release edge.
 bash ci/rafaelia-pipeline.sh signed-release
 
