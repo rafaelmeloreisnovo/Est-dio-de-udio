@@ -148,9 +148,9 @@ final class EvidenceBundleWriter {
                 context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                         PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT_GRANTED");
         line(b, "activity_recognition_permission",
-                Build.VERSION.SDK_INT < 29 ? "PLATFORM_PRE29" :
-                (context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) ==
-                        PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT_GRANTED"));
+                "NOT_DECLARED_NO_STEP_ACTIVITY_FEATURE");
+        line(b, "sensor_mudelta_policy",
+                "EXPLICIT_PROOF_ACTION");
         line(b, "access_network_state_permission",
                 context.checkSelfPermission(Manifest.permission.ACCESS_NETWORK_STATE) ==
                         PackageManager.PERMISSION_GRANTED ? "GRANTED" : "NOT_GRANTED");
