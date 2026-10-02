@@ -3,8 +3,9 @@
 Copyright (c) 2026 Rafael Melo Reis  
 SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
 
-**Software state:** `IMPLEMENTED + CI_GATE_PASS` for the software scope at `main@469eb83b0d23286190c306b17c3fd378118dadd4`, run `37014682335` / #39.  
-**Current-head physical ZIPRAF:** `NOT_RUN / TOKEN_VAZIO`.  
+**Executed software baseline:** `IMPLEMENTED + CI_GATE_PASS` for `main@469eb83b0d23286190c306b17c3fd378118dadd4`, run `37014682335` / #39.  
+**Receipt semantics:** the exact SHA/run/hash is immutable executed evidence, not a floating `main` pointer.  
+**Exact-head physical ZIPRAF:** `NOT_RUN / TOKEN_VAZIO` until issue #29 binds the newest target APK to a device.  
 **External standards audit:** `NOT_AUDITED`.  
 **Claim policy:** `claim_allowed=false`.
 
@@ -145,7 +146,7 @@ TOKEN_VAZIO_*
 
 Hardware absence is orthogonal to metric validity: an unavailable sensor is not promoted to an observation and is not converted into `FAIL_METRIC_CONTRACT` merely because the device lacks that hardware.
 
-Current examples:
+Examples:
 
 - accelerometer temporal delta: device-reported Android sensor scale, observation only after physical execution;
 - magnetometer temporal delta: device-reported microtesla scale when available; typed unavailable state otherwise;
@@ -171,7 +172,7 @@ metrics --BOUNDS--> claims
 
 Missing coordinates do not become fabricated observations. They remain typed `TOKEN_VAZIO` / unavailable / not-run states according to the actual failure or absence mode.
 
-## 8. Software CI receipt
+## 8. Executed software receipt
 
 Run #39 for `main@469eb83b0d23286190c306b17c3fd378118dadd4` executed the software assurance path and recorded, among other gates:
 
@@ -197,7 +198,7 @@ APK_REPRODUCIBLE_SAME_ENV=PASS
 INDEPENDENT_REPRODUCTION=NOT_CLAIMED
 ```
 
-This CI receipt does not supply device execution. The exact APK above remains `INSTALLED_PHYSICAL=NOT_RUN` until an external physical run binds those bytes to a target device.
+This receipt does not supply device execution. Its exact APK remains `INSTALLED_PHYSICAL=NOT_RUN`. If `main` advances after this receipt, the next physical target must use the newer exact SHA/run/APK hash tracked by issue #29 rather than treating this receipt as a floating pointer.
 
 ## 9. Android/freestanding boundary
 
@@ -221,7 +222,7 @@ It does not automatically promote:
 
 - scientific causality;
 - physical calibration without a reference;
-- current-head physical execution without device evidence;
+- exact-head physical execution without device evidence;
 - same-environment reproducibility into independent reproduction;
 - authorial authenticity from debug signing;
 - standards conformity/certification/accreditation;
