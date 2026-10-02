@@ -7,6 +7,7 @@ cd "$repo_root"
 manifest='app/src/main/AndroidManifest.xml'
 main='app/src/main/java/io/rafaelia/audiostudio/MainActivity.java'
 snapshot='app/src/main/java/io/rafaelia/audiostudio/SystemAccessSnapshot.java'
+evidence='app/src/main/java/io/rafaelia/audiostudio/EvidenceBundleWriter.java'
 vibration='app/src/main/java/io/rafaelia/audiostudio/MicroDeltaVibrationProbe.java'
 magnetic='app/src/main/java/io/rafaelia/audiostudio/MicroDeltaMagnetometerProbe.java'
 origin='ci/rafaelia-origin-assets.sh'
@@ -16,7 +17,7 @@ fail() {
   exit 1
 }
 
-for f in "$manifest" "$main" "$snapshot" "$vibration" "$magnetic" "$origin"; do
+for f in "$manifest" "$main" "$snapshot" "$evidence" "$vibration" "$magnetic" "$origin"; do
   test -s "$f" || fail "MISSING=$f"
 done
 
@@ -53,7 +54,7 @@ for forbidden in \
   fi
 done
 
-if grep -Fq 'Manifest.permission.ACTIVITY_RECOGNITION' "$main" "$snapshot"; then
+if grep -RFn 'Manifest.permission.ACTIVITY_RECOGNITION' app/src/main/java >/dev/null; then
   fail 'DEAD_ACTIVITY_RECOGNITION_RUNTIME_PATH_PRESENT'
 fi
 if grep -Fq 'REQ_ACTIVITY' "$main"; then
@@ -75,6 +76,12 @@ grep -Fq 'SensorManager.SENSOR_DELAY_GAME' "$magnetic" || \
 
 grep -Fq 'SENSOR_MUDELTA=EXPLICIT_PROOF_ACTION' "$snapshot" || \
   fail 'SYSTEM_SENSOR_EVIDENCE_POLICY_MISSING'
+grep -Fq '"activity_recognition_permission",' "$evidence" || \
+  fail 'EVIDENCE_ACTIVITY_PERMISSION_FIELD_MISSING'
+grep -Fq '"NOT_DECLARED_NO_STEP_ACTIVITY_FEATURE"' "$evidence" || \
+  fail 'EVIDENCE_ACTIVITY_PERMISSION_STATE_STALE'
+grep -Fq '"sensor_mudelta_policy",' "$evidence" || \
+  fail 'EVIDENCE_SENSOR_POLICY_FIELD_MISSING'
 grep -Fq 'ação explícita: coletando μ∆ local' "$main" || \
   fail 'EVIDENCE_SENSOR_DISCLOSURE_MISSING'
 grep -Fq 'ACTIVITY_RECOGNITION=NOT_DECLARED_NO_STEP_ACTIVITY_FEATURE' "$origin" || \
