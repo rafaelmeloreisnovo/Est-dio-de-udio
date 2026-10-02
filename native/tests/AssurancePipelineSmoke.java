@@ -56,6 +56,18 @@ public final class AssurancePipelineSmoke {
                 AssurancePipelineModel.sensorMetricState(
                         "TOKEN_VAZIO_SENSOR_UNAVAILABLE", 0, true, true));
         expect(
+                "TOKEN_VAZIO_SENSOR_UNAVAILABLE",
+                AssurancePipelineModel.sensorMetricState(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE_NOT_PRESENT", 0, true, true));
+        expect(
+                "TOKEN_VAZIO_SENSOR_UNAVAILABLE",
+                AssurancePipelineModel.sensorMetricState(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE_SERVICE_UNAVAILABLE", 0, true, true));
+        expect(
+                "TOKEN_VAZIO_SENSOR_UNAVAILABLE",
+                AssurancePipelineModel.sensorMetricState(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE_LISTENER_REGISTRATION_FAILED", 0, true, true));
+        expect(
                 "INSUFFICIENT_EVIDENCE",
                 AssurancePipelineModel.sensorMetricState(
                         "INSUFFICIENT_EVIDENCE", 1, true, true));
@@ -70,10 +82,22 @@ public final class AssurancePipelineSmoke {
         expectTrue(
                 AssurancePipelineModel.isSensorUnavailable(
                         "TOKEN_VAZIO_SENSOR_UNAVAILABLE"),
-                "unavailable sensor state must remain explicit");
+                "generic unavailable sensor state must remain explicit");
+        expectTrue(
+                AssurancePipelineModel.isSensorUnavailable(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE_NOT_PRESENT"),
+                "missing hardware must remain an unavailable sensor state");
+        expectTrue(
+                AssurancePipelineModel.isSensorUnavailable(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE_SERVICE_UNAVAILABLE"),
+                "missing platform service must remain an unavailable sensor state");
+        expectTrue(
+                AssurancePipelineModel.isSensorUnavailable(
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE_LISTENER_REGISTRATION_FAILED"),
+                "registration failure must remain an unavailable sensor state");
         expectFalse(
                 AssurancePipelineModel.isObservedSensorState(
-                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE", 0),
+                        "TOKEN_VAZIO_SENSOR_UNAVAILABLE_NOT_PRESENT", 0),
                 "unavailable sensor cannot become observed evidence");
         expectTrue(
                 AssurancePipelineModel.isObservedSensorState(
@@ -100,6 +124,7 @@ public final class AssurancePipelineSmoke {
 
         System.out.println("ASSURANCE_PIPELINE_SMOKE=PASS");
         System.out.println("SENSOR_UNAVAILABLE_SEMANTICS=PASS");
+        System.out.println("SENSOR_ACCESS_CONTRACT=NO_RUNTIME_PERMISSION_REQUIRED_CURRENT_PROFILE");
         System.out.println("COMPLIANCE_CLAIM=NOT_AUDITED");
         System.out.println("CLAIM_ALLOWED=false");
     }
