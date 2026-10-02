@@ -76,19 +76,26 @@ final class AssuranceZiprafWriter {
         final boolean sourceBound = AssurancePipelineModel.isConcreteIdentity(BuildConfig.SOURCE_SHA);
         final boolean ciBound = AssurancePipelineModel.isConcreteIdentity(BuildConfig.CI_RUN_ID);
         final boolean provenanceResolved = sourceBound && ciBound;
+
+        final String vibrationSourceState = vibration == null ? "NOT_RUN" : vibration.state;
+        final String magneticSourceState = magnetometer == null ? "NOT_RUN" : magnetometer.state;
+        final boolean vibrationUnavailable =
+                AssurancePipelineModel.isSensorUnavailable(vibrationSourceState);
+        final boolean magneticUnavailable =
+                AssurancePipelineModel.isSensorUnavailable(magneticSourceState);
         final boolean vibrationRan = vibration != null &&
-                vibration.samples > 1 &&
-                !"NOT_RUN".equals(vibration.state);
+                AssurancePipelineModel.isObservedSensorState(
+                        vibration.state, vibration.samples);
         final boolean magneticRan = magnetometer != null &&
-                magnetometer.samples > 1 &&
-                !"NOT_RUN".equals(magnetometer.state);
+                AssurancePipelineModel.isObservedSensorState(
+                        magnetometer.state, magnetometer.samples);
         final boolean behaviorObserved = vibrationRan || magneticRan || lastCalibration != null;
 
-        final boolean vibrationContract = vibration == null ||
+        final boolean vibrationContract = vibration == null || vibrationUnavailable ||
                 (vibration.samples > 1 &&
                         AssurancePipelineModel.isFinite(vibration.rmsDeltaMs2) &&
                         AssurancePipelineModel.isFinite(vibration.peakDeltaMs2));
-        final boolean magneticContract = magnetometer == null ||
+        final boolean magneticContract = magnetometer == null || magneticUnavailable ||
                 (magnetometer.samples > 1 &&
                         AssurancePipelineModel.isFinite(magnetometer.rmsDeltaUt) &&
                         AssurancePipelineModel.isFinite(magnetometer.peakDeltaUt));
@@ -127,12 +134,14 @@ final class AssuranceZiprafWriter {
                 vibration, magnetometer, lastCalibration));
         put(entries, "40_relations.json", relationsJson(
                 apkSha, rawEvidenceSha, zrfSha, cfrSha, pcmSha,
-                sourceBound, ciBound));
+                sourceBound, ciBound, vibrationSourceState, magneticSourceState));
         put(entries, "50_gaps.json", gapsJson(
                 sourceBound, ciBound, vibrationContract, magneticContract, gapCount));
         put(entries, "60_claims.json", claimsJson(
                 apkSha, sourceBound, ciBound,
-                vibrationRan, magneticRan, lastCalibration));
+                vibrationSourceState, vibration == null ? 0 : vibration.samples,
+                magneticSourceState, magnetometer == null ? 0 : magnetometer.samples,
+                lastCalibration));
         put(entries, "70_receipt.txt", receiptText(
                 generatedEpochMs, materializedCount, relationCount, gapCount, starState));
         entries.put("80_raw/evidence.txt", rawEvidenceBytes);
@@ -243,22 +252,25 @@ final class AssuranceZiprafWriter {
             MicroDeltaVibrationProbe.Result vibration,
             MicroDeltaMagnetometerProbe.Result magnetometer,
             RelativeCalibrationEngine.Result calibration) {
-        String vibState = AssurancePipelineModel.metricState(
-                vibration != null && vibration.samples > 1,
+        String vibState = AssurancePipelineModel.sensorMetricState(
+                vibration == null ? null : vibration.state,
+                vibration == null ? 0 : vibration.samples,
                 vibration != null &&
                         AssurancePipelineModel.isFinite(vibration.rmsDeltaMs2) &&
                         AssurancePipelineModel.isFinite(vibration.peakDeltaMs2),
-                true, false, true);
-        String magState = AssurancePipelineModel.metricState(
-                magnetometer != null && magnetometer.samples > 1,
+                true);
+        String magState = AssurancePipelineModel.sensorMetricState(
+                magnetometer == null ? null : magnetometer.state,
+                magnetometer == null ? 0 : magnetometer.samples,
                 magnetometer != null &&
                         AssurancePipelineModel.isFinite(magnetometer.rmsDeltaUt) &&
                         AssurancePipelineModel.isFinite(magnetometer.peakDeltaUt),
-                true, false, true);
+                true);
 
         String vib = vibration == null ?
                 "{\"state\":\"NOT_RUN\"}" :
                 "{\"state\":\"" + vibState +
+                        "\",\"source_state\":\"" + json(vibration.state) +
                         "\",\"samples\":" + vibration.samples +
                         ",\"effective_hz\":" + f6(vibration.effectiveHz) +
                         ",\"rms_delta\":" + f6(vibration.rmsDeltaMs2) +
@@ -267,6 +279,7 @@ final class AssuranceZiprafWriter {
         String mag = magnetometer == null ?
                 "{\"state\":\"NOT_RUN\"}" :
                 "{\"state\":\"" + magState +
+                        "\",\"source_state\":\"" + json(magnetometer.state) +
                         "\",\"samples\":" + magnetometer.samples +
                         ",\"effective_hz\":" + f6(magnetometer.effectiveHz) +
                         ",\"rms_delta\":" + f6(magnetometer.rmsDeltaUt) +
@@ -294,7 +307,7 @@ final class AssuranceZiprafWriter {
                 "    \"magnetic\":" + mag + ",\n" +
                 "    \"relative_room\":" + cal + "\n" +
                 "  },\n" +
-                "  \"metric_validity_policy\":\"unit+execution+finite-value+required-reference; no external standard audit inferred\"\n" +
+                "  \"metric_validity_policy\":\"availability+unit+execution+finite-value+required-reference; unavailable sensor is not a metric failure; no external standard audit inferred\"\n" +
                 "}\n";
     }
 
@@ -305,14 +318,16 @@ final class AssuranceZiprafWriter {
             String cfrSha,
             String pcmSha,
             boolean sourceBound,
-            boolean ciBound) {
+            boolean ciBound,
+            String vibrationState,
+            String magneticState) {
         return "{\n" +
                 "  \"paragraph_relations\":[\n" +
                 edge("source_sha", "BUILDS", "installed_apk", sourceBound ? "BOUND" : "TOKEN_VAZIO") + ",\n" +
                 edge("ci_run_id", "EXECUTES_BUILD_GATE", "installed_apk", ciBound ? "BOUND" : "TOKEN_VAZIO") + ",\n" +
                 edge("installed_apk:" + apkSha, "EXECUTES", "raw_evidence:" + evidenceSha, "OBSERVED") + ",\n" +
-                edge("raw_evidence", "OBSERVES", "vibration_delta", "SCOPED") + ",\n" +
-                edge("raw_evidence", "OBSERVES", "magnetic_delta", "SCOPED") + ",\n" +
+                edge("raw_evidence", "OBSERVES", "vibration_delta", sensorRelationState(vibrationState)) + ",\n" +
+                edge("raw_evidence", "OBSERVES", "magnetic_delta", sensorRelationState(magneticState)) + ",\n" +
                 edge("zrf:" + zrfSha, "MATERIALIZES", "capture_path", relationState(zrfSha)) + ",\n" +
                 edge("cfr:" + cfrSha, "MATERIALIZES", "relative_calibration_path", relationState(cfrSha)) + ",\n" +
                 edge("pcm:" + pcmSha, "MATERIALIZES", "master_path", relationState(pcmSha)) + ",\n" +
@@ -336,7 +351,7 @@ final class AssuranceZiprafWriter {
                 (sourceBound ? "" : ",\n" + gap("source_sha", "TOKEN_VAZIO", "build through source-bound CI")) +
                 (ciBound ? "" : ",\n" + gap("ci_run_id", "TOKEN_VAZIO", "build through CI with run provenance")) +
                 ((vibrationContract && magneticContract) ? "" : ",\n" +
-                        gap("metric_contract", "FAIL_METRIC_CONTRACT", "rerun probes with finite values and sufficient samples")) +
+                        gap("metric_contract", "FAIL_METRIC_CONTRACT", "rerun available probes with finite values and sufficient samples")) +
                 "\n  ]\n" +
                 "}\n";
     }
@@ -345,8 +360,10 @@ final class AssuranceZiprafWriter {
             String apkSha,
             boolean sourceBound,
             boolean ciBound,
-            boolean vibrationRan,
-            boolean magneticRan,
+            String vibrationState,
+            int vibrationSamples,
+            String magneticState,
+            int magneticSamples,
             RelativeCalibrationEngine.Result calibration) {
         return "{\n" +
                 "  \"claim_allowed\":false,\n" +
@@ -356,9 +373,9 @@ final class AssuranceZiprafWriter {
                 claim("source_ci_binding",
                         (sourceBound && ciBound) ? "PROVABLE_SCOPED" : "TOKEN_VAZIO_PROVENANCE") + ",\n" +
                 claim("vibration_behavior_observation",
-                        vibrationRan ? "OBSERVED_UNPROMOTED" : "NOT_RUN") + ",\n" +
+                        sensorClaimState(vibrationState, vibrationSamples)) + ",\n" +
                 claim("magnetic_behavior_observation",
-                        magneticRan ? "OBSERVED_UNPROMOTED" : "NOT_RUN") + ",\n" +
+                        sensorClaimState(magneticState, magneticSamples)) + ",\n" +
                 claim("relative_room_path",
                         calibration != null ? "OBSERVED_RELATIVE_UNCALIBRATED" : "NOT_RUN") + ",\n" +
                 claim("absolute_spl", "TOKEN_VAZIO_PHYSICAL_REFERENCE") + ",\n" +
@@ -381,7 +398,7 @@ final class AssuranceZiprafWriter {
                 "double_dagger_materialized_n=" + materializedCount + NL +
                 "empty_gap_count=" + gapCount + NL +
                 "delta_behavior=RUNTIME_PROBE_OR_NOT_RUN" + NL +
-                "section_metric_contract=EXPLICIT_UNITS_AND_REFERENCE_GATES" + NL +
+                "section_metric_contract=AVAILABILITY_THEN_EXPLICIT_UNITS_AND_REFERENCE_GATES" + NL +
                 "paragraph_relations=" + relationCount + NL +
                 "star_numeric_score=TOKEN_VAZIO_NOT_DEFINED" + NL +
                 "star_state=" + starState + NL +
@@ -390,6 +407,22 @@ final class AssuranceZiprafWriter {
                 "zipraf_encryption=NO" + NL +
                 "zipraf_authenticity=NOT_PROVEN_BY_CONTAINER" + NL +
                 "source_artifact_execution_evidence_claim=SEPARATE" + NL;
+    }
+
+    private static String sensorRelationState(String state) {
+        if (state == null || "NOT_RUN".equals(state)) return "NOT_RUN";
+        if (AssurancePipelineModel.isSensorUnavailable(state)) return state;
+        if ("INSUFFICIENT_EVIDENCE".equals(state)) return state;
+        return "SCOPED";
+    }
+
+    private static String sensorClaimState(String state, int samples) {
+        if (state == null || "NOT_RUN".equals(state)) return "NOT_RUN";
+        if (AssurancePipelineModel.isSensorUnavailable(state)) return state;
+        if (!AssurancePipelineModel.isObservedSensorState(state, samples)) {
+            return "INSUFFICIENT_EVIDENCE";
+        }
+        return "OBSERVED_UNPROMOTED";
     }
 
     private static String edge(String from, String relation, String to, String state) {
