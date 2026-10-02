@@ -53,6 +53,16 @@ int main(void) {
     rfa_i16 lms_reference[8] = {20,20,20,20,20,20,20,20};
     rfa_i16 lms_out[8];
     rfa_lms_q15 lms;
+    rfa_i16 nlms_weights[1];
+    rfa_i16 nlms_history[1];
+    rfa_i16 nlms_primary[256];
+    rfa_i16 nlms_reference[256];
+    rfa_i16 nlms_desired[256];
+    rfa_i16 nlms_out[256];
+    rfa_nlms_q15 nlms;
+    rfa_u64 nlms_error_before = 0ULL;
+    rfa_u64 nlms_error_after = 0ULL;
+    rfa_i16 nlms_weight_before_freeze;
     rfa_biquad_bank_q30 bq;
     rfa_biquad_coeff_q30 identity_bq;
     rfa_i16 bq_data[8] = {-1000,-500,0,500,1000,500,0,-500};
@@ -153,6 +163,31 @@ int main(void) {
     if (!rfa_lms_bind_q15(&lms, lms_weights, lms_history, 4, 512)) return 54;
     rfa_lms_cancel_block_q15(&lms, lms_primary, lms_reference, lms_out, 8);
     if (lms_out[0] != lms_primary[0]) return 55;
+
+    for (i = 0; i < 256; ++i) {
+        rfa_i32 reference = (i & 1) == 0 ? 12000 : -12000;
+        rfa_i32 desired = ((i >> 4) & 1) == 0 ? 1000 : -1000;
+        nlms_reference[i] = (rfa_i16)reference;
+        nlms_desired[i] = (rfa_i16)desired;
+        nlms_primary[i] = (rfa_i16)(desired + reference / 2);
+    }
+    if (!rfa_nlms_bind_q15(
+            &nlms, nlms_weights, nlms_history, 1, 8192, 1073741824ULL)) return 88;
+    rfa_nlms_cancel_block_q15(
+            &nlms, nlms_primary, nlms_reference, nlms_out, 256, 1);
+    for (i = 128; i < 256; ++i) {
+        rfa_i32 before = (rfa_i32)nlms_primary[i] - (rfa_i32)nlms_desired[i];
+        rfa_i32 after = (rfa_i32)nlms_out[i] - (rfa_i32)nlms_desired[i];
+        if (before < 0) before = -before;
+        if (after < 0) after = -after;
+        nlms_error_before += (rfa_u64)before;
+        nlms_error_after += (rfa_u64)after;
+    }
+    if (nlms_error_before == 0ULL) return 89;
+    if (nlms_error_after * 10ULL >= nlms_error_before) return 90;
+    nlms_weight_before_freeze = nlms_weights[0];
+    (void)rfa_nlms_cancel_sample_q15(&nlms, 7000, 12000, 0);
+    if (nlms_weights[0] != nlms_weight_before_freeze) return 91;
 
     rfa_biquad_bank_reset_q30(&bq, 1);
     identity_bq.b0_q30 = (rfa_i32)(1U << 30);
