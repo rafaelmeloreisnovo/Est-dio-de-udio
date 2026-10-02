@@ -18,6 +18,7 @@ Rafaelia Audio Studio is an Android audio workstation and measurement research p
 | test hardware | `HARDWARE_TEST_PROTOCOL.md` |
 | understand μ∆ vibration | `MICRO_DELTA_VIBRATION_V1.md` |
 | audit claims/evidence | `VERIFICATION_AND_EVIDENCE.md` |
+| inspect Android permission/sensor boundaries | `SENSOR_PERMISSION_MATRIX_V3.md` |
 | publish/share the product | `PUBLICATION_INDEX.md` |
 | prepare a release | `RELEASE_READINESS.md` |
 | understand terminology | `GLOSSARY.md` |
@@ -30,7 +31,7 @@ execution is not evidence
 evidence is not every possible claim
 ```
 
-The evidence button inside the app creates an installation/hardware/development bundle, including installed APK SHA-256 and a bounded accelerometer μ∆ observation.
+The evidence button inside the app creates an installation/hardware/development bundle. The explicit `★ VALIDAR + ZIPRAF` action also starts bounded accelerometer and magnetometer μ∆ observations; these sensors do not require an additional Android runtime permission in the current profile. `ACTIVITY_RECOGNITION` is not declared because step/activity classification is not implemented.
 
 
 ## Low/adaptive implementation route
@@ -44,5 +45,6 @@ The evidence button inside the app creates an installation/hardware/development 
 ## System / origin / signing
 
 - `AUTHORIAL_BINARY_ORIGIN_V1.md` — project/platform/toolchain/generated binary boundary.
-- `SENSOR_PERMISSION_MATRIX_V2.md` — minimal permission policy.
+- `SENSOR_PERMISSION_MATRIX_V3.md` — current minimal permission policy and fail-closed sensor gate.
+- `SENSOR_PERMISSION_MATRIX_V2.md` — retained historical predecessor; not current operational guidance.
 - `SIGNED_RELEASE_V1.md` — real signing, certificate verification and public receipt.
