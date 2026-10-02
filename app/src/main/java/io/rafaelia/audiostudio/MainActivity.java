@@ -406,7 +406,7 @@ public final class MainActivity extends Activity {
 
         evidenceRunning = true;
         status.setText(
-                "PROOF · bounded local μ∆ observation + material + metrics + gaps…");
+                "PROOF · ação explícita: coletando μ∆ local · bounded sensor window + evidence…");
 
         MicroDeltaVibrationProbe.run(this, 2200L, vibration -> {
             MicroDeltaMagnetometerProbe.run(this, 2200L, magnetometer -> {
