@@ -18,7 +18,9 @@ add_library(rfa_manifold_core STATIC
     rfa_audio_format_core.c
 )
 
-set_target_properties(dsp_core meter_core rfa_manifold_core PROPERTIES
+add_library(rfa_verbo_core STATIC rfa_verbo_core.c)
+
+set_target_properties(dsp_core meter_core rfa_manifold_core rfa_verbo_core PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
@@ -42,6 +44,7 @@ set(RFA_CORE_FLAGS
 target_compile_options(dsp_core PRIVATE ${RFA_CORE_FLAGS})
 target_compile_options(meter_core PRIVATE ${RFA_CORE_FLAGS})
 target_compile_options(rfa_manifold_core PRIVATE ${RFA_CORE_FLAGS})
+target_compile_options(rfa_verbo_core PRIVATE ${RFA_CORE_FLAGS})
 
 add_library(rafaelia_audio SHARED jni_bridge.c)
 
@@ -54,7 +57,7 @@ target_compile_options(rafaelia_audio PRIVATE
     -Werror
 )
 
-target_link_libraries(rafaelia_audio PRIVATE dsp_core meter_core rfa_manifold_core)
+target_link_libraries(rafaelia_audio PRIVATE dsp_core meter_core rfa_manifold_core rfa_verbo_core)
 
 target_link_options(rafaelia_audio PRIVATE
     -Wl,--gc-sections
