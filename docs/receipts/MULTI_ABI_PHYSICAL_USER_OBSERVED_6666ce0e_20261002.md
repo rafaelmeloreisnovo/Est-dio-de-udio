@@ -13,14 +13,17 @@ schema=rafaelia.multi-abi-physical-user-observed/v1
 - user-uploaded APK SHA-256: `20d31c49c361a50f87b28c140e8a2cf98cf8e70282d17127e743649809b9e3dd`
 - exact-byte binding: `UPLOADED_APK_SHA256 == RELEASE_ASSET_SHA256 = PASS`
 
-## Packaged ABI scope
+## Direct inspection of the uploaded APK
 
-The release APK is a multi-ABI Android artifact and contains both packaged native ABI payloads expected by the repository build contract:
+The uploaded APK bytes were inspected directly before this receipt update.
 
-- `armeabi-v7a`
-- `arm64-v8a`
+- ZIP container integrity: `PASS`
+- packaged native libraries: `2`
+- `lib/armeabi-v7a/librafaelia_audio.so`: `ELF32`, ARM, EABI5, Android 29 target metadata
+- `lib/arm64-v8a/librafaelia_audio.so`: `ELF64`, AArch64, Android 29 target metadata
+- `MULTI_ABI_PACKAGE_PRESENT=PASS`
 
-`MULTI_ABI_PACKAGE_PRESENT=PASS`
+This proves that the exact uploaded/release APK physically contains both ABI payloads. It does not by itself prove which ABI Android selected at runtime on either device.
 
 ## Physical execution — user attestation
 
@@ -39,7 +42,7 @@ The user reports that this exact multi-ABI APK installed/ran smoothly on both ph
 
 ## Evidence boundary
 
-This receipt records a real-world user observation against an exact hash-bound release artifact. It does **not** promote that observation into an instrumented ABI-selection proof or a formal automated device-test PASS.
+This receipt records direct artifact inspection plus a real-world user observation against an exact hash-bound release artifact. It does **not** promote that observation into an instrumented ABI-selection proof or a formal automated device-test PASS.
 
 - `PHYSICAL_DEVICE_COUNT_USER_ATTESTED=2`
 - `PHYSICAL_RUNTIME_USER_ATTESTED=PASS_SCOPED`
@@ -73,4 +76,4 @@ release_apk_sha256=20d31c49c361a50f87b28c140e8a2cf98cf8e70282d17127e743649809b9e
 
 Then bind the selected/runtime ABI separately for POCO and moto e(7) power without changing the historical observation above.
 
-R3=<F_ok:exact release bytes identified + multi-ABI package + physical runtime observed on 2 devices,F_gap:selected runtime ABI + installed-byte readback + formal functional test,F_next:capture minimal per-device ABI/hash receipt>
+R3=<F_ok:exact release bytes identified + direct multi-ABI inspection PASS + physical runtime observed on 2 devices,F_gap:selected runtime ABI + installed-byte readback + formal functional test,F_next:capture minimal per-device ABI/hash receipt>
