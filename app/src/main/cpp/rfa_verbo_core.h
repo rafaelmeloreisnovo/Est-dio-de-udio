@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026 Rafael Melo Reis.
+ * SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+ * Research/evaluation use: see LICENSE_RESEARCH_COMMERCIAL.md.
+ * Commercial use requires a separate written agreement with the rights holder.
+ */
+
 #ifndef RFA_VERBO_CORE_H
 #define RFA_VERBO_CORE_H
 
@@ -47,7 +54,9 @@ enum {
     RFA_VERBO_GAP_DIGNITY = 1u << 5,
     RFA_VERBO_GAP_CHILD_SAFETY = 1u << 6,
     RFA_VERBO_GAP_HUMAN_OVERSIGHT = 1u << 7,
-    RFA_VERBO_GAP_REVERSIBILITY = 1u << 8
+    RFA_VERBO_GAP_REVERSIBILITY = 1u << 8,
+    RFA_VERBO_GAP_ARTIFACT = 1u << 9,
+    RFA_VERBO_GAP_CONSENT = 1u << 10
 };
 
 rfa_verbo_result rfa_verbo_evaluate(rfa_verbo_input in);

@@ -1,31 +1,27 @@
 # VERBO V1 — Estúdio de Áudio
 
-VERBO is the small deterministic governance core that sits between an observed operation and a promoted claim.
+VERBO is a deterministic governance core between observed operations and promoted claims. It does not process audio or manufacture evidence.
 
-It does not process audio and it does not manufacture evidence. Its job is to preserve the boundary:
+It preserves:
 
 `SOURCE != ARTIFACT != EXECUTION != EVIDENCE != CLAIM`
-
-and the state rules:
 
 `TOKEN_VAZIO != 0`
 
 `IMPLEMENTED_UNTESTED != PASS`
 
-## Three planes
+## Planes and required gates
 
-- BODY: execution/evidence state.
-- SOUL: source, authority and provenance state.
-- SPIRIT: computational-ethics constraints.
+- **BODY** combines artifact, execution and evidence state.
+- **SOUL** requires source and authority.
+- **SPIRIT** requires consent, privacy, dignity, child safety, human oversight and reversibility.
 
-SPIRIT includes explicit privacy, dignity, child-safety, human oversight and reversibility gates. A missing gate blocks promotion rather than being inferred.
+Each required input is a presence gate. A zero value sets its explicit `gap_mask` bit and blocks `claim_allowed`. In particular, an artifact cannot be inferred from execution/evidence, and consent cannot be inferred from privacy or authority.
 
-## Audio-specific meaning
+A recording, DSP output, meter reading or exported container is an artifact. It is not by itself proof that a specific execution path ran. A physical-device receipt supports a claim only for the device, build and path actually observed.
 
-A recording, DSP output, meter reading or exported container is an artifact. It is not automatically proof that a specific execution path ran. A physical-device receipt can support an execution claim only for the device/build/path actually observed.
+## Build and integration boundary
 
-Microphone/audio content remains user data. VERBO therefore treats privacy and human control as execution constraints, not decorative documentation.
+`rfa_verbo_core` is built as a freestanding static C module. The exact-head CI gate must run the host smoke vectors and ARMv7/AArch64 zero-undefined plus ABI-manifest checks.
 
-## Current state
-
-The source files are implemented on a feature branch. Until compilation/tests on the exact head exist, state remains `IMPLEMENTED_UNTESTED` and no PASS claim is authorized.
+The core is not yet called by the JNI or audio execution path. CI evidence for this module therefore does not establish app-level enforcement, physical behavior, microphone behavior or an audio-quality claim. Those remain separate gates; `claim_allowed=false` until each relevant domain contract is satisfied.
