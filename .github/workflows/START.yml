@@ -109,12 +109,16 @@ jobs:
     steps:
       - name: 10 · exact checkout
         shell: bash
+        env:
+          RFA_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
           git init .
           git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
-          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          auth="$(printf 'x-access-token:%s' "$RFA_GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          unset auth
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
           echo "RAFAELIA_CHECKOUT=PASS"
@@ -199,11 +203,15 @@ jobs:
     steps:
       - name: Exact checkout for provider bootstrap
         shell: bash
+        env:
+          RFA_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git init .
           git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
-          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          auth="$(printf 'x-access-token:%s' "$RFA_GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          unset auth
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
       - name: Apply non-delete provider governance
@@ -229,11 +237,15 @@ jobs:
     steps:
       - name: Exact checkout after green gate
         shell: bash
+        env:
+          RFA_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git init .
           git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
-          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          auth="$(printf 'x-access-token:%s' "$RFA_GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          unset auth
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
 
@@ -308,11 +320,15 @@ jobs:
 
       - name: Exact checkout after green gate
         shell: bash
+        env:
+          RFA_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git init .
           git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
-          git fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          auth="$(printf 'x-access-token:%s' "$RFA_GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          unset auth
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
 
