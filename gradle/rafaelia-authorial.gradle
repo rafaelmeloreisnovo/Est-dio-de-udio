@@ -6,6 +6,7 @@
 
 def assuranceSmokeOut = layout.buildDirectory.dir("rafaelia-assurance-smoke")
 def audioInteropSmokeOut = layout.buildDirectory.dir("rafaelia-audio-interop-smoke")
+def authorialClientOut = layout.buildDirectory.dir("rafaelia-authorial-client")
 
 tasks.register("rafaeliaAssuranceModelSmoke") {
     group = "rafaelia verification"
@@ -48,6 +49,23 @@ tasks.register("rafaeliaAudioInteropSmoke") {
     }
 }
 
+tasks.register("rafaeliaAuthorialClientGate") {
+    group = "rafaelia verification"
+    description = "Fail closed on authorial/provider/toolchain boundary drift without network access."
+    doLast {
+        def outDir = authorialClientOut.get().asFile
+        delete(outDir)
+        outDir.mkdirs()
+        exec {
+            commandLine "python3",
+                    rootProject.file("ci/authorial-client-gate.py").absolutePath,
+                    "--selftest",
+                    "--receipt",
+                    new File(outDir, "receipt.json").absolutePath
+        }
+    }
+}
+
 tasks.register("rafaeliaAssuranceConsistencyGate") {
     group = "rafaelia verification"
     description = "Fail closed when ZIPRAF counts, authorial-signing gaps or receipt fields drift."
@@ -73,6 +91,7 @@ tasks.register("rafaeliaJavaGate") {
     description = "Compile the Android Java edge early and fail before full APK work."
     dependsOn("rafaeliaAssuranceModelSmoke")
     dependsOn("rafaeliaAudioInteropSmoke")
+    dependsOn("rafaeliaAuthorialClientGate")
     dependsOn("rafaeliaAssuranceConsistencyGate")
     dependsOn("rafaeliaSensorPermissionGate")
     dependsOn("compileDebugJavaWithJavac")
@@ -120,6 +139,8 @@ tasks.register("rafaeliaBuildContract") {
         println("AUDIO_INTEROP_FREESTANDING_CORE=RAW_PCM16,WAV_PCM16,AIFF_PCM16,AU_PCM16,CAF_LPCM16")
         println("AUDIO_INTEROP_EXTERNAL_CODEC_LIBRARY=NONE")
         println("SENSOR_PERMISSION_GATE=BOUND_TO_JAVA_GATE")
+        println("AUTHORIAL_CLIENT_GATE=BOUND_TO_JAVA_GATE")
+        println("AUTHORIAL_CLIENT_NETWORK=NONE")
         println("FINAL_ELF_BOUNDARY_GATE=BOUND_TO_DEBUG_APK")
         println("EXTERNAL_STANDARD_AUDIT=NOT_AUDITED")
     }
