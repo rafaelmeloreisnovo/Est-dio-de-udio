@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (c) 2026 Rafael Melo Reis.
+  SPDX-License-Identifier: LicenseRef-RAFCODE-Research-Commercial-0.1
+  Platform-only theme: no AndroidX/Material dependency is introduced.
+-->
+<resources>
+    <style name="RafaeliaAudioTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0A0D11</item>
+        <item name="android:colorAccent">#51B1CA</item>
+        <item name="android:navigationBarColor">#0A0D11</item>
+        <item name="android:statusBarColor">#0A0D11</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>
