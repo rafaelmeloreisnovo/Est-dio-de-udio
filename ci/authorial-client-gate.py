@@ -16,7 +16,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "contracts" / "rafpolimata-authorial-client-consumer.v1.json"
 
-EXPECTED_CONTROL_SHA = "ab60b2dc3444ce34136e718ab13a1f3654cd50cd"
+EXPECTED_CONTROL_SHA = "e36cd7ea43b7083b91173fe11b39ae53027cf938"
 EXPECTED_GRADLE_SHA = "f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6"
 
 
