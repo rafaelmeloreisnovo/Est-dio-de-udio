@@ -1,0 +1,81 @@
+{
+  "schema": "rafaelia.audio.authorial-client-consumer/v1",
+  "copyright": "Copyright (c) 2026 Rafael Melo Reis",
+  "spdx_license_identifier": "LicenseRef-RAFCODE-Research-Commercial-0.1",
+  "claim_allowed": false,
+  "consumer": {
+    "repository": "rafaelmeloreisnovo/Est-dio-de-udio",
+    "authority": "LOCAL_IMPLEMENTATION_AND_TEST_AUTHORITY",
+    "base_sha": "87387d4af836fbaf65521dd5d5ca3092477a2a9d"
+  },
+  "control_contract": {
+    "repository": "rafaelmeloreisnovo/RafPolimata",
+    "path": "rafci/authorial_clients.v1.json",
+    "ref": "refactor/authorial-clients-v1-20261005",
+    "sha": "ab60b2dc3444ce34136e718ab13a1f3654cd50cd",
+    "pr": 382,
+    "state": "DRAFT_CANDIDATE_POINTER_ONLY",
+    "body_copied": false,
+    "authority_transferred": false,
+    "runtime_network_fetch_required": false
+  },
+  "local_profile": {
+    "app_language": "java",
+    "kotlin_app_runtime": false,
+    "androidx": false,
+    "third_party_java_dependencies": 0,
+    "android_gradle_plugin": "8.9.2",
+    "gradle": {
+      "version": "8.11.1",
+      "sha256": "f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6"
+    },
+    "android": {
+      "compile_sdk": 36,
+      "target_sdk": 36,
+      "min_sdk": 29,
+      "build_tools": "36.0.0",
+      "ndk": "27.2.12479018",
+      "cmake": "3.22.1",
+      "abis": ["armeabi-v7a", "arm64-v8a"]
+    },
+    "r8": "OFF",
+    "resource_shrink": "OFF",
+    "jni": {
+      "implementation_files": 1,
+      "canonical_edge": "app/src/main/cpp/jni_bridge.c"
+    },
+    "c_core": {
+      "policy": "AUTHORIAL_FREESTANDING_SOURCE_CORE",
+      "system_headers": "FORBIDDEN_BY_GATE",
+      "heap_libc_runtime_calls": "FORBIDDEN_BY_GATE"
+    },
+    "external_audio_codec_library": "NONE"
+  },
+  "classification": {
+    "c": "AUTHORIAL_FREESTANDING_CORE_WHEN_GATED",
+    "java": "AUTHORIAL_ANDROID_PLATFORM_EDGE",
+    "kotlin": "DISABLED_NOT_REQUIRED_CURRENT_APP",
+    "python": "BUILD_AUDIT_ONLY_STDLIB_CLIENT",
+    "gradle": "EXTERNAL_FACTORY_TOOL_PINNED_AND_WRAPPED",
+    "android_gradle_plugin": "EXTERNAL_FACTORY_PLUGIN_PINNED",
+    "android_sdk": "PLATFORM_AND_FACTORY_EDGE_NOT_APP_LIBRARY",
+    "android_ndk": "NATIVE_FACTORY_TOOL_NOT_FREESTANDING_PROOF",
+    "cmake": "EXTERNAL_FACTORY_ORCHESTRATOR",
+    "jni": "AUTHORIAL_NARROW_BRIDGE_OVER_PLATFORM_ABI",
+    "r8": "OPTIONAL_TRANSFORM_OFF_UNTIL_SEMANTIC_GATE",
+    "assemble": "ARTIFACT_CONSTRUCTION_NOT_RUNTIME_PASS"
+  },
+  "license_boundary": {
+    "project_source": "LICENSE_RESEARCH_COMMERCIAL.md",
+    "provider_licenses_changed": false,
+    "provider_source_vendored_by_this_change": false,
+    "provider_notice_removed": false,
+    "technical_control_replaces_legal_rights": false
+  },
+  "evidence_ceiling": {
+    "source_contract": "PENDING_EXACT_HEAD_GATE",
+    "apk_build": "TOKEN_VAZIO_FOR_THIS_HEAD",
+    "physical_execution": "TOKEN_VAZIO",
+    "zipraf_physical_receipt": "TOKEN_VAZIO"
+  }
+}
