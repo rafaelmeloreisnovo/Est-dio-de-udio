@@ -16,6 +16,7 @@ token="${RFA_PROVIDER_ADMIN_TOKEN:-}"
 [ "${GITHUB_SHA:-}" = "$RFA_SOURCE_SHA" ] || fail 'EXACT_REF_SHA_MISMATCH'
 [ -n "$token" ] || fail 'PAT_ENVIRONMENTS=TOKEN_VAZIO — no Actions/admin fallback'
 command -v gh >/dev/null 2>&1 || fail 'GH_CLI_UNAVAILABLE'
+command -v jq >/dev/null 2>&1 || fail 'JQ_READBACK_TOOL_UNAVAILABLE'
 
 # The administrative credential exists only in the owner-only manual job.
 # It is not copied to the APK or used for routine main/PR build gates.
