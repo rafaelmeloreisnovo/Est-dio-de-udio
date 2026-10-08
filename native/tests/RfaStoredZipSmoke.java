@@ -32,6 +32,27 @@ public final class RfaStoredZipSmoke {
             sample[i] = (byte) state;
         }
 
+        // Independent JDK CRC oracle is TEST-ONLY; never imported into the APK.
+        java.util.zip.CRC32 oracle = new java.util.zip.CRC32();
+        oracle.update(sample, 0, sample.length);
+        eq(oracle.getValue(), RfaStoredZip.crc32(sample) & 0xffffffffL,
+                "CRC randomized payload versus independent oracle");
+
+        RfaOrderedEntries ordered = new RfaOrderedEntries();
+        ordered.add("99_SHA256SUMS.txt", new byte[0]);
+        ordered.add("80_raw/evidence.txt", sample);
+        ordered.add("00_manifest.json", "{}".getBytes(StandardCharsets.US_ASCII));
+        eq(3, ordered.size(), "ordered table count");
+        ok("00_manifest.json".equals(ordered.nameAt(0)), "stable sorted first");
+        ok("80_raw/evidence.txt".equals(ordered.nameAt(1)), "stable sorted second");
+        ok("99_SHA256SUMS.txt".equals(ordered.nameAt(2)), "stable sorted third");
+        try {
+            ordered.add("80_raw/evidence.txt", new byte[0]);
+            throw new AssertionError("duplicate ordered entry accepted");
+        } catch (IllegalArgumentException expected) {
+            ++assertions;
+        }
+
         byte[] first = pack(sample);
         byte[] second = pack(sample);
         ok(Arrays.equals(first, second), "deterministic archive bytes");
