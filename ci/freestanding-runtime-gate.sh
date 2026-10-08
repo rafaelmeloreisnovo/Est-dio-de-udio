@@ -22,6 +22,7 @@ sources=(
   dsp_core meter_core rfa_wave_core rfa_matrix_core rfa_block_core
   rfa_container_core rfa_fir_core rfa_time_core rfa_lms_core
   rfa_biquad_core rfa_voice_core rfa_measure_core rfa_rac1_core
+  rfa_audio_format_core rfa_verbo_core
 )
 
 rm -rf .runtime-gate

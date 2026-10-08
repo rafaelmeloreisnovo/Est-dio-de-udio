@@ -43,6 +43,7 @@ final class AudioRecorderEngine {
     private final Context context;
     private final File output;
     private volatile boolean running;
+    private volatile boolean captureFailed;
     private AudioRecord recorder;
     private Thread worker;
 
@@ -139,6 +140,7 @@ final class AudioRecorderEngine {
         sampleCount = 0;
         clipped = 0;
         latestCount = 0;
+        captureFailed = false;
         running = true;
         recorder.startRecording();
 
@@ -183,7 +185,12 @@ final class AudioRecorderEngine {
             while (running) {
                 int n = recorder.read(samples, 0, samples.length,
                         AudioRecord.READ_BLOCKING);
-                if (n <= 0) continue;
+                if (n < 0) {
+                    captureFailed = true;
+                    running = false;
+                    break;
+                }
+                if (n == 0) continue;
 
                 int localPeak = peak;
                 long localEnergy = energyScaled;
@@ -213,26 +220,55 @@ final class AudioRecorderEngine {
                 out.write(bytes, 0, n * 2);
             }
             out.flush();
-        } catch (IOException ignored) {
+        } catch (IOException | RuntimeException error) {
+            captureFailed = true;
             running = false;
         }
     }
 
-    void stop() {
+    /**
+     * True only when the capture worker is closed and its PCM output was flushed.
+     * A timed-out worker may still own the file and AudioRecord native buffers:
+     * do not publish its bytes or release those resources prematurely.
+     */
+    boolean stop() {
         running = false;
         if (recorder != null) {
             try {
                 recorder.stop();
             } catch (IllegalStateException ignored) {
+                captureFailed = true;
             }
         }
-        if (worker != null) {
+        final Thread captureThread = worker;
+        if (captureThread != null) {
             try {
-                worker.join(1500);
+                captureThread.join(1500);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                captureFailed = true;
+            }
+            if (captureThread.isAlive()) {
+                Thread cleanup = new Thread(() -> {
+                    try {
+                        captureThread.join();
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                    // Failure to drain remains a strict NO for the caller.
+                    // Keep platform resources until no native capture can use them.
+                    if (!captureThread.isAlive()) releaseOwnedRecorder();
+                }, "rafaelia-capture-drain");
+                cleanup.setDaemon(true);
+                cleanup.start();
+                return false;
             }
         }
+        releaseOwnedRecorder();
+        return !captureFailed;
+    }
+
+    private void releaseOwnedRecorder() {
         releaseEffects();
         if (recorder != null) {
             recorder.release();

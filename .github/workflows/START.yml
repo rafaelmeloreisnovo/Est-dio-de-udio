@@ -182,24 +182,56 @@ jobs:
         shell: bash
         run: bash ci/rafaelia-pipeline.sh summary
 
+  provider_observe:
+    name: 04 · provider / verify main
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [plan, gate]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Observe main policy without privileged PAT
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SOURCE: ${{ needs.plan.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "${{ needs.gate.result }}" = success || {
+            echo "::error::BUILD_GATE_NOT_PASS"; exit 1;
+          }
+          current_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          protected="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.protected')"
+          echo "PROVIDER_SOURCE_SHA=$EXPECTED_SOURCE"
+          echo "PROVIDER_LIVE_MAIN_SHA=$current_sha"
+          echo "PROVIDER_MAIN_PROTECTED=$protected"
+          test "$current_sha" = "$EXPECTED_SOURCE" || {
+            echo "::error::MAIN_SHA_MOVED — exact-head protection cannot be claimed"; exit 1;
+          }
+          test "$protected" = true || {
+            echo "::error::P0_MAIN_UNPROTECTED — use owner-only provider-bootstrap after configuring PAT_ENVIRONMENTS"; exit 1;
+          }
+          echo "PROVIDER_PROTECTED_FLAG=OBSERVED"
+          echo "REQUIRED_CHECK_CONTEXT=TOKEN_VAZIO_UNTIL_ADMIN_READBACK"
+
   provider_bootstrap:
-    name: 05 · provider / bootstrap
-    if: ${{ always() && (needs.plan.outputs.delivery == 'provider-bootstrap' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.gate.result == 'success')) }}
+    name: 05 · provider / bootstrap (owner-only manual)
+    # Manual provider-bootstrap deliberately skips the build gate; always() is
+    # required to evaluate this job when its dependency gate is skipped.
+    if: ${{ always() && needs.plan.result == 'success' && needs.gate.result == 'skipped' && github.event_name == 'workflow_dispatch' && github.actor == 'rafaelmeloreisnovo' && github.ref == 'refs/heads/main' && needs.plan.outputs.delivery == 'provider-bootstrap' }}
     needs:
       - plan
       - gate
     runs-on: ubuntu-latest
+    # Configure this GitHub Environment with required approval/restricted main ref.
+    # The source declaration alone DOES NOT prove provider reviewer enforcement.
+    environment:
+      name: provider-admin
     permissions:
       contents: read
     env:
       RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
-      RFA_PROVIDER_ADMIN_TOKEN: ${{ secrets.PAT_ENVIRONMENTS || secrets.PAT_ENV || secrets.PAT_ACTIONS }}
-      RFA_PAT_ENV: ${{ secrets.PAT_ENV }}
-      RFA_PAT_ENVIRONMENTS: ${{ secrets.PAT_ENVIRONMENTS }}
-      RFA_PAT_ACTIONS: ${{ secrets.PAT_ACTIONS }}
-      RFA_PAT_AGENTS: ${{ secrets.PAT_AGENTS }}
-      RFA_PAT_DEPENDABOT: ${{ secrets.PAT_DEPENDABOT }}
-      RFA_PAT_CODESPACE: ${{ secrets.PAT_CODESPACE }}
+      RFA_PROVIDER_ADMIN_TOKEN: ${{ secrets.PAT_ENVIRONMENTS }}
     steps:
       - name: Exact checkout for provider bootstrap
         shell: bash
@@ -220,7 +252,7 @@ jobs:
 
   deliver_live:
     name: 90 · delivery / live-debug
-    if: ${{ needs.plan.outputs.delivery == 'live-debug' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'rafaelmeloreisnovo' && needs.plan.outputs.delivery == 'live-debug' }}
     needs:
       - plan
       - gate
@@ -285,7 +317,7 @@ jobs:
 
   deliver_signed:
     name: 90 · delivery / signed + store
-    if: ${{ needs.plan.outputs.delivery == 'signed-release' || needs.plan.outputs.delivery == 'store-internal' || needs.plan.outputs.delivery == 'store-production' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'rafaelmeloreisnovo' && github.ref == 'refs/heads/main' && (needs.plan.outputs.delivery == 'signed-release' || needs.plan.outputs.delivery == 'store-internal' || needs.plan.outputs.delivery == 'store-production') }}
     needs:
       - plan
       - gate
@@ -309,7 +341,6 @@ jobs:
       RFA_ANDROID_KEY_PASSWORD: ${{ secrets.RAFAELIA_ANDROID_KEY_PASSWORD }}
       RFA_PAGES_REPO: ${{ vars.RAFAELIA_PAGES_REPO }}
       RFA_PAGES_PAT: ${{ secrets.RAFAELIA_PAGES_PAT }}
-      RFA_PAT_ACTIONS: ${{ secrets.PAT_ACTIONS }}
       RFA_PLAY_SERVICE_ACCOUNT_B64: ${{ secrets.RAFAELIA_PLAY_SERVICE_ACCOUNT_B64 }}
       RFA_PLAY_PACKAGE_NAME: ${{ vars.RAFAELIA_PLAY_PACKAGE_NAME }}
       RFA_PLAY_PRODUCTION_APPROVED: ${{ vars.RAFAELIA_PLAY_PRODUCTION_APPROVED }}
