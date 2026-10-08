@@ -4,6 +4,7 @@ run-name: Rafaelia Audio · ${{ github.event_name }} · ${{ github.ref_name }}
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   push:
     branches:
       - main
@@ -26,9 +27,11 @@ on:
         required: false
         type: string
 
+# Stable per-PR/per-main identity: new commits evict stale queued/in-progress work.
+# Deliberate owner-initiated deliveries are never silently cancelled.
 concurrency:
-  group: rafaelia-audio-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: rafaelia-audio-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 permissions:
   contents: read
@@ -37,9 +40,11 @@ jobs:
   plan:
     name: 00 · plan / route
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       source_sha: ${{ steps.route.outputs.source_sha }}
       delivery: ${{ steps.route.outputs.delivery }}
+      validation_lane: ${{ steps.route.outputs.validation_lane }}
     steps:
       - name: Resolve exact source and delivery route
         id: route
@@ -48,6 +53,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_SHA: ${{ github.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
           REQUESTED_SHA: ${{ inputs.source_sha }}
           REQUESTED_MODE: ${{ inputs.mode }}
         run: |
@@ -57,15 +63,24 @@ jobs:
             pull_request)
               source_sha="$PR_HEAD_SHA"
               delivery="validate"
+              # Draft development is intentionally host-only: never claim APK PASS.
+              # GitHub ready_for_review explicitly triggers the full binary gate.
+              if test "$PR_DRAFT" = true; then
+                validation_lane="fast"
+              else
+                validation_lane="full"
+              fi
               ;;
             push)
               source_sha="$EVENT_SHA"
               delivery="validate"
+              validation_lane="full"
               ;;
             workflow_dispatch)
               source_sha="$REQUESTED_SHA"
               if test -z "$source_sha"; then source_sha="$EVENT_SHA"; fi
               delivery="${REQUESTED_MODE:-validate}"
+              validation_lane="full"
               ;;
             *)
               echo "UNSUPPORTED_EVENT=$EVENT_NAME"
@@ -88,15 +103,59 @@ jobs:
 
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "delivery=$delivery" >> "$GITHUB_OUTPUT"
+          echo "validation_lane=$validation_lane" >> "$GITHUB_OUTPUT"
           echo "SOURCE_SHA=$source_sha"
           echo "DELIVERY_MODE=$delivery"
+          echo "VALIDATION_LANE=$validation_lane"
+          echo "FULL_BINARY_VALIDATION=$([[ "$validation_lane" = full ]] && echo REQUIRED || echo NOT_RUN)"
           echo "EXTERNAL_STANDARD_AUDIT=NOT_AUDITED"
+
+  quick:
+    name: gate / quick (source + host; NOT APK)
+    if: ${{ needs.plan.outputs.validation_lane == 'fast' && github.event_name == 'pull_request' }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    env:
+      RFA_SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+    steps:
+      - name: Exact source checkout (no marketplace actions)
+        shell: bash
+        env:
+          RFA_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          auth="$(printf 'x-access-token:%s' "$RFA_GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$RFA_SOURCE_SHA"
+          unset auth
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+      - name: Fast host/source gates (no SDK, Gradle or APK build)
+        shell: bash
+        run: bash ci/rafaelia-fast-gate.sh
+      - name: Explicit partial evidence receipt
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          echo "CI_LANE=FAST_SOURCE_HOST_ONLY"
+          echo "CI_SOURCE_SHA=$RFA_SOURCE_SHA"
+          echo "APK_BUILT=NOT_RUN"
+          echo "APK_INSTALLABLE=NOT_RUN"
+          echo "PHYSICAL_DEVICE=NOT_RUN"
+          echo "RELEASE_ELIGIBLE=false"
+          echo "REQUIRED_FULL_GATE=gate / build on ready_for_review/main/manual validate"
 
   gate:
     name: gate / build
-    if: ${{ needs.plan.outputs.delivery != 'provider-bootstrap' }}
+    # Full exact-head artifact gate stays mandatory before merge/release.
+    if: ${{ needs.plan.outputs.validation_lane == 'full' && needs.plan.outputs.delivery != 'provider-bootstrap' }}
     needs: plan
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
     env:
