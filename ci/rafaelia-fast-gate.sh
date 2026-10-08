@@ -25,6 +25,7 @@ bash ci/distribution-contract-gate.sh
 bash ci/test-provider-preflight.sh
 bash ci/audio-session-gate.sh
 bash ci/zipraf-lowlevel-gate.sh
+bash ci/wave-lab-gate.sh
 
 # Run freestanding C host vectors with the same strict flags as the full quality
 # stage. ARMv7 and AArch64 ELF gates remain mandatory in full mode.
