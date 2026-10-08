@@ -1,5 +1,7 @@
 # START HERE — Rafaelia Audio Studio
 
+> **P0 CI efficiency / queue (2026-10-08):** [Why 31m of wait had ~2m18s of build time, Draft quick gate, ready-for-review full gate, stale-run cancellation, rollback](ROADMAPS_IA_HUMANOS/CI_FAST_QUEUE_HOTFIX_20261008.md). Quick PASS cannot establish binary PASS or physical-device receipt.
+
 > **Java low-level / ZIPRAF (2026-10-08):** [Authorial ZIP32 serializer, CRC32, bounded byte path and interoperability gates](ROADMAPS_IA_HUMANOS/LOWLEVEL_JAVA_ZIPRAF_FREESTANDING_DELTA_20261008.md). This source delta does not replace required APK CI, provider enforcement or physical-device receipts.
 
 > **Latest P0 operations (2026-10-08):** [Provider enforcement + audio session + freestanding hardening](ROADMAPS_IA_HUMANOS/P0_PROVIDER_AUDIO_FREESTANDING_HOTFIX_20261008.md). This is a change-route memo; its CI and physical gates remain separate from historical executed receipts below.
