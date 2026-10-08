@@ -683,7 +683,7 @@ public final class MainActivity extends Activity {
             File input, int sampleRate, int channels, String origin) {
         // Single-flight bounds the platform JNI global DSP and meter state.
         // Reject parallel master/calibration/proof; never overwrite the previous good master.
-        if (calibrationRunning || evidenceRunning ||
+        if (recorder != null || calibrationRunning || evidenceRunning ||
                 !processingGate.tryEnter()) {
             if ("imported audio".equals(origin) && input != null) input.delete();
             status.setText("MASTER_BLOCKED — another audio/proof session is active");
