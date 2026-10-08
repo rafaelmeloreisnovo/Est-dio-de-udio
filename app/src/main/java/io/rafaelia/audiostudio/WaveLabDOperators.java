@@ -188,7 +188,29 @@ final class WaveLabDOperators {
     }
     /** Two-node synthetic diagnostic, each one neighbor. */
     static double[] twoNodeStep(double left,double right,double d) {
-        if (!finite(left,right,d)) return null;
-        return new double[]{left+d*(right-left),right+d*(left-right)};
+        return twoNodeStepNonuniform(left,right,d,d);
+    }
+
+    /** Permutation-covariant only when states, coefficients AND graph relabel together. */
+    static double[] twoNodeStepNonuniform(double left,double right,
+                                          double dLeft,double dRight) {
+        if (!finite(left,right,dLeft,dRight)) return null;
+        return new double[]{left+dLeft*(right-left),
+                right+dRight*(left-right)};
+    }
+
+    /**
+     * Algebraic previous state given D and labeled graph.
+     * det=1-dLeft-dRight; singular evolution has NO unique inverse.
+     * Mathematically invertible != lossless physical time reversal.
+     */
+    static double[] inverseTwoNodeStep(double nextLeft,double nextRight,
+                                       double dLeft,double dRight) {
+        if (!finite(nextLeft,nextRight,dLeft,dRight)) return null;
+        double det=1.0-dLeft-dRight;
+        if (Math.abs(det)<1e-12) return null;
+        double oldLeft=((1.0-dRight)*nextLeft-dLeft*nextRight)/det;
+        double oldRight=((1.0-dLeft)*nextRight-dRight*nextLeft)/det;
+        return finite(oldLeft,oldRight) ? new double[]{oldLeft,oldRight} : null;
     }
 }
