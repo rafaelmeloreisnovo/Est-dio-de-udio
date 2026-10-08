@@ -425,6 +425,8 @@ public final class MainActivity extends Activity {
         }
 
         evidenceRunning = true;
+        // Do not contaminate microphone/sensor evidence with app playback.
+        playback.stop();
         status.setText(
                 "PROOF · ação explícita: coletando μ∆ local · bounded sensor window + evidence…");
 
@@ -601,6 +603,8 @@ public final class MainActivity extends Activity {
         }
 
         try {
+            // Prevent the previous master from contaminating a new microphone capture.
+            playback.stop();
             // Every capture owns its PCM; second-resolution names could overwrite earlier evidence.
             recordedPcm = File.createTempFile("rafaelia_raw_", "_48k.pcm", getCacheDir());
             recorder = new AudioRecorderEngine(this, recordedPcm);
@@ -797,6 +801,10 @@ public final class MainActivity extends Activity {
     }
 
     private void playMaster() {
+        if (recorder != null || calibrationRunning || evidenceRunning || processingGate.busy()) {
+            status.setText("PLAYBACK_BLOCKED — capture, calibration, proof or master active");
+            return;
+        }
         if (lastMasteredPcm == null || !lastMasteredPcm.exists()) {
             status.setText("No master PCM is available for playback yet.");
             return;
