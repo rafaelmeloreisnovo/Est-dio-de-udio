@@ -47,15 +47,20 @@ topology() {
       | sort -u || true
   )
 
-  if test "${#external_uses[@]}" -ne 0; then
-    printf 'UNAPPROVED_EXTERNAL_ACTION=%s\n' "${external_uses[@]}"
-    fail 'external GitHub Action dependency detected'
+  # Narrow, immutable exception: Node 24 is confined to GitHub artifact
+  # transportation. It is not linked into the APK and has no repository-write token.
+  # A new action, changed pin, or additional external dependency fails closed.
+  local upload_pin
+  upload_pin='actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+  if test "${#external_uses[@]}" -ne 1 || test "${external_uses[0]:-}" != "$upload_pin"; then
+    printf 'UNAPPROVED_EXTERNAL_ACTION=%s\n' "${external_uses[@]:-TOKEN_VAZIO}"
+    fail 'external GitHub Action allowlist violated'
   fi
 
   echo 'ACTIVE_WORKFLOW_COUNT=1'
   echo 'CANONICAL_WORKFLOW=.github/workflows/START.yml'
   echo 'NODE_APP_RUNTIME=0'
-  echo 'EXTERNAL_JS_ACTIONS=NONE'
+  echo 'EXTERNAL_JS_ACTIONS=PINNED_UPLOAD_ARTIFACT_V7_ONLY'
 }
 
 quality() {
