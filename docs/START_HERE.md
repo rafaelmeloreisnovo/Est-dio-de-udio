@@ -1,5 +1,7 @@
 # START HERE — Rafaelia Audio Studio
 
+> **P0 APK delivery (2026-10-08):** [APK download gap, exact SHA artifact transport, receipt, limits, rollback](ROADMAPS_IA_HUMANOS/APK_DOWNLOAD_DELIVERY_HOTFIX_20261008.md). Proposed PR source change: **IMPLEMENTED_UNTESTED** until full GitHub Actions run produces downloadable APK bytes.
+
 > **P0 CI efficiency / queue (2026-10-08):** [Why 31m of wait had ~2m18s of build time, Draft quick gate, ready-for-review full gate, stale-run cancellation, rollback](ROADMAPS_IA_HUMANOS/CI_FAST_QUEUE_HOTFIX_20261008.md). Quick PASS cannot establish binary PASS or physical-device receipt.
 
 > **Java low-level / ZIPRAF (2026-10-08):** [Authorial ZIP32 serializer, CRC32, bounded byte path and interoperability gates](ROADMAPS_IA_HUMANOS/LOWLEVEL_JAVA_ZIPRAF_FREESTANDING_DELTA_20261008.md). This source delta does not replace required APK CI, provider enforcement or physical-device receipts.

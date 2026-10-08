@@ -236,6 +236,46 @@ jobs:
         shell: bash
         run: bash ci/rafaelia-pipeline.sh binary-receipt
 
+      # DOWNLOAD EDGE: only after exact-byte reproduction, installability,
+      # and binary SHA custody succeeded. No automatic public release.
+      - name: 82 · bind APK bytes for download
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_apk='app/build/outputs/apk/debug/app-debug.apk'
+          test -s "$source_apk"
+          test "$(sha256sum "$source_apk" | awk '{print $1}')" = "$RFA_APK_SHA256"
+          apk_name="RafaeliaAudio-${RFA_SOURCE_SHA:0:12}-run${GITHUB_RUN_ID}.apk"
+          target="$RUNNER_TEMP/$apk_name"
+          cp "$source_apk" "$target"
+          cmp -s "$source_apk" "$target"
+          printf 'RFA_DOWNLOAD_APK=%s\n' "$target" >> "$GITHUB_ENV"
+          {
+            echo '### APK download (debug, not authorially signed)'
+            echo "APK: \`$apk_name\`"
+            echo "Source SHA: \`$RFA_SOURCE_SHA\`"
+            echo "APK SHA-256: \`$RFA_APK_SHA256\`"
+            echo 'Delivery: workflow artifact only, no GitHub Release / no Play deployment.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 83 · upload exact APK (Node 24 GitHub platform edge)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ env.RFA_DOWNLOAD_APK }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 84 · upload binary custody receipts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rafaelia-binary-receipts-${{ github.run_id }}
+          path: |
+            ${{ env.RFA_BINARY_RECEIPT }}
+            ${{ env.RFA_ENTRY_MANIFEST }}
+          if-no-files-found: error
+          retention-days: 14
+
       - name: 99 · scoped summary
         if: ${{ always() }}
         shell: bash

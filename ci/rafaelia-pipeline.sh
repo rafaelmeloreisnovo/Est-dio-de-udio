@@ -47,15 +47,20 @@ topology() {
       | sort -u || true
   )
 
-  if test "${#external_uses[@]}" -ne 0; then
-    printf 'UNAPPROVED_EXTERNAL_ACTION=%s\n' "${external_uses[@]}"
-    fail 'external GitHub Action dependency detected'
+  # Narrow, immutable exception: Node 24 is confined to GitHub artifact
+  # transportation. It is not linked into the APK and has no repository-write token.
+  # A new action, changed pin, or additional external dependency fails closed.
+  local upload_pin
+  upload_pin='actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+  if test "${#external_uses[@]}" -ne 1 || test "${external_uses[0]:-}" != "$upload_pin"; then
+    printf 'UNAPPROVED_EXTERNAL_ACTION=%s\n' "${external_uses[@]:-TOKEN_VAZIO}"
+    fail 'external GitHub Action allowlist violated'
   fi
 
   echo 'ACTIVE_WORKFLOW_COUNT=1'
   echo 'CANONICAL_WORKFLOW=.github/workflows/START.yml'
   echo 'NODE_APP_RUNTIME=0'
-  echo 'EXTERNAL_JS_ACTIONS=NONE'
+  echo 'EXTERNAL_JS_ACTIONS=PINNED_UPLOAD_ARTIFACT_V7_ONLY'
 }
 
 quality() {
@@ -220,7 +225,7 @@ freestanding_source_gate=PASS
 low_dependency_gate=PASS
 authorial_toolchain_bootstrap=PASS
 node_app_runtime=0
-external_js_actions=NONE
+external_js_actions=PINNED_UPLOAD_ARTIFACT_V7_ONLY
 armv7_zero_undefined=PASS
 armv7_abi_manifest=PASS
 aarch64_zero_undefined=PASS
@@ -312,7 +317,7 @@ run_id=$RFA_CI_RUN_ID
 run_number=$RFA_CI_RUN_NUMBER
 apk_sha256=$RFA_APK_SHA256
 signing_mode=DEBUG_NONAUTHORIAL
-external_js_actions=NONE
+external_js_actions=PINNED_UPLOAD_ARTIFACT_V7_ONLY
 external_standard_audit=NOT_AUDITED
 claim_allowed=false
 EOF
@@ -355,7 +360,7 @@ run_number=$RFA_CI_RUN_NUMBER
 upstream_gate=PASS_EXECUTED_SCOPE
 authorial_toolchain_bootstrap=PASS
 node_app_runtime=0
-external_js_actions=NONE
+external_js_actions=PINNED_UPLOAD_ARTIFACT_V7_ONLY
 signing_mode=AUTHORIAL_ANDROID_APKSIGNER
 signing_certificate_match=PENDING_AT_EMBED
 signed_release_publish=PENDING_AT_EMBED

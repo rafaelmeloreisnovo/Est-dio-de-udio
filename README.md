@@ -307,7 +307,7 @@ Canonical CI now requires:
 ```text
 NODE_APP_RUNTIME = 0
 NPM/YARN/PNPM = 0
-EXTERNAL_JS_ACTIONS = NONE
+EXTERNAL_JS_ACTIONS = PINNED_UPLOAD_ARTIFACT_V7_ONLY (GitHub CI Node24; APK runtime = 0)
 GH_CLI = PLATFORM_EDGE
 ```
 
@@ -316,7 +316,9 @@ A successful main build creates:
 - APK SHA-256;
 - per-APK-entry SHA-256 manifest;
 - binary-origin receipt;
-- traceable GitHub prerelease through the runner-provided `gh` CLI.
+- directly downloadable debug `.apk` as a GitHub Actions artifact (full build only); 
+- separate retained binary receipts artifact; 
+- optional traceable GitHub prerelease only via owner-initiated `workflow_dispatch mode=live-debug` with the runner-provided `gh` CLI.
 
 A separate `Rafaelia Signed Release` workflow is fail-closed and requires a real user-controlled keystore plus the expected public certificate SHA-256. It never substitutes a debug key for an absent authorial key.
 

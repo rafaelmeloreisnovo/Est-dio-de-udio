@@ -58,7 +58,7 @@ The same pipeline serves three normal operations:
 | Event | Route |
 |---|---|
 | pull request | validate |
-| push to `main` | validate → live debug delivery |
+| push to `main` | full validate + APK artifact retention; no automatic public release |
 | manual dispatch | validate, live-debug, or signed-release |
 
 An optional exact 40-character source SHA can be supplied to manual dispatch. If omitted, the selected workflow ref SHA is used.
@@ -66,7 +66,7 @@ An optional exact 40-character source SHA can be supplied to manual dispatch. If
 ### Fast
 
 - PR execution performs one bootstrap and one canonical gate path;
-- no external JavaScript GitHub Actions are required;
+- one pinned Node24 GitHub Actions upload edge retains successful build artifacts; no external app/runtime JavaScript dependency;
 - expensive delivery work is conditional and happens only after the gate succeeds;
 - PR concurrency cancels an older in-progress run for the same ref;
 - signed delivery does not repeat quality analysis after the exact source gate has passed in the same pipeline run.
@@ -99,7 +99,7 @@ Requires:
 ```text
 ACTIVE_WORKFLOW_COUNT=1
 CANONICAL_WORKFLOW=.github/workflows/START.yml
-EXTERNAL_JS_ACTIONS=NONE
+EXTERNAL_JS_ACTIONS=PINNED_UPLOAD_ARTIFACT_V7_ONLY
 NODE_APP_RUNTIME=0
 ```
 
@@ -145,13 +145,13 @@ Hashes the APK and every non-directory ZIP/APK entry and writes `rafaelia.binary
 
 ### 90 — DELIVERY
 
-`validate`: no publishing.
+`validate`: stores validated debug APK + binary receipts in the workflow run, but does **not** publish a public Release.
 
 `live-debug`: after the gate, rebuilds the exact SHA under a write-scoped job, re-materializes provenance, generates the binary receipt and publishes a prerelease.
 
 `signed-release`: after the gate, obtains signing coordinates only from configured variables/secrets, builds release, signs/verifies through the existing authorial signing script, publishes the signed prerelease, then publishes the verification receipt to the configured Pages source.
 
-Write permission is isolated to delivery jobs. The PR quality gate remains `contents: read`.
+Write permission is isolated to delivery jobs. The PR full quality/artifact gate remains `contents: read`, with pinned `actions/upload-artifact` as GitHub transport only. Artifacts are retained for 14 days subject to provider policy; a successful build does not demonstrate an installed APK.
 
 ## Quality promotion boundary
 
