@@ -61,6 +61,9 @@ topology() {
 quality() {
   log 'PHASE=30_QUALITY_CAPABILITY'
 
+  # Fail before Gradle when fast/full workflow routing or P0 contracts regress.
+  bash ci/ci-lane-contract-gate.sh
+
   gradle :app:rafaeliaBuildContract --no-daemon --stacktrace
   gradle :app:rafaeliaJavaGate --no-daemon --stacktrace
 
