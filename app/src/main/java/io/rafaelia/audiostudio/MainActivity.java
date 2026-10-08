@@ -620,6 +620,7 @@ public final class MainActivity extends Activity {
                 startPrompter();
             }
         } catch (Exception e) {
+            if (recorder != null) recorder.stop();
             recorder = null;
             telemetryRunning = false;
             status.setText("Recording start failed · " + e.getMessage());
@@ -639,8 +640,13 @@ public final class MainActivity extends Activity {
         telemetryRunning = false;
         ui.removeCallbacks(telemetryTick);
         stopPrompter();
-        recorder.stop();
+        boolean captureComplete = recorder.stop();
         recorder = null;
+        if (!captureComplete) {
+            status.setText("CAPTURE_INVALID — read/write failure or worker not drained. " +
+                    "Raw PCM preserved for diagnostics; mastering blocked.");
+            return;
+        }
 
         status.setText(
                 "CAPTURE CLOSED · " + capture.source +
@@ -709,6 +715,7 @@ public final class MainActivity extends Activity {
                         }
                     });
                 } catch (Exception containerError) {
+                    if (zrf != null) zrf.delete();
                     lastZrf = null;
                     runOnUiThread(() -> {
                         if (studioWorkspaceView != null) {
