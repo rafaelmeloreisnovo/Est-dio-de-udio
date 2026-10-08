@@ -115,7 +115,17 @@ For two nodes, the synthetic difference evolves as `delta'=(1-2D)*delta`. With `
 - No physical D parameters, radiation measurements, actual echo DOA, SPL, or radio control are added. No RF setters, scan triggers or hardware states touched by this work.
 - Evidence statuses must come from exact-head GitHub CI log; `IMPLEMENTED_UNTESTED` until executed. A successful fast gate is **not** Android UI compile or physical experiment success.
 
-## R3
+## R3## Successor implementation — bounded W7 synthetic experiment (2026-10-08)
+
+- Producer [WaveLabDSimulator.java](../../app/src/main/java/io/rafaelia/audiostudio/WaveLabDSimulator.java) uses a **7-node undirected wheel** (hub degree 6, ring degree 3); this is not a full hexagonal lattice or an Android sensor model.
+- Positive branch: D0=0.10, Dneg=-0.20, P=0, H=0 gives D=+0.10. Negative branch: same coefficients, H=1 gives D=-0.10. Threshold is held fixed per run; no plasticity, feedback, source term or M modulation yet.
+- Deterministic guardrails: maximum 32 update steps and max observed absolute node value 8. A STOP_MAGNITUDE_BOUND status is a **bounded simulation stop**, not a discovery.
+- The [WaveLabDSimulatorTest.java](../../ci/WaveLabDSimulatorTest.java) host fixture checks symmetric mass conservation, variation trends, stop, invalid inputs, deterministic report and absence of raw sensor identities.
+- UI button: **Experimento D · simular (sem sensores / radio)**; generated text is embedded in the existing user-triggered ZIPRAF observations; initial state NOT_RUN_SYNTHETIC. Nothing uploads automatically.
+- Related Papers study: https://github.com/rafaelmeloreisnovo/papers/blob/research/wave-lab-d-coefficients-20261008/research_notes/2026-10-08_D_COEFFICIENTS_WAVE_LAB_BRIDGE_V1.md; RLL index: https://github.com/rafaelmeloreisnovo/relativity-living-light/blob/docs/rll-d-coefficients-navigation-20261008/docs/science/RLL_D_COEFFICIENTS_WAVE_LAB_INDEX_V1.md.
+- Current state: latest exact-head CI evidence must be checked; fast-lane success != Android build/device execution; claim_allowed=false.
+
+
 
 F_ok = typed symbols/derivatives/inverses with explicit domain, finite numerical fixtures and falsifiers.
 F_gap = source-producer correction agreement, full coupled simulation, on-device measurement, calibrated D identification and global stability.
