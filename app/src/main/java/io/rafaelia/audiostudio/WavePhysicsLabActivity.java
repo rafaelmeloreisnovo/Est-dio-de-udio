@@ -176,6 +176,7 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
             return;
         }
         gps = "TOKEN_VAZIO_GPS_NO_FIX";
+        gpsFixElapsedMs = -1;
         try {
             LocationManager loc = (LocationManager) getSystemService(LOCATION_SERVICE);
             Location last = loc == null ? null :
@@ -288,7 +289,7 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
                 } else {
                     result = "TOKEN_VAZIO_SHORT_CAPTURE n=" + count;
                 }
-            } catch (SecurityException | IllegalStateException e) {
+            } catch (RuntimeException e) {
                 result = "TOKEN_VAZIO_AUDIO_CAPTURE_ERROR_" + e.getClass().getSimpleName();
             } finally {
                 if (ar != null) {
