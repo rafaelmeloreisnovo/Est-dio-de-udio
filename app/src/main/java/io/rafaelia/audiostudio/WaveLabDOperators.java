@@ -69,7 +69,7 @@ final class WaveLabDOperators {
         double effectiveD = observedD - (thresholdOpen ? dNeg : 0.0);
         double t = 1.0 - effectiveD / d0;
         if (!(t > -1.0 && t < 1.0)) return Double.NaN;
-        return Math.atanh(t);
+        return 0.5 * (Math.log1p(t) - Math.log1p(-t));
     }
 
     /** The exact inverse of the M modulation when m in (-1,1). */
