@@ -51,6 +51,7 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
     private SensorManager sensorManager;
     private TextView screen;
     private TextView pose;
+    private WaveLabPlotView plot;
     private volatile float ax, ay, az;
     private volatile float yawDegrees = Float.NaN;
     private int accelEvents;
@@ -93,6 +94,10 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
         Button export = button("Salvar observacoes em ZIPRAF");
         export.setOnClickListener(v -> exportZipraf());
         root.addView(export);
+        plot = new WaveLabPlotView(this);
+        root.addView(plot, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (int)(320 * getResources().getDisplayMetrics().density)));
         root.addView(screen);
         scroll.addView(root);
         setContentView(scroll);
@@ -156,6 +161,7 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
             SensorManager.getOrientation(rotation, angles);
             yawDegrees = (float) Math.toDegrees(angles[0]);
         }
+        if (plot != null) plot.setPose(yawDegrees, ax, ay, az);
         if (accelEvents % 8 == 0 && pose != null) {
             pose.setText("POSE_SECTOR=" +
                     (Float.isNaN(yawDegrees) ? "TOKEN_VAZIO_ROTATION_VECTOR" :
@@ -258,6 +264,8 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
             AudioRecord ar = null;
             String result = "TOKEN_VAZIO_AUDIO_CAPTURE_FAILED";
             String spectrum = "TOKEN_VAZIO_AUDIO_CAPTURE_FAILED";
+            double[] displayBins = new double[WaveLabCore.BANDS_HZ.length];
+            for (int i = 0; i < displayBins.length; ++i) displayBins[i] = Double.NaN;
             try {
                 int min = AudioRecord.getMinBufferSize(48000,
                         AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
@@ -281,9 +289,11 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
                             " pose_sector=" + (Float.isNaN(yawDegrees) ?
                             "TOKEN_VAZIO" : WaveLabCore.poseSector(yawDegrees));
                     StringBuilder b = new StringBuilder();
-                    for (int hz : WaveLabCore.BANDS_HZ) {
+                    for (int i = 0; i < WaveLabCore.BANDS_HZ.length; ++i) {
+                        int hz = WaveLabCore.BANDS_HZ[i];
+                        displayBins[i] = WaveLabCore.relativeDbfs(input, count, hz);
                         b.append(hz).append("Hz=").append(
-                                fmt(WaveLabCore.relativeDbfs(input, count, hz))).append(" dBFS; ");
+                                fmt(displayBins[i])).append(" dBFS; ");
                     }
                     spectrum = b.toString();
                 } else {
@@ -300,7 +310,9 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
             }
             final String a = result, b = spectrum;
             runOnUiThread(() -> {
-                audio = a; bands = b; recording = false; show();
+                audio = a; bands = b; recording = false;
+                if (plot != null) plot.setSpectrum(displayBins);
+                show();
             });
         }, "rafaelia-wave-lab-once").start();
     }
