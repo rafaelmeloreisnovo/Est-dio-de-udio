@@ -41,6 +41,13 @@ Counts are tree entries, not unique equations nor proof counts. No unbounded cor
 - RLL `docs/RLL_NOVOEXPORT_FORMULA_ATLAS.md` reports large candidate occurrence counts from external corpus, *not validated equations*.
 - The claimed “~609 formulas” is `TOKEN_VAZIO_UNRECONCILED_CANONICAL_COUNT` until formula IDs, sources and deduplication equivalences are verified. 168, 251, 350, 420 and 53 have **different unit types** and MUST NOT be added.
 
+## W12 — D-coefficient operator analysis and falsifiers
+
+**Study:** [WAVE_LAB_D_COEFFICIENTS_OPERATOR_AUDIT_V1.md](WAVE_LAB_D_COEFFICIENTS_OPERATOR_AUDIT_V1.md).
+Source producers: RLL instituto `data/formulas/RAFAELIA_FORMAL_UNIFIED_CORE.md`; `docs/formulas/RAFAELIA_SYMBOL_TABLE.md`; Matem-tica- `papers/2026-07-17_antiderivada_vazio_fluxo_toroidal.md`, `docs/formal/FIBONACCI_INVERSE_REVERSE_JUMP_RULER_V1.md` and Pitágoras/Bhaskara crosswalk.
+
+Routed distinctions: `D_i != D_theta != D_Q != D(p,q) != D_growth(z)`; discontinuous Heaviside threshold; negative D anti-diffusive regime; log incremental ratio **approximation** vs exact `log1p`; inverse branch vs predecessor search; permutation must relabel coefficients and graph; no physical D extraction from raw radio/audio observations. Java `WaveLabDOperators` and host tests are synthetic numerical instruments, not Android/device evidence.
+
 ## Observable contracts versus absent quantities
 
 **Available in source/draft alpha1 (not yet on physical APK)**: six relative PCM bins, accelerometer x/y/z and delta, optional rotation-vector pose, last-known GNSS location, Wi-Fi cached RSSI/frequency, cellular aggregated dBm, Bluetooth adapter status, explicit ZIPRAF receipt.
