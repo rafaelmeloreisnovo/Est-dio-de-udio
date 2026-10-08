@@ -221,6 +221,10 @@ jobs:
       - plan
       - gate
     runs-on: ubuntu-latest
+    # Configure this GitHub Environment with required approval/restricted main ref.
+    # The source declaration alone DOES NOT prove provider reviewer enforcement.
+    environment:
+      name: provider-admin
     permissions:
       contents: read
     env:
