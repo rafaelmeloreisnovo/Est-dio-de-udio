@@ -16,6 +16,8 @@ javac -encoding UTF-8 -d "$tmp" "$dir/WaveLabCore.java" ci/WaveLabCoreTest.java
 java -cp "$tmp" io.rafaelia.audiostudio.WaveLabCoreTest
 javac -encoding UTF-8 -d "$tmp" "$dir/WaveLabDOperators.java" ci/WaveLabDOperatorsTest.java
 java -cp "$tmp" io.rafaelia.audiostudio.WaveLabDOperatorsTest
+javac -encoding UTF-8 -cp "$tmp" -d "$tmp" "$dir/WaveLabDSimulator.java" ci/WaveLabDSimulatorTest.java
+java -cp "$tmp" io.rafaelia.audiostudio.WaveLabDSimulatorTest
 
 echo 'WAVE_LAB_PLATFORM_FREE_MATH=PASS_HOST'
 echo 'WAVE_LAB_UI_ANDROID_COMPILE=NOT_RUN_FAST_LANE'
