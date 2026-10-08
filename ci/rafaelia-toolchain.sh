@@ -74,13 +74,34 @@ setup_android() {
     printf '%s\n' "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
   fi
 
-  yes | "$sdkmanager" --licenses >/dev/null || true
-  "$sdkmanager" \
-    "platform-tools" \
-    "platforms;android-36" \
-    "build-tools;36.0.0" \
-    "ndk;27.2.12479018" \
-    "cmake;3.22.1"
+  # Reuse the runner image when *all* pinned components are actually present.
+  # sdkmanager otherwise performs an avoidable network call for each CI run.
+  local ready=1
+  local component
+  for component in \
+    "$ANDROID_SDK_ROOT/platform-tools/adb" \
+    "$ANDROID_SDK_ROOT/platforms/android-36/android.jar" \
+    "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
+    "$ANDROID_SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" \
+    "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/cmake"
+  do
+    [ -e "$component" ] || ready=0
+  done
+
+  if [ "$ready" -eq 1 ]; then
+    printf 'ANDROID_SDK_CAPACITY=PINNED_PREINSTALLED_NO_DOWNLOAD\n'
+  else
+    printf 'ANDROID_SDK_CAPACITY=MISSING_PINNED_PACKAGE_PROVISION_REQUIRED\n'
+    command -v timeout >/dev/null 2>&1 || die "TIMEOUT_TOOL_UNAVAILABLE"
+    # Bounded external provisioning, no never-ending sdkmanager stalls.
+    timeout 45 bash -c 'yes | "$1" --licenses >/dev/null || true' _ "$sdkmanager"
+    timeout 240 "$sdkmanager" \
+      "platform-tools" \
+      "platforms;android-36" \
+      "build-tools;36.0.0" \
+      "ndk;27.2.12479018" \
+      "cmake;3.22.1" || die "PINNED_SDK_PROVISION_TIMEOUT_OR_FAILURE"
+  fi
 
   [ -d "$ANDROID_SDK_ROOT/ndk/27.2.12479018" ] || die "NDK_INSTALL_FAIL"
   [ -d "$ANDROID_SDK_ROOT/platforms/android-36" ] || die "ANDROID36_PLATFORM_INSTALL_FAIL"
