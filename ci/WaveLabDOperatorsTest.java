@@ -122,6 +122,30 @@ final class WaveLabDOperatorsTest {
         near(backward[1],5,1e-12,"invertible two-node D operator right");
         require(WaveLabDOperators.inverseTwoNodeStep(2.5,2.5,0.5,0.5)==null,
                 "singular D matrix has no unique reverse");
+        near(WaveLabDOperators.inverseSignedLog1p(
+                WaveLabDOperators.signedLog1p(-0.35,0.1),0.1),-0.35,1e-12,
+                "signed D logarithm is bijective with scale");
+        require(Double.isNaN(WaveLabDOperators.signedLog1p(-0.35,0)),
+                "signed logarithm missing normalization");
+        near(WaveLabDOperators.inverseLogLogRatio(
+                WaveLabDOperators.logLogRatio(10,2),2),10,1e-12,
+                "normalized log-log roundtrip");
+        require(Double.isNaN(WaveLabDOperators.logLogRatio(1,2)),
+                "log-log normalized domain x/scale > 1");
+        double qA=2,qB=3,qC=5;
+        double dqNumerical=(WaveLabDOperators.quadraticDeficit(qA,qB+h,qC)-
+                WaveLabDOperators.quadraticDeficit(qA,qB-h,qC))/(2*h);
+        near(WaveLabDOperators.dQuadraticDeficitDB(qA,qB),dqNumerical,2e-10,
+                "quadratic D derivative wrt B");
+        double qpNumerical=(WaveLabDOperators.primitiveQuadraticDeficitB(qA,qB+h,qC)-
+                WaveLabDOperators.primitiveQuadraticDeficitB(qA,qB-h,qC))/(2*h);
+        near(qpNumerical,WaveLabDOperators.quadraticDeficit(qA,qB,qC),2e-10,
+                "quadratic D antiderivative wrt B");
+        double invB=WaveLabDOperators.inverseQuadraticDeficitBPrincipal(
+                qA,qC,WaveLabDOperators.quadraticDeficit(qA,qB,qC));
+        near(invB,Math.abs(qB),1e-12,"quadratic inverse principal B branch");
+        require(Double.isNaN(WaveLabDOperators.inverseQuadraticDeficitBPrincipal(
+                2,0,2)),"quadratic inverse must reject negative radicand");
         System.out.println("WaveLabDOperatorsTest PASS: " + checks + " host assertions");
     }
 }
