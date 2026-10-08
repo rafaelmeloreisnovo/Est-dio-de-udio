@@ -64,6 +64,9 @@ quality() {
   gradle :app:rafaeliaBuildContract --no-daemon --stacktrace
   gradle :app:rafaeliaJavaGate --no-daemon --stacktrace
 
+  # Same Java session gate used in the APK; exercise contention without Android runtime.
+  bash ci/audio-session-gate.sh
+
   local core_cflags
   core_cflags='-std=c11 -O2 -ffreestanding -fno-builtin -nostdinc -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-common -Wall -Wextra -Werror -Iapp/src/main/cpp'
 
