@@ -36,7 +36,6 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
     private static final int REQ_AUDIO = 100;
@@ -78,7 +77,7 @@ public final class MainActivity extends Activity {
     private volatile boolean calibrationRunning;
     private volatile boolean evidenceRunning;
     // JNI DSP/meter states are platform-owned and currently shared: serialize sessions.
-    private final AtomicBoolean processingRunning = new AtomicBoolean(false);
+    private final AudioProcessingGate processingGate = new AudioProcessingGate();
     private boolean prompterRunning;
     private boolean telemetryRunning;
 
@@ -416,7 +415,7 @@ public final class MainActivity extends Activity {
     }
 
     private void generateEvidenceBundle() {
-        if (processingRunning.get() || calibrationRunning || recorder != null) {
+        if (processingGate.busy() || calibrationRunning || recorder != null) {
             status.setText("PROOF_BLOCKED — audio session is still active");
             return;
         }
@@ -512,7 +511,7 @@ public final class MainActivity extends Activity {
     }
 
     private void runRelativeCalibration() {
-        if (processingRunning.get() || evidenceRunning) {
+        if (processingGate.busy() || evidenceRunning) {
             status.setText("CAL_BLOCKED — master or ZIPRAF is active");
             return;
         }
@@ -592,7 +591,7 @@ public final class MainActivity extends Activity {
     }
 
     private void startRecording(boolean narration) {
-        if (processingRunning.get() || calibrationRunning || evidenceRunning) {
+        if (processingGate.busy() || calibrationRunning || evidenceRunning) {
             status.setText("REC_BLOCKED — mastering, calibration or proof is active");
             return;
         }
@@ -685,7 +684,7 @@ public final class MainActivity extends Activity {
         // Single-flight bounds the platform JNI global DSP and meter state.
         // Reject parallel master/calibration/proof; never overwrite the previous good master.
         if (calibrationRunning || evidenceRunning ||
-                !processingRunning.compareAndSet(false, true)) {
+                !processingGate.tryEnter()) {
             if ("imported audio".equals(origin) && input != null) input.delete();
             status.setText("MASTER_BLOCKED — another audio/proof session is active");
             return;
@@ -788,11 +787,11 @@ public final class MainActivity extends Activity {
                 } finally {
                     if (!committed && mastered != null) mastered.delete();
                     if ("imported audio".equals(origin) && input != null) input.delete();
-                    processingRunning.set(false);
+                    processingGate.leave();
                 }
             }, "rafaelia-mastering").start();
         } catch (RuntimeException e) {
-            processingRunning.set(false);
+            processingGate.leave();
             status.setText("MASTER_START_FAILED — " + e.getClass().getSimpleName());
         }
     }
