@@ -404,11 +404,7 @@ jobs:
       RFA_PLAY_PACKAGE_NAME: ${{ vars.RAFAELIA_PLAY_PACKAGE_NAME }}
       RFA_PLAY_PRODUCTION_APPROVED: ${{ vars.RAFAELIA_PLAY_PRODUCTION_APPROVED }}
     steps:
-      - name: Provider enforcement gate
-        shell: bash
-        run: bash ci/provider-enforcement-gate.sh
-
-      - name: Exact checkout after green gate
+      - name: Exact checkout for signed delivery
         shell: bash
         env:
           RFA_GITHUB_TOKEN: ${{ github.token }}
@@ -421,6 +417,10 @@ jobs:
           unset auth
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$RFA_SOURCE_SHA"
+
+      - name: Provider enforcement gate
+        shell: bash
+        run: bash ci/provider-enforcement-gate.sh
 
       - name: Bind deterministic Android revision
         shell: bash
