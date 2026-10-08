@@ -22,6 +22,8 @@ grep -Fq 'boolean captureComplete = recorder.stop();' "$main" || fail 'CAPTURE_C
 grep -Fq 'if (!captureComplete)' "$main" || fail 'PARTIAL_PCM_PROMOTION_RISK'
 grep -Fq 'if (captureThread.isAlive())' "$engine" || fail 'CAPTURE_DRAIN_NOT_GATED'
 grep -Fq 'captureFailed = true;' "$engine" || fail 'CAPTURE_IO_FAILURE_NOT_RECORDED'
+grep -Fq 'PLAYBACK_BLOCKED — capture, calibration, proof or master active' "$main" || fail 'PLAYBACK_CALIBRATION_COLLISION'
+grep -Fq 'PROOF_BLOCKED — audio session is still active' "$main" || fail 'PROOF_OVERLAP_NOT_GATED'
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
