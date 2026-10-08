@@ -278,6 +278,22 @@ public final class MainActivity extends Activity {
         first.addView(stopPlayback, weight());
         panel.addView(first);
 
+        Button waveLab = button("Wave physics lab · read-only");
+        waveLab.setOnClickListener(v -> {
+            if (recorder != null || processingGate.busy() || calibrationRunning || evidenceRunning) {
+                status.setText("WAVE_LAB_BLOCKED — finish audio and evidence sessions first");
+                return;
+            }
+            Intent intent = new Intent(this, WavePhysicsLabActivity.class);
+            if (lastCalibrationResult != null) {
+                intent.putExtra("calibrated", true);
+                intent.putExtra("lag_samples", lastCalibrationResult.bestLag);
+                intent.putExtra("rt60_relative_ms", lastCalibrationResult.preferredRt60Millis());
+            }
+            startActivity(intent);
+        });
+        panel.addView(waveLab);
+
         panel.addView(sectionLabel("PCM EXPORT FORMATS"));
 
         LinearLayout exportPrimary = row();
