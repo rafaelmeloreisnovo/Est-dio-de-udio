@@ -36,6 +36,7 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
     private static final int REQ_AUDIO = 100;
@@ -76,6 +77,8 @@ public final class MainActivity extends Activity {
     private boolean pendingCalibration;
     private volatile boolean calibrationRunning;
     private volatile boolean evidenceRunning;
+    // JNI DSP/meter states are platform-owned and currently shared: serialize sessions.
+    private final AtomicBoolean processingRunning = new AtomicBoolean(false);
     private boolean prompterRunning;
     private boolean telemetryRunning;
 
@@ -413,6 +416,10 @@ public final class MainActivity extends Activity {
     }
 
     private void generateEvidenceBundle() {
+        if (processingRunning.get() || calibrationRunning || recorder != null) {
+            status.setText("PROOF_BLOCKED — audio session is still active");
+            return;
+        }
         if (evidenceRunning) {
             status.setText("Evidence / ZIPRAF generation is already running.");
             return;
@@ -505,6 +512,10 @@ public final class MainActivity extends Activity {
     }
 
     private void runRelativeCalibration() {
+        if (processingRunning.get() || evidenceRunning) {
+            status.setText("CAL_BLOCKED — master or ZIPRAF is active");
+            return;
+        }
         if (calibrationRunning) {
             status.setText("Relative calibration is already running.");
             return;
@@ -581,16 +592,18 @@ public final class MainActivity extends Activity {
     }
 
     private void startRecording(boolean narration) {
+        if (processingRunning.get() || calibrationRunning || evidenceRunning) {
+            status.setText("REC_BLOCKED — mastering, calibration or proof is active");
+            return;
+        }
         if (recorder != null) {
             status.setText("Recording is already active.");
             return;
         }
 
         try {
-            String stamp = new SimpleDateFormat(
-                    "yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            recordedPcm = new File(
-                    getCacheDir(), "rafaelia_raw_" + stamp + "_48k.pcm");
+            // Every capture owns its PCM; second-resolution names could overwrite earlier evidence.
+            recordedPcm = File.createTempFile("rafaelia_raw_", "_48k.pcm", getCacheDir());
             recorder = new AudioRecorderEngine(this, recordedPcm);
             recorder.start();
 
@@ -663,19 +676,29 @@ public final class MainActivity extends Activity {
 
     private void runPipelineFromPcm(
             File input, int sampleRate, int channels, String origin) {
+        // Single-flight bounds the platform JNI global DSP and meter state.
+        // Reject parallel master/calibration/proof; never overwrite the previous good master.
+        if (calibrationRunning || evidenceRunning ||
+                !processingRunning.compareAndSet(false, true)) {
+            if ("imported audio".equals(origin) && input != null) input.delete();
+            status.setText("MASTER_BLOCKED — another audio/proof session is active");
+            return;
+        }
         final int preset = selectedPreset();
         final long target = selectedTargetEnergy();
         final String targetLabel = selectedTargetLabel();
         status.setText("PROCESSING " + origin + " · " + targetLabel + "…");
 
-        new Thread(() -> {
-            File mastered = new File(getCacheDir(), "rafaelia_mastered_48k.pcm");
-            File zrf = new File(
-                    getCacheDir(), "rafaelia_session_" +
-                    System.currentTimeMillis() + ".zrf");
-            Uri outputUri = null;
+        try {
+            new Thread(() -> {
+                File mastered = null;
+                File zrf = null;
+                Uri outputUri = null;
+                boolean committed = false;
 
-            try {
+                try {
+                    mastered = File.createTempFile("rafaelia_mastered_", "_48k.pcm", getCacheDir());
+                    zrf = File.createTempFile("rafaelia_session_", ".zrf", getCacheDir());
                 try {
                     lastZrf = SessionContainerWriter.wrapRawPcmAsZrf(
                             input, zrf, sampleRate, channels);
@@ -718,10 +741,15 @@ public final class MainActivity extends Activity {
                 }
 
                 publishOutput(outputUri);
-                lastOutput = outputUri;
-                lastMasteredPcm = result.pcmFile;
-                lastMasteredRate = sampleRate;
-                lastMasteredChannels = channels;
+                final Uri publishedUri = outputUri;
+                final File completeMaster = result.pcmFile;
+                committed = true;
+                runOnUiThread(() -> {
+                    lastOutput = publishedUri;
+                    lastMasteredPcm = completeMaster;
+                    lastMasteredRate = sampleRate;
+                    lastMasteredChannels = channels;
+                });
 
                 int gainPct = (int) ((result.gainQ30 * 100L) >> 30);
                 long fullScaleQ16 = 32768L << 16;
@@ -744,14 +772,22 @@ public final class MainActivity extends Activity {
                             "\nOgg/Opus=" + finalOutputUri +
                             "\nEXTERNAL_STANDARD_AUDIT=NOT_AUDITED");
                 });
-            } catch (Exception e) {
-                if (outputUri != null) {
-                    getContentResolver().delete(outputUri, null, null);
+                } catch (Exception e) {
+                    if (outputUri != null) {
+                        getContentResolver().delete(outputUri, null, null);
+                    }
+                    runOnUiThread(() ->
+                            status.setText("Pipeline failed · " + e.getMessage()));
+                } finally {
+                    if (!committed && mastered != null) mastered.delete();
+                    if ("imported audio".equals(origin) && input != null) input.delete();
+                    processingRunning.set(false);
                 }
-                runOnUiThread(() ->
-                        status.setText("Pipeline failed · " + e.getMessage()));
-            }
-        }, "rafaelia-mastering").start();
+            }, "rafaelia-mastering").start();
+        } catch (RuntimeException e) {
+            processingRunning.set(false);
+            status.setText("MASTER_START_FAILED — " + e.getClass().getSimpleName());
+        }
     }
 
     private void playMaster() {
@@ -885,7 +921,7 @@ public final class MainActivity extends Activity {
 
             new Thread(() -> {
                 try {
-                    File pcm = new File(getCacheDir(), "rafaelia_imported.pcm");
+                    File pcm = File.createTempFile("rafaelia_imported_", ".pcm", getCacheDir());
                     AudioPipeline.DecodedAudio decoded =
                             AudioPipeline.decodeToPcm(this, uri, pcm);
                     runOnUiThread(() -> runPipelineFromPcm(
