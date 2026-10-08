@@ -69,6 +69,7 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
     private long lastAccelNanos;
     private long gpsFixElapsedMs = -1;
     private String acoustic = "TOKEN_VAZIO_NOT_CALIBRATED_HERE";
+    private String dSimulation = "NOT_RUN_SYNTHETIC";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -91,6 +92,12 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
         Button mic = button("Amostrar espectro local (microfone, 4096 amostras)");
         mic.setOnClickListener(v -> sampleMic());
         root.addView(mic);
+        Button simulateD = button("Experimento D · simular (sem sensores / radio)");
+        simulateD.setOnClickListener(v -> {
+            dSimulation = WaveLabDSimulator.compareForReceipt();
+            show();
+        });
+        root.addView(simulateD);
         Button export = button("Salvar observacoes em ZIPRAF");
         export.setOnClickListener(v -> exportZipraf());
         root.addView(export);
@@ -351,6 +358,7 @@ public final class WavePhysicsLabActivity extends Activity implements SensorEven
                 + "spectral_bins_relative_dbfs=" + bands + "\n"
                 + "audio_observation_epoch_ms=" + recordTime + "\n"
                 + "acoustic=" + acoustic + "\n"
+                + "d_simulation=" + dSimulation + "\n"
                 + "echo_direction=TOKEN_VAZIO_MONO_UNDERDETERMINED\n"
                 + "range_m=TOKEN_VAZIO_UNCALIBRATED_IO_LATENCY\n"
                 + "gnss_cn0=TOKEN_VAZIO_NOT_MEASURED\n"
