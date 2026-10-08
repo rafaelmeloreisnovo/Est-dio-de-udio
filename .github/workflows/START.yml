@@ -216,7 +216,9 @@ jobs:
 
   provider_bootstrap:
     name: 05 · provider / bootstrap (owner-only manual)
-    if: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'rafaelmeloreisnovo' && github.ref == 'refs/heads/main' && needs.plan.outputs.delivery == 'provider-bootstrap' }}
+    # Manual provider-bootstrap deliberately skips the build gate; always() is
+    # required to evaluate this job when its dependency gate is skipped.
+    if: ${{ always() && needs.plan.result == 'success' && needs.gate.result == 'skipped' && github.event_name == 'workflow_dispatch' && github.actor == 'rafaelmeloreisnovo' && github.ref == 'refs/heads/main' && needs.plan.outputs.delivery == 'provider-bootstrap' }}
     needs:
       - plan
       - gate
