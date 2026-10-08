@@ -22,6 +22,21 @@ grep -Fq 'RELEASE_ELIGIBLE=false' "$wf" || fail 'FAST_RELEASE_BYPASS'
 grep -Fq 'github.actor == '\''rafaelmeloreisnovo'\''' "$wf" || fail 'PROVIDER_OWNER_GATE_REGRESSION'
 grep -Fq "needs.plan.outputs.delivery == 'provider-bootstrap'" "$wf" || fail 'MANUAL_ADMIN_REGRESSION'
 
+# Full APK delivery is bounded to successful same-job provenance and receipt,
+# without publishing a public release from an unprotected main branch.
+upload_pin='actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+test "$(grep -Fc "uses: $upload_pin" "$wf")" -eq 2 || fail 'APK_DOWNLOAD_PIN_OR_COUNT_REGRESSION'
+grep -Fq 'archive: false' "$wf" || fail 'APK_DIRECT_DOWNLOAD_NOT_CONFIGURED'
+grep -Fq 'if-no-files-found: error' "$wf" || fail 'APK_MISSING_NOT_FAIL_CLOSED'
+awk '
+  /^  gate:/ { gate=1; next }
+  gate && /^  [a-z_]+:/ { gate=0 }
+  gate && /- name: 80 · binary receipt/ { receipt=NR }
+  gate && /- name: 83 · upload exact APK/ { upload=NR }
+  gate && /- name: 84 · upload binary custody receipts/ { custody=NR }
+  END { exit !(receipt > 0 && upload > receipt && custody > upload) }
+' "$wf" || fail 'APK_UPLOAD_BEFORE_RECEIPT_OR_OUTSIDE_FULL_GATE'
+
 # No SDK/Gradle/distribution run is executed by the fast entry point.
 if grep -nE '^([^#]*)(sdkmanager|gradle[[:space:]]+:app|rafaelia-pipeline.sh[[:space:]]+bootstrap|publish-live|publish-signed|distribution-release.sh)' "$quick"; then
   fail 'FAST_REINTRODUCED_HEAVY_TOOLCHAIN_OR_DELIVERY'
