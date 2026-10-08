@@ -66,6 +66,8 @@ quality() {
 
   # Same Java session gate used in the APK; exercise contention without Android runtime.
   bash ci/audio-session-gate.sh
+  # Exercise the exact low-level ZIPRAF serializer and compatibility oracle.
+  bash ci/zipraf-lowlevel-gate.sh
   # Exercise fail-closed authority/target checks without any real GitHub mutation.
   bash ci/test-provider-preflight.sh
 

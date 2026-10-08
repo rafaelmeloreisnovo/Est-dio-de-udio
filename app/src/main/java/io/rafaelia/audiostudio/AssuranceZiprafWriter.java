@@ -12,17 +12,11 @@ import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.zip.CRC32;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 /**
  * Builds a bounded ZIPRAF evidence package from one real in-app execution.
@@ -128,7 +122,7 @@ final class AssuranceZiprafWriter {
                 provenanceResolved);
 
         final int relationCount = 9;
-        final TreeMap<String, byte[]> entries = new TreeMap<>();
+        final RfaOrderedEntries entries = new RfaOrderedEntries();
 
         put(entries, "00_manifest.json", manifestJson(
                 generatedEpochMs, rawEvidence.displayName, rawEvidenceSha,
@@ -157,13 +151,13 @@ final class AssuranceZiprafWriter {
                 generatedEpochMs, materializedCount,
                 embeddedArtifactCount, referencedArtifactCount,
                 relationCount, gapCount, starState, authorialSigningResolved));
-        entries.put("80_raw/evidence.txt", rawEvidenceBytes);
+        entries.add("80_raw/evidence.txt", rawEvidenceBytes);
 
         StringBuilder sums = new StringBuilder(4096);
-        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-            sums.append(sha256Bytes(entry.getValue()))
+        for (int i = 0; i < entries.size(); ++i) {
+            sums.append(sha256Bytes(entries.bytesAt(i)))
                     .append("  ")
-                    .append(entry.getKey())
+                    .append(entries.nameAt(i))
                     .append(NL);
         }
         put(entries, "99_SHA256SUMS.txt", sums.toString());
@@ -184,12 +178,13 @@ final class AssuranceZiprafWriter {
         boolean success = false;
         try (OutputStream raw = context.getContentResolver().openOutputStream(uri, "w")) {
             if (raw == null) throw new IllegalStateException("ZIPRAF output stream unavailable");
-            try (ZipOutputStream zip = new ZipOutputStream(raw)) {
-                for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-                    writeStoredEntry(zip, entry.getKey(), entry.getValue());
-                }
-                zip.finish();
+            // No java.util.zip runtime: exact ZIP32 STORED bytes + CRC32 are
+            // serialized by the project-owned low-level implementation.
+            RfaStoredZip zip = new RfaStoredZip(raw);
+            for (int i = 0; i < entries.size(); ++i) {
+                zip.add(entries.nameAt(i), entries.bytesAt(i));
             }
+            zip.finish();
             success = true;
         } finally {
             if (success) {
@@ -513,35 +508,29 @@ final class AssuranceZiprafWriter {
         return false;
     }
 
-    private static void put(TreeMap<String, byte[]> entries, String name, String text) {
-        entries.put(name, text.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static void writeStoredEntry(
-            ZipOutputStream zip, String name, byte[] bytes) throws Exception {
-        CRC32 crc = new CRC32();
-        crc.update(bytes, 0, bytes.length);
-        ZipEntry entry = new ZipEntry(name);
-        entry.setMethod(ZipEntry.STORED);
-        entry.setSize(bytes.length);
-        entry.setCompressedSize(bytes.length);
-        entry.setCrc(crc.getValue());
-        entry.setTime(0L);
-        zip.putNextEntry(entry);
-        zip.write(bytes);
-        zip.closeEntry();
+    private static void put(RfaOrderedEntries entries, String name, String text) {
+        entries.add(name, text.getBytes(StandardCharsets.UTF_8));
     }
 
     private static byte[] readUriBytes(Context context, Uri uri) throws Exception {
         try (InputStream in = context.getContentResolver().openInputStream(uri)) {
             if (in == null) throw new IllegalStateException("raw evidence stream unavailable");
-            ByteArrayOutputStream out = new ByteArrayOutputStream(16384);
+            RfaBoundedBytes out = new RfaBoundedBytes(RfaStoredZip.MAX_ENTRY_BYTES);
             byte[] buffer = new byte[8192];
-            int n;
-            while ((n = in.read(buffer)) >= 0) {
-                if (n > 0) out.write(buffer, 0, n);
+            int zeroReads = 0;
+            while (true) {
+                int n = in.read(buffer);
+                if (n < 0) break;
+                if (n == 0) {
+                    if (++zeroReads >= 16) {
+                        throw new java.io.IOException("RFA evidence input stalled");
+                    }
+                    continue;
+                }
+                zeroReads = 0;
+                out.append(buffer, 0, n);
             }
-            return out.toByteArray();
+            return out.exactBytes();
         }
     }
 
