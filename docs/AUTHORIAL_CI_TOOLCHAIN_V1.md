@@ -31,13 +31,20 @@ The canonical CI path no longer uses JavaScript Actions for:
 
 Those jobs are replaced with project-owned shell orchestration.
 
-The canonical workflow now permits **no external JavaScript Action**.
+The canonical workflow permits **one narrowly pinned third-party GitHub Action dependency** solely for storing a successful full build as a downloadable workflow artifact. It runs on GitHub's hosted Node 24 action execution environment. This does not add Node, JavaScript or third-party libraries to the Android APK, nor does it give the full validation job `contents: write`.
 
 ```text
-EXTERNAL_JS_ACTIONS = NONE
+EXTERNAL_JS_ACTIONS = PINNED_UPLOAD_ARTIFACT_V7_ONLY
+ACTION = actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+ACTION_VERSION = v7.0.2
+RUNTIME_BOUNDARY = HOSTED_GITHUB_CI_NODE24_ONLY
+APK_NODE_RUNTIME = 0
+APK_OUTPUT = DEBUG_NONAUTHORIAL, directly downloadable from full GitHub Actions run
+APK_RECEIPTS = binary-origin + per-entry SHA-256, separate retained artifact
+RETENTION = 14 days (subject to provider policy)
 ```
 
-Successful main builds publish the debug APK through the runner-provided GitHub CLI as a traceable prerelease. `gh` remains an external GitHub platform tool and is not reclassified as project-authored.
+The uploader is owned by GitHub's `actions` organization, not the project; its source/license and immutable pin require review as an external component. The purpose is to retain bytes that were formerly deleted with the runner. No project-authored drop-in equivalent is claimed; replacement would require a supported and audited artifact transport. The existing `gh` transport remains the separately authorized **manual** `workflow_dispatch mode=live-debug` prerelease route. An ordinary main push does not automatically publish a GitHub Release, and branch protection P0 remains independent.
 
 ## Checkout
 
@@ -89,13 +96,13 @@ A mismatch fails closed.
 
 The workflow scans all workflow `uses:` entries.
 
-Permitted external JavaScript Action set:
+Permitted external JavaScript Action set (immutable SHA, exactly two invocations in full gate):
 
 ```text
-{}
+{actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9}
 ```
 
-Any external Action fails the gate.
+All other external Actions or a changed SHA fail the topology gate. Contract tests bind upload after reproducibility, installability and binary receipt. Rollback: revert the hotfix PR to restore no external Actions and no automatic artifact retention.
 
 Local reusable workflows remain allowed.
 
