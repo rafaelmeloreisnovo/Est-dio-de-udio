@@ -1,5 +1,7 @@
 # START HERE — Rafaelia Audio Studio
 
+> **Latest P0 operations (2026-10-08):** [Provider enforcement + audio session + freestanding hardening](ROADMAPS_IA_HUMANOS/P0_PROVIDER_AUDIO_FREESTANDING_HOTFIX_20261008.md). This is a change-route memo; its CI and physical gates remain separate from historical executed receipts below.
+
 ## 1. What this is
 
 Rafaelia Audio Studio is an Android audio workstation and measurement research platform with a narrow Android edge and authorial fixed-point freestanding C cores.
