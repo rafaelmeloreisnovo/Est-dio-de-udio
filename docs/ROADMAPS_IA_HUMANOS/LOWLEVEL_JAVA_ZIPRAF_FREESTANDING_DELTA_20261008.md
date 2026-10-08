@@ -21,6 +21,7 @@ This delta removes a genuine high-value hosted-library dependency from the evide
 | Evidence bytes | `ByteArrayOutputStream` | `RfaBoundedBytes` | cap 8 MiB per entry |
 | Maximum archive | no dedicated project limit | 64 MiB total / 32 entries | fail-closed |
 | ZIP path | library default | ASCII [A-Za-z0-9_./-] without traversal | fixed ZIPRAF names |
+| Sorted entry collection | `TreeMap<String, byte[]>` + `Map.Entry` | `RfaOrderedEntries` fixed 32-slot arrays with insert-sort | no `TreeMap` / `Map` in ZIP writer |
 | Storage | Android `MediaStore` | **retained** | indispensable platform I/O |
 | SHA256 | authorial `LowSha256` | **retained** | no provider dependency |
 | DSP | C freestanding + shared JNI edge | **unchanged** | no DSP implementation duplication |
@@ -35,7 +36,7 @@ The new ZIP archive uses fixed DOS timestamp `1980-01-01 00:00:00`; this differs
 → Android sensor/raw evidence collection [hosted]
 → RfaBoundedBytes [project-owned primitive-copy, bounded]
 → LowSha256 [project-owned]
-→ canonical name-sorted entry map
+→ RfaOrderedEntries (fixed 32-slot sorted arrays)
 → RfaStoredZip.add(name, bytes)
      - validate ASCII name, duplicate, counts, size
      - bitwise CRC32 per byte
@@ -53,8 +54,9 @@ CI quality gate `ci/zipraf-lowlevel-gate.sh` compiles with `javac` and executes:
 - deterministic archive byte identity for repeated identical inputs;
 - `CRC32("")=0` and `CRC32("123456789")=0xCBF43926` known-answer tests;
 - `java.util.zip.ZipFile` **test-only** reader, verifying names, stored method, size, CRC and full extracted entry bytes;
+- test-only JDK CRC32 oracle versus authorial bitwise CRC32 on deterministic pseudo-random 32 KiB payload; sorted insertion and duplicate rejection in the fixed array table;
 - negative cases: parent traversal, leading slash, backslash, non-ASCII, double slash, duplicate entry, >8 MiB data, >32 entries, write after finish, bounded buffer overflow/invalid slice;
-- source-level gate rejecting `java.util.zip` and `ByteArrayOutputStream` imports from shipped Java.
+- source-level gate rejecting `java.util.zip` and `ByteArrayOutputStream` imports from shipped Java, and `java.util.Map/TreeMap` from ZIPRAF writer.
 
 This is an initial deterministic host compatibility oracle. An independent ZIP parser/unzip implementation, streaming stress on a physical Android device and ZIPRAF readback receipts should be performed separately.
 
