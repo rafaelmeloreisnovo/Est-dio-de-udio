@@ -45,11 +45,23 @@ cat > "${RUNNER_TEMP:-/tmp}/rafaelia-main-protection.json" <<'JSON'
 }
 JSON
 
-gh api \
-  --method PUT \
-  -H 'Accept: application/vnd.github+json' \
-  "repos/$repo/branches/main/protection" \
-  --input "${RUNNER_TEMP:-/tmp}/rafaelia-main-protection.json" >/dev/null
+# Do not overwrite an existing policy: PUT with null reviews/restrictions
+# would otherwise silently remove stronger human/admin protection.
+already_protected="$(gh api "repos/$repo/branches/main" --jq '.protected')"
+case "$already_protected" in
+  false)
+    gh api \
+      --method PUT \
+      -H 'Accept: application/vnd.github+json' \
+      "repos/$repo/branches/main/protection" \
+      --input "${RUNNER_TEMP:-/tmp}/rafaelia-main-protection.json" >/dev/null
+    printf 'PROVIDER_PROTECTION_MUTATION=INITIALIZE_UNPROTECTED_MAIN\n'
+    ;;
+  true)
+    printf 'PROVIDER_PROTECTION_MUTATION=SKIPPED_ALREADY_PROTECTED\n'
+    ;;
+  *) fail "PROVIDER_MAIN_PROTECTED_STATE=TOKEN_VAZIO" ;;
+esac
 
 for environment in signed-release google-play github-pages; do
   printf '{}' | gh api \
