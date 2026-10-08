@@ -1,5 +1,7 @@
 # START HERE — Rafaelia Audio Studio
 
+> **Java low-level / ZIPRAF (2026-10-08):** [Authorial ZIP32 serializer, CRC32, bounded byte path and interoperability gates](ROADMAPS_IA_HUMANOS/LOWLEVEL_JAVA_ZIPRAF_FREESTANDING_DELTA_20261008.md). This source delta does not replace required APK CI, provider enforcement or physical-device receipts.
+
 > **Latest P0 operations (2026-10-08):** [Provider enforcement + audio session + freestanding hardening](ROADMAPS_IA_HUMANOS/P0_PROVIDER_AUDIO_FREESTANDING_HOTFIX_20261008.md). This is a change-route memo; its CI and physical gates remain separate from historical executed receipts below.
 
 ## 1. What this is
