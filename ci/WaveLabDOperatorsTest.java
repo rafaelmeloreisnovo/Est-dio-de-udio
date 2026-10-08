@@ -107,6 +107,21 @@ final class WaveLabDOperatorsTest {
                 "positive diffusion smooths synthetic contrast");
         require(Math.abs(grow[0]-grow[1])>1.0,
                 "negative diffusion amplifies synthetic contrast");
+        double[] varying=WaveLabDOperators.twoNodeStepNonuniform(2,5,0.1,0.2);
+        double[] reindexed=WaveLabDOperators.twoNodeStepNonuniform(5,2,0.2,0.1);
+        near(varying[0],reindexed[1],1e-12,
+                "state and coefficient permutation covariance left");
+        near(varying[1],reindexed[0],1e-12,
+                "state and coefficient permutation covariance right");
+        double[] mismatch=WaveLabDOperators.twoNodeStepNonuniform(5,2,0.1,0.2);
+        require(Math.abs(varying[0]-mismatch[1])>1e-4,
+                "changing state ordering alone breaks covariance");
+        double[] backward=WaveLabDOperators.inverseTwoNodeStep(
+                varying[0],varying[1],0.1,0.2);
+        near(backward[0],2,1e-12,"invertible two-node D operator left");
+        near(backward[1],5,1e-12,"invertible two-node D operator right");
+        require(WaveLabDOperators.inverseTwoNodeStep(2.5,2.5,0.5,0.5)==null,
+                "singular D matrix has no unique reverse");
         System.out.println("WaveLabDOperatorsTest PASS: " + checks + " host assertions");
     }
 }
