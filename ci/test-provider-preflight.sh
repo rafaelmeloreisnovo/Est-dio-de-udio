@@ -11,6 +11,7 @@ test -s "$workflow" && test -s "$bootstrap" || fail 'SOURCE_MISSING'
 # Verify manual owner-only capability in the *active* pipeline.
 grep -Fq "github.event_name == 'workflow_dispatch' && github.actor == 'rafaelmeloreisnovo' && github.ref == 'refs/heads/main' && needs.plan.outputs.delivery == 'provider-bootstrap'" "$workflow" || fail 'ADMIN_JOB_NOT_OWNER_BOUND'
 grep -Fq 'RFA_PROVIDER_ADMIN_TOKEN: ${{ secrets.PAT_ENVIRONMENTS }}' "$workflow" || fail 'DEDICATED_PAT_MISSING'
+grep -Fq 'name: provider-admin' "$workflow" || fail 'PROVIDER_ENVIRONMENT_NOT_SEPARATED'
 if grep -Eq 'secrets.PAT_ACTIONS|secrets.PAT_ENV[[:space:]]*\|\|' "$workflow"; then
   fail 'ADMIN_OR_RELEASE_USES_CROSS_CAPABILITY_PAT_FALLBACK'
 fi
