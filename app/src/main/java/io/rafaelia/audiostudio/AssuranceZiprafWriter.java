@@ -17,8 +17,6 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Builds a bounded ZIPRAF evidence package from one real in-app execution.
@@ -124,7 +122,7 @@ final class AssuranceZiprafWriter {
                 provenanceResolved);
 
         final int relationCount = 9;
-        final TreeMap<String, byte[]> entries = new TreeMap<>();
+        final RfaOrderedEntries entries = new RfaOrderedEntries();
 
         put(entries, "00_manifest.json", manifestJson(
                 generatedEpochMs, rawEvidence.displayName, rawEvidenceSha,
@@ -153,13 +151,13 @@ final class AssuranceZiprafWriter {
                 generatedEpochMs, materializedCount,
                 embeddedArtifactCount, referencedArtifactCount,
                 relationCount, gapCount, starState, authorialSigningResolved));
-        entries.put("80_raw/evidence.txt", rawEvidenceBytes);
+        entries.add("80_raw/evidence.txt", rawEvidenceBytes);
 
         StringBuilder sums = new StringBuilder(4096);
-        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-            sums.append(sha256Bytes(entry.getValue()))
+        for (int i = 0; i < entries.size(); ++i) {
+            sums.append(sha256Bytes(entries.bytesAt(i)))
                     .append("  ")
-                    .append(entry.getKey())
+                    .append(entries.nameAt(i))
                     .append(NL);
         }
         put(entries, "99_SHA256SUMS.txt", sums.toString());
@@ -183,8 +181,8 @@ final class AssuranceZiprafWriter {
             // No java.util.zip runtime: exact ZIP32 STORED bytes + CRC32 are
             // serialized by the project-owned low-level implementation.
             RfaStoredZip zip = new RfaStoredZip(raw);
-            for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-                zip.add(entry.getKey(), entry.getValue());
+            for (int i = 0; i < entries.size(); ++i) {
+                zip.add(entries.nameAt(i), entries.bytesAt(i));
             }
             zip.finish();
             success = true;
@@ -510,8 +508,8 @@ final class AssuranceZiprafWriter {
         return false;
     }
 
-    private static void put(TreeMap<String, byte[]> entries, String name, String text) {
-        entries.put(name, text.getBytes(StandardCharsets.UTF_8));
+    private static void put(RfaOrderedEntries entries, String name, String text) {
+        entries.add(name, text.getBytes(StandardCharsets.UTF_8));
     }
 
     private static byte[] readUriBytes(Context context, Uri uri) throws Exception {
