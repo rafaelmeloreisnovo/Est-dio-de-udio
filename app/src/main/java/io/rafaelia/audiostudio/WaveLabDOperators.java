@@ -103,6 +103,31 @@ final class WaveLabDOperators {
         return Double.isFinite(out) ? out : Double.NaN;
     }
 
+    /** Dimensionless signed-log for signed/negative D, with known positive scale. */
+    static double signedLog1p(double d, double scale) {
+        if (!finite(d,scale) || !(scale>0.0)) return Double.NaN;
+        return Math.copySign(Math.log1p(Math.abs(d)/scale),d);
+    }
+
+    /** Inverse of signedLog1p; do not confuse with natural log of negative D. */
+    static double inverseSignedLog1p(double transformed, double scale) {
+        if (!finite(transformed,scale) || !(scale>0.0)) return Double.NaN;
+        double result=Math.copySign(scale*Math.expm1(Math.abs(transformed)),transformed);
+        return Double.isFinite(result) ? result : Double.NaN;
+    }
+
+    /** Log-log of a dimensionless positive ratio x/scale strictly above 1. */
+    static double logLogRatio(double x,double scale) {
+        if (!finite(x,scale) || !(scale>0.0) || !(x/scale>1.0))
+            return Double.NaN;
+        return Math.log(Math.log(x/scale));
+    }
+    static double inverseLogLogRatio(double transformed,double scale) {
+        if (!finite(transformed,scale) || !(scale>0.0)) return Double.NaN;
+        double x=scale*Math.exp(Math.exp(transformed));
+        return Double.isFinite(x) ? x : Double.NaN;
+    }
+
     /** Discrete derivative; reconstruct with start and increments, not indefinite integral. */
     static double[] discreteDifferences(double[] series) {
         if (series == null || series.length < 1) return null;
@@ -176,6 +201,29 @@ final class WaveLabDOperators {
     static double quadraticDeficit(double A,double B,double C) {
         if (!finite(A,B,C) || A==0.0) return Double.NaN;
         return -(B*B-4.0*A*C)/(4.0*A);
+    }
+
+    /** Partial dD_Q/dB at fixed A,C. */
+    static double dQuadraticDeficitDB(double A,double B) {
+        if (!finite(A,B) || A==0.0) return Double.NaN;
+        return -B/(2.0*A);
+    }
+
+    /** Primitive of D_Q wrt B at fixed A,C, with C=0 integration constant. */
+    static double primitiveQuadraticDeficitB(double A,double B,double C) {
+        if (!finite(A,B,C) || A==0.0) return Double.NaN;
+        return C*B - (B*B*B)/(12.0*A);
+    }
+
+    /**
+     * Principal nonnegative B for fixed A,C,D_Q. The negative branch -B is
+     * equally valid when B>0; this is NOT a globally unique inverse.
+     */
+    static double inverseQuadraticDeficitBPrincipal(double A,double C,double deficit) {
+        if (!finite(A,C,deficit) || A==0.0) return Double.NaN;
+        double square=4.0*A*(C-deficit);
+        return square>=0.0 && Double.isFinite(square) ? Math.sqrt(square)
+                : Double.NaN;
     }
 
     /**
