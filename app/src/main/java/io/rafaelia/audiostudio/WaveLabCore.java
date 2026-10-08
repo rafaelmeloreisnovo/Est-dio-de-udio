@@ -14,7 +14,7 @@ final class WaveLabCore {
     static double relativeDbfs(short[] samples, int n, int hz) {
         if (samples == null || n < 64 || n > samples.length ||
                 hz <= 0 || hz >= SAMPLE_RATE / 2) return Double.NaN;
-        int k = (int) Math.round((double) n * hz / SAMPLE_RATE);
+        double k = (double) n * hz / SAMPLE_RATE;
         if (k <= 0 || k >= n / 2) return Double.NaN;
         double w = 2.0 * Math.PI * k / n;
         double coefficient = 2.0 * Math.cos(w);
