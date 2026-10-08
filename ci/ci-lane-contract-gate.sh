@@ -27,6 +27,19 @@ if grep -nE '^([^#]*)(sdkmanager|gradle[[:space:]]+:app|rafaelia-pipeline.sh[[:s
   fail 'FAST_REINTRODUCED_HEAVY_TOOLCHAIN_OR_DELIVERY'
 fi
 grep -Fq 'FAST_APK_AND_ABI_CROSS_BUILD=NOT_RUN' "$quick" || fail 'FAST_CROSSABI_BOUNDARY_MISSING'
+
+# Signed delivery must load the exact source before running the repository-owned
+# enforcement script, and must still enforce before any signing/bootstrap.
+awk '
+  /^  deliver_signed:/ { signed=1; next }
+  signed && /^  [a-z_]+:/ { signed=0 }
+  signed && /- name: Exact checkout for signed delivery/ { checkout=NR }
+  signed && /- name: Provider enforcement gate/ { enforce=NR }
+  signed && /- name: Signing capability bootstrap/ { bootstrap=NR }
+  END { exit !(checkout > 0 && enforce > checkout && bootstrap > enforce) }
+' "$wf" || fail 'SIGNED_ENFORCEMENT_ORDER_REGRESSION'
+test -s ci/provider-enforcement-gate.sh || fail 'SIGNED_ENFORCEMENT_SOURCE_MISSING'
+
 printf 'CI_LANE_ROUTING=PASS_SOURCE_CONTRACT\n'
 printf 'FAST_IS_NOT_FULL_BUILD=PASS_CLAIM_CONTRACT\n'
 printf 'P0_PROVIDER_BOOTSTRAP=UNCHANGED_OWNER_ONLY\n'
